@@ -50,6 +50,8 @@ Add your local credentials to `.env.local`. Never commit this file.
 
 Optional: `AI_MODEL` defaults to `openai/gpt-5.6-luna`; `AI_GATEWAY_API_KEY` is needed only when Vercel OIDC is unavailable.
 
+The browser simulator is disabled by default. Set `ENABLE_SIMULATOR=true` only when public testing is intentional; the route also applies a basic per-instance request limit.
+
 ## Meta webhook setup
 
 Use this callback URL in the Meta developer dashboard:
@@ -75,4 +77,3 @@ npm run typecheck
 npm test
 npm run build
 ```
-

@@ -13,10 +13,10 @@ export function getSetupState() {
   return {
     database: process.env.DATABASE_URL ? "postgres" as const : "memory" as const,
     aiConfigured,
+    simulatorEnabled: aiConfigured && process.env.ENABLE_SIMULATOR === "true",
     model: process.env.AI_MODEL || "openai/gpt-5.6-luna",
     whatsappConfigured: missingWhatsApp.length === 0,
     missingWhatsApp,
     adminConfigured: Boolean(process.env.ADMIN_PASSWORD && process.env.SESSION_SECRET)
   };
 }
-

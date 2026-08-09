@@ -2,6 +2,8 @@ import Link from "next/link";
 import { TestChat } from "@/components/test-chat";
 import { getSetupState } from "@/lib/env";
 
+export const dynamic = "force-dynamic";
+
 export default function Home() {
   const setup = getSetupState();
   return (
@@ -48,9 +50,9 @@ export default function Home() {
             <span className="kicker">Conversation simulator</span>
             <h2>See how the assistant responds.</h2>
             <p>Use the test chat before connecting the Meta WhatsApp webhook. Test leads appear in the admin dashboard.</p>
-            {!setup.aiConfigured && <div className="notice"><strong>AI setup required</strong><span>Deploy on Vercel or add an AI Gateway key to enable live replies.</span></div>}
+            {!setup.simulatorEnabled && <div className="notice"><strong>Simulator disabled</strong><span>Set ENABLE_SIMULATOR=true after AI Gateway is configured to enable public test replies.</span></div>}
           </div>
-          <TestChat enabled={setup.aiConfigured} />
+          <TestChat enabled={setup.simulatorEnabled} />
         </div>
       </section>
 
@@ -58,4 +60,3 @@ export default function Home() {
     </main>
   );
 }
-
