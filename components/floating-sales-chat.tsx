@@ -13,7 +13,7 @@ const welcome: WidgetMessage = {
 };
 
 const suggestions = ["Pa Gym pricing", "Research proposal support", "Data analysis"] as const;
-const MEDMINDS_WHATSAPP = "260977259132";
+const MEDMINDS_WHATSAPP = "260762402042";
 
 function now() {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
