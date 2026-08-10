@@ -32,7 +32,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
     inputSchema: z.object({ category: z.string().max(80).optional() }),
     execute: async ({ category }) => {
       const offers = (await listOffers(true)).filter((offer) => !category || offer.category.toLowerCase().includes(category.toLowerCase()));
-      return offers.length ? offers.map(({ name, category: offerCategory, description, features, priceZmw, paymentInstructions }) => ({ name, category: offerCategory, description, features, priceZmw, paymentInstructions })) : { available: false, instruction: "No verified active offer matches this request. Do not guess. Arrange human confirmation." };
+      return offers.length ? offers.map(({ name, category: offerCategory, description, features, priceZmw, rushPriceZmw, paymentInstructions }) => ({ name, category: offerCategory, description, features, standardPriceZmw: priceZmw, rushPriceZmw, paymentInstructions })) : { available: false, instruction: "No verified active offer matches this request. Do not guess. Arrange human confirmation." };
     }
   });
 
@@ -55,7 +55,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const transcript = [...history, ...(latestStored ? [] : [{ role: "user" as const, content: text }])]
     .map((message) => `${message.role === "user" ? "Client" : "Agent"}: ${message.content}`).join("\n");
   const result = await agent.generate({ prompt: `Conversation including the client's latest message:\n${transcript}\n\nReply only with the WhatsApp message to send.` });
-  const reply = result.text.trim() || "I'll refer this to a member of the MedMinds team so they can assist you properly.";
+  const reply = (result.text.trim() || "I'll refer this to a member of the MedMinds team so they can assist you properly.").replaceAll("—", ",");
   await addMessage(phone, "assistant", reply);
   return reply;
 }

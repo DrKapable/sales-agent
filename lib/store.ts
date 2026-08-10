@@ -1,4 +1,5 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { offerSeeds } from "@/lib/catalogue";
 import type { ConversationMessage, Lead, LeadPatch, Offer } from "@/lib/types";
 
 type MemoryStore = {
@@ -7,12 +8,7 @@ type MemoryStore = {
   offers: Map<string, Offer>;
 };
 
-const offerSeeds: Omit<Offer, "id" | "updatedAt">[] = [
-  { slug: "pa-gym", name: "Pa Gym", category: "Learning", description: "Exam-focused clinical learning and revision support.", features: ["Structured revision", "Practice support", "Digital access"], priceZmw: null, paymentInstructions: null, active: false },
-  { slug: "research-support", name: "Research Support", category: "Research", description: "Structured support for proposals, dissertations and manuscripts.", features: ["Project scoping", "Academic support", "Progress tracking"], priceZmw: null, paymentInstructions: null, active: false },
-  { slug: "data-analysis", name: "Data Analysis", category: "Research", description: "Data cleaning, statistical analysis and results reporting.", features: ["Data cleaning", "Statistical analysis", "Results support"], priceZmw: null, paymentInstructions: null, active: false },
-  { slug: "tutorials", name: "Tutorials and Courses", category: "Learning", description: "Focused tutorials matched to the learner's programme and goal.", features: ["Focused teaching", "Exam preparation", "Flexible learning"], priceZmw: null, paymentInstructions: null, active: false }
-];
+const CATALOGUE_VERSION = 1;
 
 declare global {
   var __medmindsMemoryStore: MemoryStore | undefined;
@@ -57,13 +53,19 @@ async function ensureDatabase() {
     await db.query(`CREATE TABLE IF NOT EXISTS offers (
       id UUID PRIMARY KEY, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL, category TEXT NOT NULL,
       description TEXT NOT NULL, features JSONB NOT NULL DEFAULT '[]', price_zmw NUMERIC,
-      payment_instructions TEXT, active BOOLEAN NOT NULL DEFAULT FALSE, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      rush_price_zmw NUMERIC, payment_instructions TEXT, active BOOLEAN NOT NULL DEFAULT FALSE,
+      catalogue_version INTEGER NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+    await db.query(`ALTER TABLE offers ADD COLUMN IF NOT EXISTS rush_price_zmw NUMERIC`);
+    await db.query(`ALTER TABLE offers ADD COLUMN IF NOT EXISTS catalogue_version INTEGER NOT NULL DEFAULT 0`);
     for (const offer of offerSeeds) {
       await db.query(
-        `INSERT INTO offers (id, slug, name, category, description, features, price_zmw, payment_instructions, active)
-         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9) ON CONFLICT (slug) DO NOTHING`,
-        [crypto.randomUUID(), offer.slug, offer.name, offer.category, offer.description, JSON.stringify(offer.features), offer.priceZmw, offer.paymentInstructions, offer.active]
+        `INSERT INTO offers (id, slug, name, category, description, features, price_zmw, rush_price_zmw, payment_instructions, active, catalogue_version)
+         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11)
+         ON CONFLICT (slug) DO UPDATE SET name=$3,category=$4,description=$5,features=$6::jsonb,
+         price_zmw=$7,rush_price_zmw=$8,payment_instructions=$9,active=$10,catalogue_version=$11,updated_at=NOW()
+         WHERE offers.catalogue_version < $11`,
+        [crypto.randomUUID(), offer.slug, offer.name, offer.category, offer.description, JSON.stringify(offer.features), offer.priceZmw, offer.rushPriceZmw, offer.paymentInstructions, offer.active, CATALOGUE_VERSION]
       );
     }
   })();
@@ -88,6 +90,7 @@ function mapOffer(row: Record<string, unknown>): Offer {
     id: String(row.id), slug: String(row.slug), name: String(row.name), category: String(row.category),
     description: String(row.description), features: Array.isArray(row.features) ? row.features.map(String) : [],
     priceZmw: row.price_zmw === null ? null : Number(row.price_zmw),
+    rushPriceZmw: row.rush_price_zmw === null ? null : Number(row.rush_price_zmw),
     paymentInstructions: row.payment_instructions ? String(row.payment_instructions) : null,
     active: Boolean(row.active), updatedAt: new Date(String(row.updated_at)).toISOString()
   };
@@ -162,10 +165,10 @@ export async function saveOffer(input: Omit<Offer, "id" | "updatedAt">): Promise
     memory.offers.set(input.slug, offer);
     return offer;
   }
-  const rows = await db.query(`INSERT INTO offers (id,slug,name,category,description,features,price_zmw,payment_instructions,active)
-    VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9) ON CONFLICT (slug) DO UPDATE SET name=$3,category=$4,description=$5,
-    features=$6::jsonb,price_zmw=$7,payment_instructions=$8,active=$9,updated_at=NOW() RETURNING *`,
-    [crypto.randomUUID(), input.slug, input.name, input.category, input.description, JSON.stringify(input.features), input.priceZmw, input.paymentInstructions, input.active]);
+  const rows = await db.query(`INSERT INTO offers (id,slug,name,category,description,features,price_zmw,rush_price_zmw,payment_instructions,active)
+    VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10) ON CONFLICT (slug) DO UPDATE SET name=$3,category=$4,description=$5,
+    features=$6::jsonb,price_zmw=$7,rush_price_zmw=$8,payment_instructions=$9,active=$10,updated_at=NOW() RETURNING *`,
+    [crypto.randomUUID(), input.slug, input.name, input.category, input.description, JSON.stringify(input.features), input.priceZmw, input.rushPriceZmw, input.paymentInstructions, input.active]);
   return mapOffer(rows[0] as Record<string, unknown>);
 }
 
@@ -176,4 +179,3 @@ export async function listLeads(): Promise<Lead[]> {
   const rows = await db.query(`SELECT * FROM leads ORDER BY updated_at DESC LIMIT 200`);
   return rows.map((row) => mapLead(row as Record<string, unknown>));
 }
-
