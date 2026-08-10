@@ -13,6 +13,7 @@ const welcome: WidgetMessage = {
 };
 
 const suggestions = ["Pa Gym pricing", "Research proposal support", "Data analysis"] as const;
+const MEDMINDS_WHATSAPP = "260977259132";
 
 function now() {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -23,12 +24,25 @@ function plausibleWhatsApp(value: string) {
   return digits.length >= 9 && digits.length <= 15;
 }
 
+function plausibleName(value: string) {
+  return value.trim().length >= 2 && value.trim().length <= 120;
+}
+
+function whatsappHref(name: string) {
+  const trimmed = name.trim();
+  const text = trimmed
+    ? `Hi MedMinds, my name is ${trimmed}. I would like some assistance.`
+    : "Hi MedMinds, I would like some assistance.";
+  return `https://wa.me/${MEDMINDS_WHATSAPP}?text=${encodeURIComponent(text)}`;
+}
+
 export function FloatingSalesChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<WidgetMessage[]>([welcome]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [sessionId, setSessionId] = useState(() => `web-${crypto.randomUUID()}`);
+  const [name, setName] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [contactReady, setContactReady] = useState(false);
   const [contactError, setContactError] = useState("");
@@ -37,11 +51,11 @@ export function FloatingSalesChat() {
   useEffect(() => {
     document.body.classList.add("medmindsWidgetBody");
     document.documentElement.classList.add("medmindsWidgetHtml");
-    const saved = window.localStorage.getItem("medminds-chat-whatsapp") || "";
-    if (saved && plausibleWhatsApp(saved)) {
-      setWhatsappNumber(saved);
-      setContactReady(true);
-    }
+    const savedName = window.localStorage.getItem("medminds-chat-name") || "";
+    const savedNumber = window.localStorage.getItem("medminds-chat-whatsapp") || "";
+    if (savedName) setName(savedName);
+    if (savedNumber) setWhatsappNumber(savedNumber);
+    if (plausibleName(savedName) && plausibleWhatsApp(savedNumber)) setContactReady(true);
     return () => {
       document.body.classList.remove("medmindsWidgetBody");
       document.documentElement.classList.remove("medmindsWidgetHtml");
@@ -67,12 +81,20 @@ export function FloatingSalesChat() {
 
   function saveContact(event: FormEvent) {
     event.preventDefault();
-    const value = whatsappNumber.trim();
-    if (!plausibleWhatsApp(value)) {
-      setContactError("Enter a valid WhatsApp number, preferably with country code, for example +260...");
+    const cleanName = name.trim();
+    const cleanNumber = whatsappNumber.trim();
+    if (!plausibleName(cleanName)) {
+      setContactError("Please tell us the name you would like us to use.");
       return;
     }
-    window.localStorage.setItem("medminds-chat-whatsapp", value);
+    if (!plausibleWhatsApp(cleanNumber)) {
+      setContactError("Please enter a valid WhatsApp number, preferably with country code, for example +260...");
+      return;
+    }
+    window.localStorage.setItem("medminds-chat-name", cleanName);
+    window.localStorage.setItem("medminds-chat-whatsapp", cleanNumber);
+    setName(cleanName);
+    setWhatsappNumber(cleanNumber);
     setContactError("");
     setContactReady(true);
   }
@@ -87,7 +109,7 @@ export function FloatingSalesChat() {
       const response = await fetch("/api/public-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, whatsappNumber, message: text })
+        body: JSON.stringify({ sessionId, name, whatsappNumber, message: text })
       });
       const data = await response.json() as { reply?: string; error?: string };
       setMessages((current) => [...current, {
@@ -140,16 +162,20 @@ export function FloatingSalesChat() {
 
     {!contactReady ? <div className="widgetContactGate">
       <div className="widgetContactCard">
-        <div className="widgetContactIcon" aria-hidden="true">☎</div>
-        <h3>Your WhatsApp contact</h3>
-        <p>Share the number you use on WhatsApp. We use it only so a MedMinds team member can contact you if your enquiry needs human assistance.</p>
+        <div className="widgetContactIcon" aria-hidden="true">👋</div>
+        <h3>Before we start</h3>
+        <p>May we know your name and the WhatsApp number you use? This helps us address you properly and contact you if a team member needs to assist.</p>
         <form className="widgetContactForm" onSubmit={saveContact}>
+          <label htmlFor="medminds-name">What should we call you?</label>
+          <input id="medminds-name" type="text" autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" maxLength={120} />
           <label htmlFor="medminds-whatsapp">WhatsApp number</label>
           <input id="medminds-whatsapp" type="tel" inputMode="tel" autoComplete="tel" value={whatsappNumber} onChange={(event) => setWhatsappNumber(event.target.value)} placeholder="e.g. +260 97 123 4567" />
           {contactError ? <p className="widgetContactError">{contactError}</p> : null}
           <button type="submit">Continue to chat</button>
         </form>
-        <p className="widgetContactPrivacy">Your number is linked to this MedMinds enquiry for follow-up and escalation.</p>
+        <div className="widgetContactDivider"><span>or</span></div>
+        <a className="widgetWhatsAppOption" href={whatsappHref(name)} target="_blank" rel="noopener noreferrer">Chat on WhatsApp</a>
+        <p className="widgetContactPrivacy">Your details are used only for this MedMinds enquiry and follow-up.</p>
       </div>
     </div> : <>
       <div className="widgetMessages" aria-live="polite">
@@ -164,7 +190,11 @@ export function FloatingSalesChat() {
         <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleKeyDown} maxLength={4000} rows={1} placeholder="Type a message" aria-label="Message MedMinds" disabled={busy} />
         <button type="submit" aria-label="Send message" disabled={busy || !input.trim()}>➤</button>
       </form>
-      <div className="widgetFooter"><span>MedMinds Learning Centre</span><span>·</span><button type="button" className="widgetContactStatus" onClick={changeContact}>Change WhatsApp</button></div>
+      <div className="widgetFooter">
+        <span>MedMinds Learning Centre</span><span>·</span>
+        <button type="button" className="widgetContactStatus" onClick={changeContact}>Edit contact</button><span>·</span>
+        <a className="widgetFooterWhatsApp" href={whatsappHref(name)} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+      </div>
     </>}
   </section>;
 }

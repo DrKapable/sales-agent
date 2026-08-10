@@ -10,10 +10,15 @@
 .widgetContactForm input:focus{border-color:#2fae9f;box-shadow:0 0 0 3px rgba(47,174,159,.1)}
 .widgetContactForm button{min-height:46px;border:0;border-radius:13px;background:#2fae9f;color:#fff;font-size:12px;font-weight:800;box-shadow:0 9px 22px rgba(47,174,159,.2)}
 .widgetContactError{margin:0!important;color:#a13b3b!important;font-size:10px!important;font-weight:700}
+.widgetContactDivider{display:flex;align-items:center;gap:10px;margin:13px 0;color:#8a9aa7;font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.widgetContactDivider::before,.widgetContactDivider::after{content:"";height:1px;flex:1;background:#e2e9ed}
+.widgetWhatsAppOption{min-height:44px;display:flex;align-items:center;justify-content:center;border:1px solid #bfe1da;border-radius:13px;background:#f1faf7;color:#17745f;font-size:12px;font-weight:800;text-decoration:none}
+.widgetWhatsAppOption::before{content:"●";margin-right:7px;color:#25d366;font-size:13px}
+.widgetWhatsAppOption:hover{border-color:#2fae9f;background:#e8f7f3}
 .widgetContactPrivacy{margin-top:11px!important;color:#8798a5!important;font-size:9px!important;text-align:center}
 .widgetFooter{display:flex!important;align-items:center;justify-content:center;gap:6px;min-height:24px}
-.widgetContactStatus{border:0;background:transparent;color:#718694;font-size:8px;padding:0;cursor:pointer}
-.widgetContactStatus:hover{text-decoration:underline;color:#1e8078}
+.widgetContactStatus,.widgetFooterWhatsApp{border:0;background:transparent;color:#718694;font-size:8px;padding:0;cursor:pointer;text-decoration:none}
+.widgetContactStatus:hover,.widgetFooterWhatsApp:hover{text-decoration:underline;color:#1e8078}
 
 @media(max-width:480px){
   .widgetContactGate{padding:18px 14px}
