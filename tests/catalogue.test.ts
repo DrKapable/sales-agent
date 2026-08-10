@@ -19,4 +19,11 @@ describe("approved service catalogue", () => {
   it("contains no em dash in client-facing catalogue text", () => {
     expect(JSON.stringify(offerSeeds)).not.toContain("—");
   });
+
+  it("uses the approved payment account for paid services", () => {
+    const paidOffers = offerSeeds.filter((offer) => (offer.priceZmw ?? 0) > 0);
+    expect(paidOffers.length).toBeGreaterThan(0);
+    expect(paidOffers.every((offer) => offer.paymentInstructions?.includes("0977259132"))).toBe(true);
+    expect(paidOffers.every((offer) => offer.paymentInstructions?.includes("Juma Phiri"))).toBe(true);
+  });
 });
