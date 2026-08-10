@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import "./globals.css";
+import "./admin-mobile.css";
 
 export const metadata: Metadata = {
   title: "MedMinds Sales Agent",
