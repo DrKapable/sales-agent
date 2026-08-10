@@ -657,3 +657,223 @@ td select { max-width: 205px; border: 1px solid var(--line); border-radius: 8px;
     scroll-behavior: auto;
   }
 }
+
+/* Mobile width containment */
+.dashboard,
+.dashboardMain,
+.dashboardHeader,
+.metricGrid,
+.pipeline,
+.leadToolbar,
+.offerToolbar,
+.offerGrid,
+.setupGrid,
+.inboxLayout,
+.leadList,
+.conversationPanel,
+.conversationHeader,
+.clientIdentity,
+.controlStrip,
+.conversationMeta,
+.followUpTools,
+.messageTimeline,
+.replyComposer,
+.composerTop,
+.composerInputRow,
+.internalNoteDetails,
+.internalNote {
+  min-width: 0;
+  max-width: 100%;
+}
+.dashboard {
+  width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+.dashboardMain {
+  width: 100%;
+}
+.dashboard input,
+.dashboard select,
+.dashboard textarea,
+.dashboard button {
+  max-width: 100%;
+}
+.leadToolbar input,
+.leadToolbar select,
+.offerToolbar input,
+.offerToolbar select,
+.controlStrip label,
+.controlStrip select,
+.composerTop label,
+.composerTop select,
+.followUpTools label,
+.followUpTools input,
+.replyComposer textarea,
+.internalNote textarea {
+  width: 100%;
+  min-width: 0;
+}
+.composerTop label {
+  flex: 1 1 260px;
+}
+.conversationMeta span,
+.followUpTools > span,
+.internalNoteDetails summary b,
+.composerFooter small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 620px) {
+  .dashboardMain {
+    padding-inline: max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-right));
+  }
+  .dashboardHeader {
+    flex-wrap: wrap;
+  }
+  .dashboardHeader > div {
+    min-width: 0;
+  }
+  .dashboardHeader h1 {
+    overflow-wrap: anywhere;
+  }
+  .sidebar {
+    width: 100%;
+    max-width: 100vw;
+    padding-inline: max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-right));
+  }
+  .sidebar nav {
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 6px;
+    overflow: visible;
+  }
+  .sidebar nav button {
+    width: 100%;
+    min-width: 0;
+    min-height: 50px;
+    padding: 8px 4px;
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: normal;
+  }
+  .sidebar nav button b {
+    flex: none;
+  }
+  .metricGrid {
+    gap: 9px;
+  }
+  .metricGrid div {
+    min-width: 0;
+    padding: 14px 12px;
+  }
+  .metricGrid span {
+    overflow-wrap: anywhere;
+  }
+  .pipeline button {
+    min-width: 0;
+    white-space: normal;
+  }
+  .leadToolbar,
+  .offerToolbar,
+  .offerGrid,
+  .setupGrid,
+  .priceGrid {
+    width: 100%;
+    grid-template-columns: minmax(0,1fr);
+  }
+  .inboxLayout {
+    width: 100%;
+    border-radius: 14px;
+  }
+  .leadListItem {
+    grid-template-columns: 42px minmax(0,1fr) auto;
+    gap: 9px;
+    padding: 14px 10px;
+  }
+  .leadBadges {
+    min-width: 0;
+  }
+  .conversationHeader {
+    width: 100%;
+    padding: 15px 12px;
+  }
+  .clientIdentity {
+    width: 100%;
+  }
+  .clientIdentity div {
+    flex: 1;
+  }
+  .conversationActions {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+  .conversationActions > * {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 7px;
+    text-align: center;
+  }
+  .controlStrip {
+    width: 100%;
+  }
+  .controlStrip label,
+  .composerTop label {
+    overflow: hidden;
+  }
+  .conversationMeta span {
+    max-width: 100%;
+  }
+  .followUpTools > div,
+  .quickReplies {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .composerTop {
+    align-items: flex-end;
+  }
+  .composerTop label {
+    flex-basis: auto;
+  }
+  .composerTop > span {
+    flex: none;
+  }
+  .internalNoteDetails summary b {
+    max-width: 40%;
+    text-align: right;
+  }
+  .offerCard,
+  .setupCard,
+  .webhookCard {
+    min-width: 0;
+    padding: 18px 14px;
+  }
+}
+
+@media (max-width: 380px) {
+  .dashboardMain {
+    padding-inline: 8px;
+  }
+  .dashboardHeader h1 {
+    font-size: 30px;
+  }
+  .metricGrid {
+    grid-template-columns: minmax(0,1fr);
+  }
+  .controlStrip {
+    grid-template-columns: minmax(0,1fr);
+  }
+  .controlStrip > .button {
+    grid-column: auto;
+  }
+  .leadListItem {
+    grid-template-columns: 40px minmax(0,1fr);
+  }
+  .leadBadges {
+    grid-column: 2;
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
