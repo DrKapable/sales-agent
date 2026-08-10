@@ -44,16 +44,19 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const handoffTool = tool({
-    description: "Refer a client and notify the correct MedMinds team member. Use payment for payment confirmation, refunds or payment concerns; discount for any discount request; and general for service enquiries, custom quotations, complaints or other assistance.",
+    description: "Refer a client only when human help is genuinely required. If the client explicitly asks for a named MedMinds person, preserve that name in the reason or summary so the request can be routed correctly.",
     inputSchema: z.object({
       referralType: z.enum(["payment", "discount", "general"]),
       reason: z.string().min(3).max(500),
       summary: z.string().min(10).max(900).describe("A concise factual summary of the client's request and relevant conversation details.")
     }),
     execute: async ({ referralType, reason, summary }) => {
-      const recipient = recipientForReferral(referralType);
+      const referralText = `${reason} ${summary}`;
+      const specificallyAskedForMustafa = /\b(dr\.?\s*)?mustafa\b|\bjuma\s+phiri\b/i.test(referralText);
+      const recipient = specificallyAskedForMustafa ? recipientForReferral("payment") : recipientForReferral(referralType);
       const savedLead = await updateLead(phone, { status: "HUMAN ASSISTANCE REQUIRED", handoffReason: reason, aiPaused: true, assignedTo: recipient.name });
-      if (source === "whatsapp") {
+      const canNotifyTeam = source === "whatsapp" || /^\d{8,15}$/.test(phone);
+      if (canNotifyTeam) {
         referralNotification = {
           phone: recipient.phone,
           recipientName: recipient.name,
@@ -63,7 +66,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
       return {
         queued: true,
         assignedTo: recipient.name,
-        notificationQueued: source === "whatsapp",
+        notificationQueued: canNotifyTeam,
         instruction: `Tell the client the referral has been recorded for ${recipient.name}, who will assist them.`
       };
     }

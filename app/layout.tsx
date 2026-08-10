@@ -9,6 +9,7 @@ import "./admin-mobile-v6.css";
 import "./admin-mobile-v7.css";
 import "./brand-v2.css";
 import "./brand-v2-fix.css";
+import "./public-chat-v2.css";
 
 export const metadata: Metadata = {
   title: "MedMinds Learning Centre",
