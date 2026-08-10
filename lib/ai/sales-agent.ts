@@ -2,7 +2,9 @@ import { gateway, tool, ToolLoopAgent } from "ai";
 import { z } from "zod";
 import { SALES_AGENT_PROMPT } from "@/lib/ai/prompt";
 import { addMessage, getConversation, getOrCreateLead, listOffers, updateLead } from "@/lib/store";
+import { buildReferralMessage, recipientForReferral } from "@/lib/referrals";
 import { leadStatuses, type LeadPatch } from "@/lib/types";
+import { sendWhatsAppText } from "@/lib/whatsapp";
 
 export async function replyToClient(phone: string, text: string, source: "whatsapp" | "simulator") {
   const lead = await getOrCreateLead(phone, source);
@@ -37,11 +39,30 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const handoffTool = tool({
-    description: "Request assistance from a human MedMinds team member for refunds, disputes, complaints, special pricing, custom quotations, sensitive matters, or unavailable verified information.",
-    inputSchema: z.object({ reason: z.string().min(3).max(500) }),
-    execute: async ({ reason }) => {
-      await updateLead(phone, { status: "HUMAN ASSISTANCE REQUIRED", handoffReason: reason });
-      return { queued: true, instruction: "Tell the client a MedMinds team member will assist them." };
+    description: "Refer a client and notify the correct MedMinds team member. Use payment for payment confirmation, refunds or payment concerns; discount for any discount request; and general for service enquiries, custom quotations, complaints or other assistance.",
+    inputSchema: z.object({
+      referralType: z.enum(["payment", "discount", "general"]),
+      reason: z.string().min(3).max(500),
+      summary: z.string().min(10).max(900).describe("A concise factual summary of the client's request and relevant conversation details.")
+    }),
+    execute: async ({ referralType, reason, summary }) => {
+      const savedLead = await updateLead(phone, { status: "HUMAN ASSISTANCE REQUIRED", handoffReason: reason });
+      const recipient = recipientForReferral(referralType);
+      let notificationSent = false;
+      if (source === "whatsapp") {
+        try {
+          await sendWhatsAppText(recipient.phone, buildReferralMessage({ recipientName: recipient.name, lead: savedLead, reason, summary }));
+          notificationSent = true;
+        } catch (error) {
+          console.error("WhatsApp referral notification failed", { clientPhone: phone, recipient: recipient.name, error });
+        }
+      }
+      return {
+        queued: true,
+        assignedTo: recipient.name,
+        notificationSent,
+        instruction: `Tell the client the referral has been recorded for ${recipient.name}, who will assist them.`
+      };
     }
   });
 
