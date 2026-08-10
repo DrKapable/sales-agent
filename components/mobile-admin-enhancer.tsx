@@ -12,6 +12,7 @@ export function MobileAdminEnhancer() {
   const [sectionTitle, setSectionTitle] = useState("Chats");
   const [actionsTarget, setActionsTarget] = useState<HTMLElement | null>(null);
   const [headerTarget, setHeaderTarget] = useState<HTMLElement | null>(null);
+  const [controlsTarget, setControlsTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     const sidebar = document.querySelector<HTMLElement>(".sidebar");
@@ -24,9 +25,11 @@ export function MobileAdminEnhancer() {
       const dashboard = document.querySelector<HTMLElement>(".dashboard");
       const actions = document.querySelector<HTMLElement>(".conversationPanel .conversationActions");
       const header = document.querySelector<HTMLElement>(".conversationPanel .conversationHeader");
+      const controls = document.querySelector<HTMLElement>(".conversationPanel .controlStrip");
       setActive(Boolean(dashboard));
       setActionsTarget((current) => current === actions ? current : actions);
       setHeaderTarget((current) => current === header ? current : header);
+      setControlsTarget((current) => current === controls ? current : controls);
     };
 
     syncTargets();
@@ -93,10 +96,16 @@ export function MobileAdminEnhancer() {
       headerTarget
     ) : null}
     {actionsTarget ? createPortal(
-      <button type="button" className="mobileToolsButton" aria-label={toolsOpen ? "Hide client controls" : "Open client controls"} aria-expanded={toolsOpen} onClick={() => setToolsOpen((value) => !value)}>
-        <span className="mobileToolsLabel">{toolsOpen ? "Hide controls" : "Client controls"}</span><span className="mobileToolsDots" aria-hidden="true">⋮</span>
+      <button type="button" className={`mobileToolsButton ${toolsOpen ? "isOpen" : ""}`} aria-label={toolsOpen ? "Close client controls" : "Open client controls"} aria-expanded={toolsOpen} title={toolsOpen ? "Close client controls" : "Client controls"} onClick={() => setToolsOpen((value) => !value)}>
+        <span className="mobileToolsLabel">{toolsOpen ? "Close controls" : "Client controls"}</span><span className="mobileToolsDots" aria-hidden="true">{toolsOpen ? "×" : "⋮"}</span>
       </button>,
       actionsTarget
+    ) : null}
+    {controlsTarget && chatOpen && toolsOpen ? createPortal(
+      <button type="button" className="mobileControlsClose" onClick={() => setToolsOpen(false)} aria-label="Close client controls">
+        <span>Client controls</span><strong>Close ×</strong>
+      </button>,
+      controlsTarget
     ) : null}
   </>;
 }

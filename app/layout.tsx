@@ -6,6 +6,7 @@ import "./admin-mobile.css";
 import "./admin-mobile-v4.css";
 import "./admin-mobile-v5.css";
 import "./admin-mobile-v6.css";
+import "./admin-mobile-v7.css";
 
 export const metadata: Metadata = {
   title: "MedMinds Sales Agent",
