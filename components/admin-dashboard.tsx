@@ -2,13 +2,19 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { BrandLogo } from "@/components/brand-logo";
 import type { getSetupState } from "@/lib/env";
-import { leadStatuses, type ConversationMessage, type Lead, type Offer } from "@/lib/types";
+import { leadPriorities, leadStatuses, type ConversationMessage, type Lead, type Offer } from "@/lib/types";
 
 type Setup = ReturnType<typeof getSetupState>;
 type ConversationState = { lead: Lead; messages: ConversationMessage[]; replyWindow: { open: boolean; expiresAt: string | null }; delivery?: { status: "accepted" | "simulated"; messageId: string | null } };
 type Tab = "leads" | "offers" | "setup";
 const staffMembers = ["Dr. Mustafa Juma Phiri", "Dr Kanyembo Ng'andwe"] as const;
+const quickReplies = [
+  { label: "Acknowledge", text: "Thank you for contacting MedMinds. I am reviewing your request and will assist you shortly." },
+  { label: "Research pricing", text: "You can review our research service prices here: https://www.medmindslc.online/pricing" },
+  { label: "Payment details", text: "Payments are submitted to 0977259132, Juma Phiri. Please send your proof of payment here for confirmation." }
+] as const;
 
 export function AdminDashboard({ initialLeads, initialOffers, setup }: { initialLeads: Lead[]; initialOffers: Offer[]; setup: Setup }) {
   const [leads, setLeads] = useState(initialLeads);
@@ -25,18 +31,20 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   const [saving, setSaving] = useState(false);
   const [leadQuery, setLeadQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [offerQuery, setOfferQuery] = useState("");
   const [offerCategory, setOfferCategory] = useState("All categories");
 
   const converted = leads.filter((lead) => lead.status === "CONVERTED").length;
   const humanManaged = leads.filter((lead) => lead.aiPaused).length;
   const followUps = leads.filter((lead) => lead.status === "FOLLOW-UP REQUIRED" || lead.status === "HUMAN ASSISTANCE REQUIRED").length;
+  const dueFollowUps = leads.filter((lead) => isFollowUpDue(lead)).length;
   const conversion = leads.length ? Math.round((converted / leads.length) * 100) : 0;
   const counts = useMemo(() => leadStatuses.map((status) => ({ status, count: leads.filter((lead) => lead.status === status).length })), [leads]);
   const filteredLeads = useMemo(() => leads.filter((lead) => {
     const text = `${lead.name || ""} ${lead.phone} ${lead.serviceInterest || ""} ${lead.programme || ""}`.toLowerCase();
-    return (statusFilter === "ALL" || lead.status === statusFilter) && text.includes(leadQuery.trim().toLowerCase());
-  }), [leads, leadQuery, statusFilter]);
+    return (statusFilter === "ALL" || lead.status === statusFilter) && (priorityFilter === "ALL" || lead.priority === priorityFilter) && text.includes(leadQuery.trim().toLowerCase());
+  }).sort((a, b) => leadSortScore(b) - leadSortScore(a) || b.updatedAt.localeCompare(a.updatedAt)), [leads, leadQuery, priorityFilter, statusFilter]);
   const offerCategories = useMemo(() => ["All categories", ...Array.from(new Set(offers.map((offer) => offer.category))).sort()], [offers]);
   const visibleOffers = useMemo(() => offers.filter((offer) => {
     const text = `${offer.name} ${offer.category} ${offer.description}`.toLowerCase();
@@ -68,7 +76,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
     return () => window.clearInterval(timer);
   }, [selectedLeadId, tab, loadConversation]);
 
-  async function patchLead(id: string, patch: Partial<Pick<Lead, "status" | "aiPaused" | "assignedTo" | "internalNote">>) {
+  async function patchLead(id: string, patch: Partial<Pick<Lead, "status" | "aiPaused" | "assignedTo" | "internalNote" | "priority" | "followUpAt">>) {
     setSaving(true);
     try {
       const response = await fetch(`/api/admin/leads/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
@@ -112,8 +120,8 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   }
 
   function exportLeads() {
-    const headings = ["Name", "Phone", "Service", "Programme", "Institution", "Deadline", "Status", "Assigned to", "AI paused", "Updated"];
-    const rows = filteredLeads.map((lead) => [lead.name, lead.phone, lead.serviceInterest, lead.programme, lead.institution, lead.deadline, lead.status, lead.assignedTo, lead.aiPaused ? "Yes" : "No", lead.updatedAt]);
+    const headings = ["Name", "Phone", "Service", "Programme", "Institution", "Deadline", "Status", "Priority", "Follow-up", "Assigned to", "AI paused", "Updated"];
+    const rows = filteredLeads.map((lead) => [lead.name, lead.phone, lead.serviceInterest, lead.programme, lead.institution, lead.deadline, lead.status, lead.priority, lead.followUpAt, lead.assignedTo, lead.aiPaused ? "Yes" : "No", lead.updatedAt]);
     const csv = [headings, ...rows].map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a"); anchor.href = url; anchor.download = `medminds-leads-${new Date().toISOString().slice(0, 10)}.csv`; anchor.click(); URL.revokeObjectURL(url);
@@ -123,7 +131,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
 
   return <main className="dashboard">
     <aside className="sidebar">
-      <Link href="/" className="brand"><span className="brandMark">M</span><span>MedMinds</span></Link>
+      <Link href="/" className="brand sidebarLogo" aria-label="MedMinds Learning Centre home"><BrandLogo priority compact /></Link>
       <nav>
         <button className={tab === "leads" ? "active" : ""} onClick={() => setTab("leads")}><span>Inbox</span><b>{humanManaged || ""}</b></button>
         <button className={tab === "offers" ? "active" : ""} onClick={() => setTab("offers")}>Offers and pricing</button>
@@ -135,14 +143,14 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
       <header className="dashboardHeader"><div><span className="kicker">Sales operations</span><h1>{tab === "leads" ? "Client inbox" : tab === "offers" ? "Approved offers" : "Configuration"}</h1></div><span className={`setupBadge ${setup.whatsappConfigured ? "ready" : "pending"}`}>{setup.whatsappConfigured ? "WhatsApp ready" : "Setup pending"}</span></header>
 
       {tab === "leads" && <>
-        <div className="metricGrid"><div><span>Total leads</span><strong>{leads.length}</strong></div><div><span>Conversion</span><strong>{conversion}%</strong></div><div><span>Needs attention</span><strong>{followUps}</strong></div><div><span>Human managed</span><strong>{humanManaged}</strong></div></div>
+        <div className="metricGrid"><div><span>Total leads</span><strong>{leads.length}</strong></div><div><span>Conversion</span><strong>{conversion}%</strong></div><div><span>Needs attention</span><strong>{followUps}</strong></div><div><span>Follow-ups due</span><strong>{dueFollowUps}</strong></div><div><span>Human managed</span><strong>{humanManaged}</strong></div></div>
         <div className="pipeline">{counts.filter((item) => item.count > 0).map((item) => <button key={item.status} onClick={() => setStatusFilter(item.status)}>{item.status}<strong>{item.count}</strong></button>)}</div>
-        <div className="leadToolbar"><input value={leadQuery} onChange={(event) => setLeadQuery(event.target.value)} placeholder="Search name, number, service or programme" /><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{leadStatuses.map((status) => <option key={status}>{status}</option>)}</select><button className="button buttonGhost" onClick={exportLeads}>Export CSV</button></div>
+        <div className="leadToolbar"><input value={leadQuery} onChange={(event) => setLeadQuery(event.target.value)} placeholder="Search name, number, service or programme" /><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{leadStatuses.map((status) => <option key={status}>{status}</option>)}</select><select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option value="ALL">All priorities</option>{leadPriorities.map((priority) => <option key={priority}>{priority}</option>)}</select><button className="button buttonGhost" onClick={exportLeads}>Export CSV</button></div>
         <div className="inboxLayout">
           <section className="leadList" aria-label="Client conversations">
             <div className="leadListTop"><strong>{filteredLeads.length} clients</strong><span>Auto-refreshing</span></div>
             {filteredLeads.map((lead) => <button key={lead.id} className={`leadListItem ${selectedLeadId === lead.id ? "selected" : ""}`} onClick={() => setSelectedLeadId(lead.id)}>
-              <span className="clientAvatar">{initials(lead.name)}</span><span className="leadListCopy"><strong>{lead.name || "Unnamed client"}</strong><small>{lead.serviceInterest || "Service not established"}</small><em>{lead.phone} · {relativeTime(lead.updatedAt)}</em></span><span className={`statusPill ${lead.aiPaused ? "human" : "ai"}`}>{lead.aiPaused ? "Human" : "AI"}</span>
+              <span className="clientAvatar">{initials(lead.name)}</span><span className="leadListCopy"><strong>{lead.name || "Unnamed client"}</strong><small>{lead.serviceInterest || "Service not established"}</small><em>{lead.phone} · {lead.followUpAt ? `${followUpLabel(lead.followUpAt)} · ` : ""}{relativeTime(lead.updatedAt)}</em></span><span className="leadBadges"><span className={`priorityPill ${lead.priority.toLowerCase()}`}>{lead.priority}</span><span className={`statusPill ${lead.aiPaused ? "human" : "ai"}`}>{lead.aiPaused ? "Human" : "AI"}</span></span>
             </button>)}
             {!filteredLeads.length && <div className="emptyState"><strong>No matching clients</strong><p>Adjust the search or status filter.</p></div>}
           </section>
@@ -156,7 +164,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   </main>;
 }
 
-function ConversationPanel(props: { conversation: ConversationState | null; loading: boolean; error: string; notice: string; sender: (typeof staffMembers)[number]; note: string; replyText: string; saving: boolean; onSender: (value: (typeof staffMembers)[number]) => void; onNote: (value: string) => void; onReply: (value: string) => void; onPatch: (id: string, patch: Partial<Pick<Lead, "status" | "aiPaused" | "assignedTo" | "internalNote">>) => Promise<Lead | null>; onSend: () => Promise<void> }) {
+function ConversationPanel(props: { conversation: ConversationState | null; loading: boolean; error: string; notice: string; sender: (typeof staffMembers)[number]; note: string; replyText: string; saving: boolean; onSender: (value: (typeof staffMembers)[number]) => void; onNote: (value: string) => void; onReply: (value: string) => void; onPatch: (id: string, patch: Partial<Pick<Lead, "status" | "aiPaused" | "assignedTo" | "internalNote" | "priority" | "followUpAt">>) => Promise<Lead | null>; onSend: () => Promise<void> }) {
   const { conversation, loading } = props;
   if (loading && !conversation) return <section className="conversationPanel"><div className="panelState">Loading conversation...</div></section>;
   if (!conversation) return <section className="conversationPanel"><div className="panelState"><strong>Select a client</strong><p>Review their history and manage the conversation here.</p></div></section>;
@@ -164,12 +172,13 @@ function ConversationPanel(props: { conversation: ConversationState | null; load
   const canFreeReply = lead.source !== "whatsapp" || conversation.replyWindow.open;
   return <section className="conversationPanel">
     <header className="conversationHeader"><div className="clientIdentity"><span className="clientAvatar large">{initials(lead.name)}</span><div><strong>{lead.name || "Unnamed client"}</strong><span>{lead.phone} · {lead.serviceInterest || "Service not established"}</span></div></div><div className="conversationActions"><button className="iconButton" onClick={() => navigator.clipboard.writeText(lead.phone)}>Copy number</button><a className="iconButton" href={`https://wa.me/${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">Open WhatsApp</a></div></header>
-    <div className="controlStrip"><label>Assigned to<select value={lead.assignedTo ?? ""} onChange={(event) => void props.onPatch(lead.id, { assignedTo: event.target.value ? event.target.value as Lead["assignedTo"] : null })}><option value="">Unassigned</option>{staffMembers.map((staff) => <option key={staff}>{staff}</option>)}</select></label><label>Status<select value={lead.status} onChange={(event) => void props.onPatch(lead.id, { status: event.target.value as Lead["status"] })}>{leadStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>{lead.aiPaused ? <button className="button resumeButton" disabled={props.saving} onClick={() => void props.onPatch(lead.id, { aiPaused: false, assignedTo: null, status: "FOLLOW-UP REQUIRED" })}>Resume AI</button> : <button className="button takeoverButton" disabled={props.saving} onClick={() => void props.onPatch(lead.id, { aiPaused: true, assignedTo: props.sender, status: "HUMAN ASSISTANCE REQUIRED" })}>Take over</button>}</div>
+    <div className="controlStrip"><label>Assigned to<select value={lead.assignedTo ?? ""} onChange={(event) => void props.onPatch(lead.id, { assignedTo: event.target.value ? event.target.value as Lead["assignedTo"] : null })}><option value="">Unassigned</option>{staffMembers.map((staff) => <option key={staff}>{staff}</option>)}</select></label><label>Status<select value={lead.status} onChange={(event) => void props.onPatch(lead.id, { status: event.target.value as Lead["status"] })}>{leadStatuses.map((status) => <option key={status}>{status}</option>)}</select></label><label>Priority<select value={lead.priority} onChange={(event) => void props.onPatch(lead.id, { priority: event.target.value as Lead["priority"] })}>{leadPriorities.map((priority) => <option key={priority}>{priority}</option>)}</select></label>{lead.aiPaused ? <button className="button resumeButton" disabled={props.saving} onClick={() => void props.onPatch(lead.id, { aiPaused: false, assignedTo: null, status: "FOLLOW-UP REQUIRED" })}>Resume AI</button> : <button className="button takeoverButton" disabled={props.saving} onClick={() => void props.onPatch(lead.id, { aiPaused: true, assignedTo: props.sender, status: "HUMAN ASSISTANCE REQUIRED" })}>Take over</button>}</div>
     <div className="conversationMeta"><span className={lead.aiPaused ? "humanMode" : "aiMode"}>{lead.aiPaused ? `AI paused${lead.assignedTo ? ` for ${lead.assignedTo}` : ""}` : "AI responding"}</span><span className={canFreeReply ? "windowOpen" : "windowClosed"}>{lead.source !== "whatsapp" ? "Simulator conversation" : conversation.replyWindow.open ? `Reply window open${conversation.replyWindow.expiresAt ? ` until ${new Date(conversation.replyWindow.expiresAt).toLocaleString()}` : ""}` : "24-hour window closed"}</span></div>
+    <div className={`followUpTools ${isFollowUpDue(lead) ? "overdue" : ""}`}><label>Next follow-up<input type="datetime-local" value={toLocalDateTimeInput(lead.followUpAt)} onChange={(event) => void props.onPatch(lead.id, { followUpAt: event.target.value ? new Date(event.target.value).toISOString() : null })} /></label><div><button type="button" onClick={() => void props.onPatch(lead.id, { followUpAt: futureIso(24), status: "FOLLOW-UP REQUIRED" })}>Tomorrow</button><button type="button" onClick={() => void props.onPatch(lead.id, { followUpAt: futureIso(72), status: "FOLLOW-UP REQUIRED" })}>In 3 days</button>{lead.followUpAt && <button type="button" onClick={() => void props.onPatch(lead.id, { followUpAt: null })}>Clear</button>}</div><span>{lead.followUpAt ? followUpLabel(lead.followUpAt) : "No follow-up scheduled"}</span></div>
     <div className="messageTimeline">{conversation.messages.map((message) => <MessageBubble key={message.id} message={message} />)}{!conversation.messages.length && <div className="emptyState"><p>No messages yet.</p></div>}</div>
     {props.error && <div className="conversationError">{props.error}</div>}
     {props.notice && <div className="conversationNotice">{props.notice}</div>}
-    <div className="replyComposer"><div className="composerTop"><label>Send as<select value={props.sender} onChange={(event) => props.onSender(event.target.value as (typeof staffMembers)[number])}>{staffMembers.map((staff) => <option key={staff}>{staff}</option>)}</select></label><span>{props.replyText.length}/4000</span></div><textarea value={props.replyText} maxLength={4000} onChange={(event) => props.onReply(event.target.value)} placeholder={lead.aiPaused ? "Write a personal reply..." : "Take over the conversation to reply as a human."} disabled={!lead.aiPaused || !canFreeReply} /><div className="composerFooter"><small>{lead.source !== "whatsapp" ? "Simulator replies stay in the dashboard and are not sent through WhatsApp." : !canFreeReply ? "An approved Meta template is required before you can reply." : lead.aiPaused ? "The AI remains paused while you manage this conversation." : "Take over first to prevent simultaneous AI and human replies."}</small><button className="button buttonPrimary" disabled={!lead.aiPaused || !canFreeReply || !props.replyText.trim() || props.saving} onClick={() => void props.onSend()}>{props.saving ? (lead.source === "whatsapp" ? "Sending..." : "Saving...") : (lead.source === "whatsapp" ? "Send reply" : "Add simulator reply")}</button></div></div>
+    <div className="replyComposer"><div className="composerTop"><label>Send as<select value={props.sender} onChange={(event) => props.onSender(event.target.value as (typeof staffMembers)[number])}>{staffMembers.map((staff) => <option key={staff}>{staff}</option>)}</select></label><span>{props.replyText.length}/4000</span></div><div className="quickReplies" aria-label="Quick replies">{quickReplies.map((reply) => <button key={reply.label} type="button" onClick={() => props.onReply(reply.text)} disabled={!lead.aiPaused || !canFreeReply}>{reply.label}</button>)}</div><textarea value={props.replyText} maxLength={4000} onChange={(event) => props.onReply(event.target.value)} placeholder={lead.aiPaused ? "Write a personal reply..." : "Take over the conversation to reply as a human."} disabled={!lead.aiPaused || !canFreeReply} /><div className="composerFooter"><small>{lead.source !== "whatsapp" ? "Simulator replies stay in the dashboard and are not sent through WhatsApp." : !canFreeReply ? "An approved Meta template is required before you can reply." : lead.aiPaused ? "The AI remains paused while you manage this conversation." : "Take over first to prevent simultaneous AI and human replies."}</small><button className="button buttonPrimary" disabled={!lead.aiPaused || !canFreeReply || !props.replyText.trim() || props.saving} onClick={() => void props.onSend()}>{props.saving ? (lead.source === "whatsapp" ? "Sending..." : "Saving...") : (lead.source === "whatsapp" ? "Send reply" : "Add simulator reply")}</button></div></div>
     <div className="internalNote"><div><strong>Internal note</strong><span>Visible only to administrators</span></div><textarea value={props.note} maxLength={2000} onChange={(event) => props.onNote(event.target.value)} placeholder="Add context, a follow-up reminder or next action." /><button className="button buttonGhost" disabled={props.saving || props.note === (lead.internalNote ?? "")} onClick={() => void props.onPatch(lead.id, { internalNote: props.note || null })}>Save note</button></div>
   </section>;
 }
@@ -189,3 +198,8 @@ function OfferEditor({ offer, onSave }: { offer: Offer; onSave: (offer: Offer) =
 function SetupCard({ title, ready, detail }: { title: string; ready: boolean; detail: string }) { return <article className="setupCard"><span className={ready ? "check ready" : "check"}>{ready ? "✓" : "!"}</span><div><h3>{title}</h3><p>{detail}</p></div></article>; }
 function initials(name: string | null) { return name ? name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() : "?"; }
 function relativeTime(value: string) { const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000)); if (minutes < 1) return "now"; if (minutes < 60) return `${minutes}m`; const hours = Math.round(minutes / 60); if (hours < 24) return `${hours}h`; return `${Math.round(hours / 24)}d`; }
+function isFollowUpDue(lead: Lead) { return Boolean(lead.followUpAt && new Date(lead.followUpAt).getTime() <= Date.now() && !["CONVERTED", "LOST LEAD"].includes(lead.status)); }
+function leadSortScore(lead: Lead) { return (isFollowUpDue(lead) ? 400 : 0) + (lead.priority === "HOT" ? 200 : lead.priority === "WARM" ? 100 : 0) + (lead.aiPaused ? 25 : 0); }
+function futureIso(hours: number) { return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString(); }
+function toLocalDateTimeInput(value: string | null) { if (!value) return ""; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
+function followUpLabel(value: string) { const date = new Date(value); const label = date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); return date.getTime() <= Date.now() ? `Overdue ${label}` : `Due ${label}`; }

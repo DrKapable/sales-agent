@@ -43,12 +43,15 @@ async function ensureDatabase() {
       id UUID PRIMARY KEY, phone TEXT UNIQUE NOT NULL, name TEXT, email TEXT, institution TEXT,
       programme TEXT, service_interest TEXT, deadline TEXT, package_name TEXT,
       status TEXT NOT NULL, handoff_reason TEXT, ai_paused BOOLEAN NOT NULL DEFAULT FALSE,
-      assigned_to TEXT, internal_note TEXT, source TEXT NOT NULL,
+      assigned_to TEXT, internal_note TEXT, priority TEXT NOT NULL DEFAULT 'STANDARD',
+      follow_up_at TIMESTAMPTZ, source TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
     await db.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS ai_paused BOOLEAN NOT NULL DEFAULT FALSE`);
     await db.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_to TEXT`);
     await db.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS internal_note TEXT`);
+    await db.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'STANDARD'`);
+    await db.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS follow_up_at TIMESTAMPTZ`);
     await db.query(`CREATE TABLE IF NOT EXISTS messages (
       id UUID PRIMARY KEY, external_id TEXT UNIQUE, phone TEXT NOT NULL, role TEXT NOT NULL,
       content TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -91,6 +94,8 @@ function mapLead(row: Record<string, unknown>): Lead {
     status: String(row.status) as Lead["status"], handoffReason: row.handoff_reason ? String(row.handoff_reason) : null,
     aiPaused: Boolean(row.ai_paused), assignedTo: row.assigned_to ? String(row.assigned_to) : null,
     internalNote: row.internal_note ? String(row.internal_note) : null,
+    priority: (row.priority ? String(row.priority) : "STANDARD") as Lead["priority"],
+    followUpAt: row.follow_up_at ? new Date(String(row.follow_up_at)).toISOString() : null,
     source: String(row.source) as Lead["source"], createdAt: new Date(String(row.created_at)).toISOString(),
     updatedAt: new Date(String(row.updated_at)).toISOString()
   };
@@ -121,7 +126,7 @@ export async function getOrCreateLead(phone: string, source: Lead["source"]): Pr
       return existing;
     }
     const now = new Date().toISOString();
-    const lead: Lead = { id: crypto.randomUUID(), phone, name: null, email: null, institution: null, programme: null, serviceInterest: null, deadline: null, packageName: null, status: "NEW LEAD", handoffReason: null, aiPaused: false, assignedTo: null, internalNote: null, source, createdAt: now, updatedAt: now };
+    const lead: Lead = { id: crypto.randomUUID(), phone, name: null, email: null, institution: null, programme: null, serviceInterest: null, deadline: null, packageName: null, status: "NEW LEAD", handoffReason: null, aiPaused: false, assignedTo: null, internalNote: null, priority: "STANDARD", followUpAt: null, source, createdAt: now, updatedAt: now };
     memory.leads.set(phone, lead);
     return lead;
   }
@@ -143,8 +148,8 @@ export async function updateLead(phone: string, patch: LeadPatch): Promise<Lead>
   }
   const rows = await db.query(`UPDATE leads SET name=$2,email=$3,institution=$4,programme=$5,service_interest=$6,
     deadline=$7,package_name=$8,status=$9,handoff_reason=$10,ai_paused=$11,assigned_to=$12,internal_note=$13,
-    updated_at=NOW() WHERE phone=$1 RETURNING *`,
-    [phone, updated.name, updated.email, updated.institution, updated.programme, updated.serviceInterest, updated.deadline, updated.packageName, updated.status, updated.handoffReason, updated.aiPaused, updated.assignedTo, updated.internalNote]);
+    priority=$14,follow_up_at=$15,updated_at=NOW() WHERE phone=$1 RETURNING *`,
+    [phone, updated.name, updated.email, updated.institution, updated.programme, updated.serviceInterest, updated.deadline, updated.packageName, updated.status, updated.handoffReason, updated.aiPaused, updated.assignedTo, updated.internalNote, updated.priority, updated.followUpAt]);
   return mapLead(rows[0] as Record<string, unknown>);
 }
 

@@ -11,6 +11,8 @@ export const leadStatuses = [
 
 export type LeadStatus = (typeof leadStatuses)[number];
 export type MessageRole = "user" | "assistant";
+export const leadPriorities = ["HOT", "WARM", "STANDARD"] as const;
+export type LeadPriority = (typeof leadPriorities)[number];
 
 export type Lead = {
   id: string;
@@ -27,6 +29,8 @@ export type Lead = {
   aiPaused: boolean;
   assignedTo: string | null;
   internalNote: string | null;
+  priority: LeadPriority;
+  followUpAt: string | null;
   source: "whatsapp" | "simulator";
   createdAt: string;
   updatedAt: string;
@@ -58,5 +62,5 @@ export type Offer = {
 export type LeadPatch = Partial<Pick<Lead,
   "name" | "email" | "institution" | "programme" | "serviceInterest" |
   "deadline" | "packageName" | "status" | "handoffReason" | "aiPaused" |
-  "assignedTo" | "internalNote"
+  "assignedTo" | "internalNote" | "priority" | "followUpAt"
 >>;

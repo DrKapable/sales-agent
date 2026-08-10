@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { leadStatuses } from "@/lib/types";
+import { leadPriorities, leadStatuses } from "@/lib/types";
 import { listLeads, updateLead } from "@/lib/store";
 
 const schema = z.object({
   status: z.enum(leadStatuses).optional(),
   aiPaused: z.boolean().optional(),
   assignedTo: z.enum(["Dr. Mustafa Juma Phiri", "Dr Kanyembo Ng'andwe"]).nullable().optional(),
-  internalNote: z.string().trim().max(2000).nullable().optional()
+  internalNote: z.string().trim().max(2000).nullable().optional(),
+  priority: z.enum(leadPriorities).optional(),
+  followUpAt: z.string().datetime().nullable().optional()
 }).refine((value) => Object.keys(value).length > 0);
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

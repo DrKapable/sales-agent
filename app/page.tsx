@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 import { TestChat } from "@/components/test-chat";
 import { getSetupState } from "@/lib/env";
 
@@ -9,7 +10,7 @@ export default function Home() {
   return (
     <main>
       <nav className="nav shell">
-        <Link href="/" className="brand"><span className="brandMark">M</span><span>MedMinds</span></Link>
+        <Link href="/" className="brand brandLogoLink" aria-label="MedMinds Learning Centre home"><BrandLogo priority /></Link>
         <Link href="/admin" className="button buttonGhost">Admin dashboard</Link>
       </nav>
 
@@ -27,7 +28,7 @@ export default function Home() {
           </div>
         </div>
         <div className="heroCard" aria-label="Sales workflow overview">
-          <div className="miniHeader"><span className="avatar">MM</span><div><strong>MedMinds Assistant</strong><small>Typically replies instantly</small></div><span className="online">Online</span></div>
+          <div className="miniHeader"><span className="avatar logoAvatar"><BrandLogo compact /></span><div><strong>MedMinds Assistant</strong><small>Typically replies within 30 seconds</small></div><span className="online">Online</span></div>
           <div className="message in">Hi 👋 What can I help you prepare for?</div>
           <div className="message out">I need help with my MPH proposal.</div>
           <div className="message in">Certainly. What stage is your proposal at, and when is it due?</div>

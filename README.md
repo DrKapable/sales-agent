@@ -12,7 +12,9 @@ A production-oriented WhatsApp sales assistant for MedMinds Learning Centre. It 
 - Lead pipeline with MedMinds sales statuses
 - Automatic WhatsApp referral summaries to the appropriate MedMinds team member
 - Admin client inbox with full conversation history, human takeover, direct staff replies and AI resume controls
-- Lead search, status filtering, staff assignment, internal notes and CSV export
+- Lead search, status and priority filtering, staff assignment, internal notes and CSV export
+- Lead priority scoring, scheduled follow-ups, overdue-first sorting and reusable staff quick replies
+- Official MedMinds branding and a responsive guided chat simulator
 - Persistent Postgres support, with clearly marked temporary memory mode
 - Secure signed administrator session
 - Browser-based conversation simulator

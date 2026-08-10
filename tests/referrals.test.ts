@@ -17,6 +17,8 @@ const lead: Lead = {
   aiPaused: true,
   assignedTo: "Dr. Mustafa Juma Phiri",
   internalNote: null,
+  priority: "STANDARD",
+  followUpAt: null,
   source: "whatsapp",
   createdAt: "2026-08-10T00:00:00.000Z",
   updatedAt: "2026-08-10T00:00:00.000Z"

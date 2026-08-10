@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function AdminLogin() {
   const [password, setPassword] = useState("");
@@ -17,9 +18,8 @@ export default function AdminLogin() {
   }
 
   return <main className="loginPage"><div className="loginCard">
-    <Link href="/" className="brand"><span className="brandMark">M</span><span>MedMinds</span></Link>
+    <Link href="/" className="brand brandLogoLink" aria-label="MedMinds Learning Centre home"><BrandLogo priority /></Link>
     <span className="kicker">Admin access</span><h1>Sales dashboard</h1><p>Enter the configured administrator password.</p>
     <form onSubmit={submit}><label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>{error && <div className="formError">{error}</div>}<button className="button buttonPrimary" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button></form>
   </div></main>;
 }
-
