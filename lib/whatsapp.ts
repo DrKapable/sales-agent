@@ -10,6 +10,40 @@ export function verifyWhatsAppSignature(rawBody: string, signature: string | nul
 
 export type IncomingWhatsAppMessage = { id: string; phone: string; name: string | null; text: string };
 
+const redactSensitiveMetaText = (value: unknown) => {
+  if (typeof value !== "string") return undefined;
+  return value
+    .slice(0, 1000)
+    .replace(/(bearer\s+)[a-z0-9._~-]+/gi, "$1[REDACTED]")
+    .replace(/\+?\d{8,15}/g, "[REDACTED_NUMBER]");
+};
+
+export function sanitizeWhatsAppApiError(rawBody: string) {
+  try {
+    const payload = JSON.parse(rawBody) as {
+      error?: {
+        code?: unknown;
+        error_subcode?: unknown;
+        type?: unknown;
+        message?: unknown;
+        error_data?: { details?: unknown };
+        fbtrace_id?: unknown;
+      };
+    };
+    const error = payload?.error;
+    return {
+      code: typeof error?.code === "number" ? error.code : undefined,
+      subcode: typeof error?.error_subcode === "number" ? error.error_subcode : undefined,
+      type: redactSensitiveMetaText(error?.type),
+      message: redactSensitiveMetaText(error?.message),
+      details: redactSensitiveMetaText(error?.error_data?.details),
+      traceId: redactSensitiveMetaText(error?.fbtrace_id)
+    };
+  } catch {
+    return { message: redactSensitiveMetaText(rawBody) || "Unparseable Meta error response" };
+  }
+}
+
 export function parseIncomingMessages(payload: unknown): IncomingWhatsAppMessage[] {
   if (!payload || typeof payload !== "object") return [];
   const entries = (payload as { entry?: unknown[] }).entry;
@@ -42,6 +76,8 @@ export async function sendWhatsAppText(phone: string, body: string) {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: phone, type: "text", text: { preview_url: false, body } })
   });
-  if (!response.ok) throw new Error(`WhatsApp API returned ${response.status}.`);
+  if (!response.ok) {
+    const metaError = sanitizeWhatsAppApiError(await response.text());
+    throw new Error(`WhatsApp API returned ${response.status}: ${JSON.stringify(metaError)}`);
+  }
 }
-
