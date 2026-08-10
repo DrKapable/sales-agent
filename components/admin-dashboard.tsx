@@ -132,7 +132,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   return <main className="dashboard">
     <aside className="sidebar">
       <Link href="/" className="brand sidebarLogo" aria-label="MedMinds Learning Centre home"><BrandLogo priority compact /></Link>
-      <nav>
+      <nav aria-label="Admin sections">
         <button className={tab === "leads" ? "active" : ""} onClick={() => setTab("leads")}><span>Inbox</span><b>{humanManaged || ""}</b></button>
         <button className={tab === "offers" ? "active" : ""} onClick={() => setTab("offers")}>Offers and pricing</button>
         <button className={tab === "setup" ? "active" : ""} onClick={() => setTab("setup")}>Configuration</button>
