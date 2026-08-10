@@ -7,10 +7,11 @@ import "./admin-mobile-v4.css";
 import "./admin-mobile-v5.css";
 import "./admin-mobile-v6.css";
 import "./admin-mobile-v7.css";
+import "./brand-v2.css";
 
 export const metadata: Metadata = {
-  title: "MedMinds Sales Agent",
-  description: "WhatsApp sales and lead management for MedMinds Learning Centre"
+  title: "MedMinds Learning Centre",
+  description: "MedMinds Learning Centre sales assistant for Pa Gym, research support, tutorials, courses and digital services"
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -1,63 +1,64 @@
 import Link from "next/link";
+import Script from "next/script";
 import { BrandLogo } from "@/components/brand-logo";
-import { TestChat } from "@/components/test-chat";
-import { getSetupState } from "@/lib/env";
-
-export const dynamic = "force-dynamic";
 
 export default function Home() {
-  const setup = getSetupState();
   return (
-    <main>
-      <nav className="nav shell">
+    <main className="homePage">
+      <nav className="nav shell homeNav">
         <Link href="/" className="brand brandLogoLink" aria-label="MedMinds Learning Centre home"><BrandLogo priority /></Link>
-        <Link href="/admin" className="button buttonGhost">Admin dashboard</Link>
+        <div className="homeNavStatus"><span className="statusDot" /> Sales assistant online</div>
       </nav>
 
-      <section className="hero shell">
+      <section className="hero shell homeHero">
+        <span className="floatingOrb orbOne" aria-hidden="true" />
+        <span className="floatingOrb orbTwo" aria-hidden="true" />
+        <span className="floatingRing" aria-hidden="true" />
+        <span className="floatingChip chipOne" aria-hidden="true">Pa Gym</span>
+        <span className="floatingChip chipTwo" aria-hidden="true">Research support</span>
+        <span className="floatingChip chipThree" aria-hidden="true">Tutorials</span>
+
         <div className="heroCopy">
-          <div className="eyebrow"><span className="statusDot" /> WhatsApp sales, made personal</div>
-          <h1>Turn MedMinds enquiries into clear next steps.</h1>
-          <p className="heroText">A focused sales assistant for Pa Gym, research support, tutorials, courses, and other approved MedMinds services.</p>
+          <div className="eyebrow"><span className="statusDot" /> MedMinds, ready when you are</div>
+          <h1>Learning, research and academic support in one place.</h1>
+          <p className="heroText">Ask about Pa Gym, proposal and dissertation support, data analysis, tutorials, courses or other MedMinds services. Our sales assistant can guide you immediately.</p>
           <div className="heroActions">
-            <a href="#simulator" className="button buttonPrimary">Test the agent</a>
-            <Link href="/admin" className="button buttonSecondary">Manage leads</Link>
+            <button type="button" className="button buttonPrimary" data-medminds-open-chat>Chat with MedMinds</button>
+            <a href="#services" className="button buttonSecondary">Explore services</a>
           </div>
           <div className="trustRow">
-            <span>Verified pricing only</span><span>Human handover</span><span>Lead tracking</span>
+            <span>Approved pricing</span><span>Human support when needed</span><span>Available on MedMinds platforms</span>
           </div>
         </div>
-        <div className="heroCard" aria-label="Sales workflow overview">
-          <div className="miniHeader"><span className="avatar logoAvatar"><BrandLogo compact /></span><div><strong>MedMinds Assistant</strong><small>Typically replies within 30 seconds</small></div><span className="online">Online</span></div>
-          <div className="message in">Hi 👋 What can I help you prepare for?</div>
-          <div className="message out">I need help with my MPH proposal.</div>
-          <div className="message in">Certainly. What stage is your proposal at, and when is it due?</div>
-          <div className="flowTags"><span>Need identified</span><span>Lead qualified</span><span>Next step set</span></div>
+
+        <div className="heroCard brandHeroCard" aria-label="Example MedMinds conversation">
+          <div className="miniHeader"><span className="avatar logoAvatar"><BrandLogo compact /></span><div><strong>MedMinds Assistant</strong><small>Online</small></div><span className="online">● Live</span></div>
+          <div className="message in">Hi 👋 What can I help you with today?</div>
+          <div className="message out">How much is a Master's research proposal?</div>
+          <div className="message in">Master's proposal support is within the approved K2,000 to K3,000 range, depending on the deadline and applicable adjustments. When do you need it?</div>
+          <div className="flowTags"><span>Ask naturally</span><span>Get a clear answer</span><span>Choose the next step</span></div>
         </div>
       </section>
 
-      <section className="featureSection shell">
-        <div className="sectionHeading"><span className="kicker">Purpose-built</span><h2>A sales process with sensible controls.</h2></div>
+      <section id="services" className="featureSection shell">
+        <div className="sectionHeading"><div><span className="kicker">What we support</span><h2>Practical help for study, research and professional work.</h2></div></div>
         <div className="featureGrid">
-          <article><span className="featureNumber">01</span><h3>Understands the need</h3><p>Qualifies the client's programme, objective, service, and deadline without repeating questions.</p></article>
-          <article><span className="featureNumber">02</span><h3>Uses approved offers</h3><p>Quotes only active packages configured by MedMinds. Unverified pricing is escalated.</p></article>
-          <article><span className="featureNumber">03</span><h3>Moves the lead forward</h3><p>Tracks lead status and ends qualified conversations with one clear, low-pressure action.</p></article>
+          <article><span className="featureNumber">01</span><h3>Pa Gym</h3><p>Exam-focused theory, question practice and OSCE preparation for medical and health-profession learners.</p><button type="button" className="serviceChatLink" data-medminds-open-chat>Ask about Pa Gym →</button></article>
+          <article><span className="featureNumber">02</span><h3>Research support</h3><p>Proposal and dissertation support, data analysis, editing and other approved academic research services.</p><button type="button" className="serviceChatLink" data-medminds-open-chat>Ask about research →</button></article>
+          <article><span className="featureNumber">03</span><h3>Tutorials and digital services</h3><p>Tutorials, courses, presentations, software, websites and selected MedMinds digital solutions.</p><button type="button" className="serviceChatLink" data-medminds-open-chat>Ask what is available →</button></article>
         </div>
       </section>
 
-      <section id="simulator" className="simulatorSection">
-        <div className="shell simulatorGrid">
-          <div className="simulatorCopy">
-            <span className="kicker">Conversation simulator</span>
-            <h2>See how the assistant responds.</h2>
-            <p>Use the test chat before connecting the Meta WhatsApp webhook. Test leads appear in the admin dashboard.</p>
-            {!setup.simulatorEnabled && <div className="notice"><strong>Simulator disabled</strong><span>Set ENABLE_SIMULATOR=true after AI Gateway is configured to enable public test replies.</span></div>}
-          </div>
-          <TestChat enabled={setup.simulatorEnabled} />
-        </div>
+      <section className="homeCta shell">
+        <div><span className="kicker">Need help choosing?</span><h2>Start with one question.</h2><p>The assistant uses the same approved MedMinds service catalogue used by our WhatsApp sales workflow.</p></div>
+        <button type="button" className="button buttonPrimary" data-medminds-open-chat>Open chat</button>
       </section>
 
-      <footer className="footer shell"><span>MedMinds Learning Centre</span><span>Sales Agent Console</span></footer>
+      <footer className="footer shell homeFooter">
+        <span>© {new Date().getFullYear()} MedMinds Learning Centre</span>
+        <Link href="/admin" className="staffAccess" aria-label="MedMinds staff access">Staff access</Link>
+      </footer>
+      <Script src="/medminds-chat.js" strategy="afterInteractive" />
     </main>
   );
 }

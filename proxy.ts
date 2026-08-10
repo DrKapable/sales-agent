@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sessionCookieName, verifySessionToken } from "@/lib/session";
 
-function contentSecurityPolicy(nonce: string) {
+function contentSecurityPolicy(nonce: string, embeddable = false) {
   const connectSource = process.env.NODE_ENV === "development" ? "connect-src 'self' ws: http:" : "connect-src 'self'";
   return [
     "default-src 'self'",
@@ -11,7 +11,7 @@ function contentSecurityPolicy(nonce: string) {
     "font-src 'self'",
     connectSource,
     "object-src 'none'",
-    "frame-ancestors 'none'",
+    embeddable ? "frame-ancestors *" : "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'"
   ].join("; ");
@@ -25,7 +25,8 @@ function applyContentSecurityPolicy(response: NextResponse, policy: string) {
 export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
-  const policy = contentSecurityPolicy(nonce);
+  const embeddable = path === "/widget" || path.startsWith("/widget/");
+  const policy = contentSecurityPolicy(nonce, embeddable);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", policy);
