@@ -31,10 +31,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (state.lead.source === "whatsapp" && !window.open) {
     return NextResponse.json({ error: "The 24-hour WhatsApp reply window has closed. Use an approved Meta template to reopen the conversation." }, { status: 409 });
   }
-  if (state.lead.source === "whatsapp") await sendWhatsAppText(state.lead.phone, parsed.data.text);
-  await addMessage(state.lead.phone, "assistant", humanMessageContent(parsed.data.sender, parsed.data.text));
+  let externalId: string | null = null;
+  let delivery: { status: "accepted" | "simulated"; messageId: string | null } = { status: "simulated", messageId: null };
+  if (state.lead.source === "whatsapp") {
+    try {
+      console.info("Admin WhatsApp reply sending", { leadId: state.lead.id, sender: parsed.data.sender });
+      const sent = await sendWhatsAppText(state.lead.phone, parsed.data.text);
+      externalId = sent.messageId;
+      delivery = { status: "accepted", messageId: sent.messageId };
+      console.info("Admin WhatsApp reply accepted by Meta", { leadId: state.lead.id, messageId: sent.messageId });
+    } catch (error) {
+      console.error("Admin WhatsApp reply failed", { leadId: state.lead.id, error });
+      return NextResponse.json({ error: "Meta did not accept this WhatsApp reply. Check the production log for the specific reason." }, { status: 502 });
+    }
+  }
+  await addMessage(state.lead.phone, "assistant", humanMessageContent(parsed.data.sender, parsed.data.text), externalId);
   const lead = await updateLead(state.lead.phone, { aiPaused: true, assignedTo: parsed.data.sender, status: "HUMAN ASSISTANCE REQUIRED" });
   const messages = await getConversation(state.lead.phone, 100);
-  return NextResponse.json({ lead, messages, replyWindow: replyWindow(messages) });
+  return NextResponse.json({ lead, messages, replyWindow: replyWindow(messages), delivery });
 }
-

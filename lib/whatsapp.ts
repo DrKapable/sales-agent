@@ -77,8 +77,13 @@ export async function sendWhatsAppText(phone: string, body: string) {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: phone, type: "text", text: { preview_url: false, body } })
   });
+  const rawBody = await response.text();
   if (!response.ok) {
-    const metaError = sanitizeWhatsAppApiError(await response.text());
+    const metaError = sanitizeWhatsAppApiError(rawBody);
     throw new Error(`WhatsApp API returned ${response.status}: ${JSON.stringify(metaError)}`);
   }
+  const payload = JSON.parse(rawBody) as { contacts?: Array<{ wa_id?: string }>; messages?: Array<{ id?: string }> };
+  const messageId = payload.messages?.[0]?.id;
+  if (!messageId) throw new Error("WhatsApp API accepted the request without returning a message ID.");
+  return { messageId, waId: payload.contacts?.[0]?.wa_id ?? null };
 }

@@ -54,6 +54,11 @@ async function ensureDatabase() {
       content TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
     await db.query(`CREATE INDEX IF NOT EXISTS messages_phone_created_idx ON messages(phone, created_at DESC)`);
+    await db.query(`UPDATE leads SET source='whatsapp'
+      WHERE source='simulator' AND EXISTS (
+        SELECT 1 FROM messages
+        WHERE messages.phone=leads.phone AND messages.external_id LIKE 'wamid.%'
+      )`);
     await db.query(`CREATE TABLE IF NOT EXISTS offers (
       id UUID PRIMARY KEY, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL, category TEXT NOT NULL,
       description TEXT NOT NULL, features JSONB NOT NULL DEFAULT '[]', price_zmw NUMERIC,
@@ -107,14 +112,24 @@ export async function getOrCreateLead(phone: string, source: Lead["source"]): Pr
   const db = database();
   if (!db) {
     const existing = memory.leads.get(phone);
-    if (existing) return existing;
+    if (existing) {
+      if (source === "whatsapp" && existing.source !== "whatsapp") {
+        const promoted = { ...existing, source: "whatsapp" as const };
+        memory.leads.set(phone, promoted);
+        return promoted;
+      }
+      return existing;
+    }
     const now = new Date().toISOString();
     const lead: Lead = { id: crypto.randomUUID(), phone, name: null, email: null, institution: null, programme: null, serviceInterest: null, deadline: null, packageName: null, status: "NEW LEAD", handoffReason: null, aiPaused: false, assignedTo: null, internalNote: null, source, createdAt: now, updatedAt: now };
     memory.leads.set(phone, lead);
     return lead;
   }
   const rows = await db.query(`INSERT INTO leads (id, phone, status, source) VALUES ($1,$2,'NEW LEAD',$3)
-    ON CONFLICT (phone) DO UPDATE SET updated_at = leads.updated_at RETURNING *`, [crypto.randomUUID(), phone, source]);
+    ON CONFLICT (phone) DO UPDATE SET
+      source = CASE WHEN EXCLUDED.source='whatsapp' THEN 'whatsapp' ELSE leads.source END,
+      updated_at = leads.updated_at
+    RETURNING *`, [crypto.randomUUID(), phone, source]);
   return mapLead(rows[0] as Record<string, unknown>);
 }
 

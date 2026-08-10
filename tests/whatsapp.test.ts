@@ -1,6 +1,11 @@
 import { createHmac } from "node:crypto";
-import { describe, expect, it } from "vitest";
-import { parseIncomingMessages, sanitizeWhatsAppApiError, verifyWhatsAppSignature } from "../lib/whatsapp";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { parseIncomingMessages, sanitizeWhatsAppApiError, sendWhatsAppText, verifyWhatsAppSignature } from "../lib/whatsapp";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 describe("WhatsApp webhook security", () => {
   it("accepts only a valid HMAC signature", () => {
@@ -36,6 +41,21 @@ describe("WhatsApp webhook security", () => {
       message: "Recipient [REDACTED_NUMBER] cannot be reached with Bearer [REDACTED]",
       details: "Phone [REDACTED_NUMBER] is not permitted",
       traceId: "A1b2C3"
+    });
+  });
+
+  it("returns Meta's accepted outgoing message ID", async () => {
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "1277782185417553");
+    vi.stubEnv("WHATSAPP_GRAPH_VERSION", "v25.0");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      contacts: [{ wa_id: "260970000000" }],
+      messages: [{ id: "wamid.outgoing" }]
+    }), { status: 200 })));
+
+    await expect(sendWhatsAppText("260970000000", "Hello")).resolves.toEqual({
+      messageId: "wamid.outgoing",
+      waId: "260970000000"
     });
   });
 });

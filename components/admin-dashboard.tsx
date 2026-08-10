@@ -6,7 +6,7 @@ import type { getSetupState } from "@/lib/env";
 import { leadStatuses, type ConversationMessage, type Lead, type Offer } from "@/lib/types";
 
 type Setup = ReturnType<typeof getSetupState>;
-type ConversationState = { lead: Lead; messages: ConversationMessage[]; replyWindow: { open: boolean; expiresAt: string | null } };
+type ConversationState = { lead: Lead; messages: ConversationMessage[]; replyWindow: { open: boolean; expiresAt: string | null }; delivery?: { status: "accepted" | "simulated"; messageId: string | null } };
 type Tab = "leads" | "offers" | "setup";
 const staffMembers = ["Dr. Mustafa Juma Phiri", "Dr Kanyembo Ng'andwe"] as const;
 
@@ -18,6 +18,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   const [conversation, setConversation] = useState<ConversationState | null>(null);
   const [conversationLoading, setConversationLoading] = useState(false);
   const [conversationError, setConversationError] = useState("");
+  const [conversationNotice, setConversationNotice] = useState("");
   const [replyText, setReplyText] = useState("");
   const [sender, setSender] = useState<(typeof staffMembers)[number]>(staffMembers[0]);
   const [note, setNote] = useState("");
@@ -95,7 +96,11 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
       setLeads((current) => current.map((lead) => lead.id === data.lead.id ? data.lead : lead));
       setReplyText("");
       setConversationError("");
-    } catch (error) { setConversationError(error instanceof Error ? error.message : "Unable to send the reply."); }
+      setConversationNotice(data.delivery?.status === "accepted" ? "Reply accepted by Meta for WhatsApp delivery." : "Simulator reply saved. No WhatsApp message was sent.");
+    } catch (error) {
+      setConversationNotice("");
+      setConversationError(error instanceof Error ? error.message : "Unable to send the reply.");
+    }
     finally { setSaving(false); }
   }
 
@@ -141,7 +146,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
             </button>)}
             {!filteredLeads.length && <div className="emptyState"><strong>No matching clients</strong><p>Adjust the search or status filter.</p></div>}
           </section>
-          <ConversationPanel conversation={conversation} loading={conversationLoading} error={conversationError} sender={sender} note={note} replyText={replyText} saving={saving} onSender={setSender} onNote={setNote} onReply={setReplyText} onPatch={patchLead} onSend={sendHumanReply} />
+          <ConversationPanel conversation={conversation} loading={conversationLoading} error={conversationError} notice={conversationNotice} sender={sender} note={note} replyText={replyText} saving={saving} onSender={setSender} onNote={setNote} onReply={setReplyText} onPatch={patchLead} onSend={sendHumanReply} />
         </div>
       </>}
 
@@ -151,7 +156,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   </main>;
 }
 
-function ConversationPanel(props: { conversation: ConversationState | null; loading: boolean; error: string; sender: (typeof staffMembers)[number]; note: string; replyText: string; saving: boolean; onSender: (value: (typeof staffMembers)[number]) => void; onNote: (value: string) => void; onReply: (value: string) => void; onPatch: (id: string, patch: Partial<Pick<Lead, "status" | "aiPaused" | "assignedTo" | "internalNote">>) => Promise<Lead | null>; onSend: () => Promise<void> }) {
+function ConversationPanel(props: { conversation: ConversationState | null; loading: boolean; error: string; notice: string; sender: (typeof staffMembers)[number]; note: string; replyText: string; saving: boolean; onSender: (value: (typeof staffMembers)[number]) => void; onNote: (value: string) => void; onReply: (value: string) => void; onPatch: (id: string, patch: Partial<Pick<Lead, "status" | "aiPaused" | "assignedTo" | "internalNote">>) => Promise<Lead | null>; onSend: () => Promise<void> }) {
   const { conversation, loading } = props;
   if (loading && !conversation) return <section className="conversationPanel"><div className="panelState">Loading conversation...</div></section>;
   if (!conversation) return <section className="conversationPanel"><div className="panelState"><strong>Select a client</strong><p>Review their history and manage the conversation here.</p></div></section>;
@@ -163,7 +168,8 @@ function ConversationPanel(props: { conversation: ConversationState | null; load
     <div className="conversationMeta"><span className={lead.aiPaused ? "humanMode" : "aiMode"}>{lead.aiPaused ? `AI paused${lead.assignedTo ? ` for ${lead.assignedTo}` : ""}` : "AI responding"}</span><span className={canFreeReply ? "windowOpen" : "windowClosed"}>{lead.source !== "whatsapp" ? "Simulator conversation" : conversation.replyWindow.open ? `Reply window open${conversation.replyWindow.expiresAt ? ` until ${new Date(conversation.replyWindow.expiresAt).toLocaleString()}` : ""}` : "24-hour window closed"}</span></div>
     <div className="messageTimeline">{conversation.messages.map((message) => <MessageBubble key={message.id} message={message} />)}{!conversation.messages.length && <div className="emptyState"><p>No messages yet.</p></div>}</div>
     {props.error && <div className="conversationError">{props.error}</div>}
-    <div className="replyComposer"><div className="composerTop"><label>Send as<select value={props.sender} onChange={(event) => props.onSender(event.target.value as (typeof staffMembers)[number])}>{staffMembers.map((staff) => <option key={staff}>{staff}</option>)}</select></label><span>{props.replyText.length}/4000</span></div><textarea value={props.replyText} maxLength={4000} onChange={(event) => props.onReply(event.target.value)} placeholder={lead.aiPaused ? "Write a personal reply..." : "Take over the conversation to reply as a human."} disabled={!lead.aiPaused || !canFreeReply} /><div className="composerFooter"><small>{!canFreeReply ? "An approved Meta template is required before you can reply." : lead.aiPaused ? "The AI remains paused while you manage this conversation." : "Take over first to prevent simultaneous AI and human replies."}</small><button className="button buttonPrimary" disabled={!lead.aiPaused || !canFreeReply || !props.replyText.trim() || props.saving} onClick={() => void props.onSend()}>{props.saving ? "Sending..." : "Send reply"}</button></div></div>
+    {props.notice && <div className="conversationNotice">{props.notice}</div>}
+    <div className="replyComposer"><div className="composerTop"><label>Send as<select value={props.sender} onChange={(event) => props.onSender(event.target.value as (typeof staffMembers)[number])}>{staffMembers.map((staff) => <option key={staff}>{staff}</option>)}</select></label><span>{props.replyText.length}/4000</span></div><textarea value={props.replyText} maxLength={4000} onChange={(event) => props.onReply(event.target.value)} placeholder={lead.aiPaused ? "Write a personal reply..." : "Take over the conversation to reply as a human."} disabled={!lead.aiPaused || !canFreeReply} /><div className="composerFooter"><small>{lead.source !== "whatsapp" ? "Simulator replies stay in the dashboard and are not sent through WhatsApp." : !canFreeReply ? "An approved Meta template is required before you can reply." : lead.aiPaused ? "The AI remains paused while you manage this conversation." : "Take over first to prevent simultaneous AI and human replies."}</small><button className="button buttonPrimary" disabled={!lead.aiPaused || !canFreeReply || !props.replyText.trim() || props.saving} onClick={() => void props.onSend()}>{props.saving ? (lead.source === "whatsapp" ? "Sending..." : "Saving...") : (lead.source === "whatsapp" ? "Send reply" : "Add simulator reply")}</button></div></div>
     <div className="internalNote"><div><strong>Internal note</strong><span>Visible only to administrators</span></div><textarea value={props.note} maxLength={2000} onChange={(event) => props.onNote(event.target.value)} placeholder="Add context, a follow-up reminder or next action." /><button className="button buttonGhost" disabled={props.saving || props.note === (lead.internalNote ?? "")} onClick={() => void props.onPatch(lead.id, { internalNote: props.note || null })}>Save note</button></div>
   </section>;
 }
