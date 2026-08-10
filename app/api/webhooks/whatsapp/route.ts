@@ -20,14 +20,24 @@ export async function POST(request: NextRequest) {
   after(async () => {
     for (const message of messages) {
       try {
+        console.info("WhatsApp message received", { messageId: message.id, phoneSuffix: message.phone.slice(-4) });
         const isNew = await addMessage(message.phone, "user", message.text, message.id);
         if (!isNew) continue;
         if (message.name) await updateLead(message.phone, { name: message.name });
-        const reply = await replyToClient(message.phone, message.text, "whatsapp");
-        await sendWhatsAppText(message.phone, reply);
+        const result = await replyToClient(message.phone, message.text, "whatsapp");
+        console.info("WhatsApp client reply generated", { messageId: message.id, hasReferral: Boolean(result.referralNotification) });
+        await sendWhatsAppText(message.phone, result.reply);
+        console.info("WhatsApp client reply sent", { messageId: message.id });
+        if (result.referralNotification) {
+          try {
+            await sendWhatsAppText(result.referralNotification.phone, result.referralNotification.body);
+            console.info("WhatsApp referral notification sent", { messageId: message.id, recipient: result.referralNotification.recipientName });
+          } catch (error) {
+            console.error("WhatsApp referral notification failed", { messageId: message.id, recipient: result.referralNotification.recipientName, error });
+          }
+        }
       } catch (error) { console.error("WhatsApp message processing failed", { messageId: message.id, error }); }
     }
   });
   return NextResponse.json({ received: true });
 }
-
