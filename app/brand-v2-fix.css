@@ -1,0 +1,15 @@
+:root {
+  --navy: #203a5a;
+  --navy-deep: #152d49;
+  --teal: #2fae9f;
+  --teal-deep: #1e8078;
+  --teal-soft: #e6f7f4;
+  --ink: #203a5a;
+  --muted: #62778a;
+  --green: #2fae9f;
+  --green-dark: #1e8078;
+  --mint: #e6f7f4;
+  --cream: #f7fafc;
+  --line: #d9e4ea;
+  --shadow: 0 24px 70px rgba(32,58,90,.13);
+}
