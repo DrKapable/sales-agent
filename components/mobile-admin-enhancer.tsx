@@ -5,18 +5,22 @@ import { createPortal } from "react-dom";
 import { BrandLogo } from "@/components/brand-logo";
 
 export function MobileAdminEnhancer() {
+  const [active, setActive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [actionsTarget, setActionsTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     const sidebar = document.querySelector<HTMLElement>(".sidebar");
-    sidebar?.classList.toggle("mobileOpen", menuOpen);
-  }, [menuOpen]);
+    sidebar?.classList.toggle("mobileOpen", active && menuOpen);
+    if (!active) setMenuOpen(false);
+  }, [active, menuOpen]);
 
   useEffect(() => {
     const syncTargets = () => {
+      const dashboard = document.querySelector<HTMLElement>(".dashboard");
       const actions = document.querySelector<HTMLElement>(".conversationPanel .conversationActions");
+      setActive(Boolean(dashboard));
       setActionsTarget((current) => current === actions ? current : actions);
     };
 
@@ -38,11 +42,13 @@ export function MobileAdminEnhancer() {
 
   useEffect(() => {
     const panel = document.querySelector<HTMLElement>(".conversationPanel");
-    panel?.classList.toggle("mobileToolsOpen", toolsOpen);
+    panel?.classList.toggle("mobileToolsOpen", active && toolsOpen);
     return () => panel?.classList.remove("mobileToolsOpen");
-  }, [toolsOpen, actionsTarget]);
+  }, [active, toolsOpen, actionsTarget]);
 
   useEffect(() => { setToolsOpen(false); }, [actionsTarget]);
+
+  if (!active) return null;
 
   return <>
     <div className="mobileAdminBar" aria-label="Agent Admin mobile navigation">
