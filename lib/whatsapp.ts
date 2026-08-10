@@ -73,6 +73,7 @@ export async function sendWhatsAppText(phone: string, body: string) {
   if (!/^v\d+\.\d+$/.test(version) || !/^\d+$/.test(phoneNumberId)) throw new Error("Invalid WhatsApp Graph configuration.");
   const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
     method: "POST",
+    signal: AbortSignal.timeout(12000),
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: phone, type: "text", text: { preview_url: false, body } })
   });
