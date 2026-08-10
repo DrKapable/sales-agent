@@ -10,6 +10,7 @@ A production-oriented WhatsApp sales assistant for MedMinds Learning Centre. It 
 - A management-approved catalogue for research, Pa Gym, courses, academic support and digital services
 - Admin-controlled standard and rush prices, features, payment instructions, and offer activation
 - Lead pipeline with MedMinds sales statuses
+- Automatic WhatsApp referral summaries to the appropriate MedMinds team member
 - Persistent Postgres support, with clearly marked temporary memory mode
 - Secure signed administrator session
 - Browser-based conversation simulator
@@ -67,6 +68,7 @@ Use the same value for Meta's verify token and `WHATSAPP_VERIFY_TOKEN`. Subscrib
 - The versioned catalogue is loaded once into new or existing databases. Later admin edits are preserved.
 - Research ranges use their midpoint for a 14-day deadline and their upper limit for deadlines under 14 days.
 - Payments use the approved Juma Phiri account on 0977259132. Dr. Mustafa Juma Phiri handles payment confirmation and discounts; Dr Kanyembo Ng'andwe handles other enquiries.
+- Live WhatsApp referrals send the assigned team member the client's name, contact, service details, deadline, reason and concise conversation summary. Simulator referrals are recorded without sending staff notifications.
 - Active custom-quote services may have no numeric price, but must contain approved quotation instructions.
 - The AI cannot mark a lead converted. Conversion requires confirmation by the external payment process or an authorised administrator.
 - Refunds, disputes, complaints, special discounts, custom quotations, and unavailable verified information trigger human assistance.
