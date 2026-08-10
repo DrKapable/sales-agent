@@ -51,8 +51,8 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
       summary: z.string().min(10).max(900).describe("A concise factual summary of the client's request and relevant conversation details.")
     }),
     execute: async ({ referralType, reason, summary }) => {
-      const savedLead = await updateLead(phone, { status: "HUMAN ASSISTANCE REQUIRED", handoffReason: reason });
       const recipient = recipientForReferral(referralType);
+      const savedLead = await updateLead(phone, { status: "HUMAN ASSISTANCE REQUIRED", handoffReason: reason, aiPaused: true, assignedTo: recipient.name });
       if (source === "whatsapp") {
         referralNotification = {
           phone: recipient.phone,

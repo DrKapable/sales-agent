@@ -11,6 +11,8 @@ A production-oriented WhatsApp sales assistant for MedMinds Learning Centre. It 
 - Admin-controlled standard and rush prices, features, payment instructions, and offer activation
 - Lead pipeline with MedMinds sales statuses
 - Automatic WhatsApp referral summaries to the appropriate MedMinds team member
+- Admin client inbox with full conversation history, human takeover, direct staff replies and AI resume controls
+- Lead search, status filtering, staff assignment, internal notes and CSV export
 - Persistent Postgres support, with clearly marked temporary memory mode
 - Secure signed administrator session
 - Browser-based conversation simulator
@@ -71,6 +73,8 @@ Use the same value for Meta's verify token and `WHATSAPP_VERIFY_TOKEN`. Subscrib
 - Live WhatsApp referrals send the assigned team member the client's name, contact, service details, deadline, reason and concise conversation summary. Simulator referrals are recorded without sending staff notifications.
 - The client reply is always sent before a staff referral notification, and Meta API calls have a bounded timeout so staff delivery cannot block client responses.
 - Live WhatsApp replies use a variable 6 to 15-second target from the start of processing. If AI generation already takes that long, no additional delay is added.
+- A human takeover pauses future AI replies for that client. New client messages remain visible in the inbox until staff reply or resume AI.
+- Human free-text replies are permitted only inside Meta's 24-hour client-service window. Outside the window, the dashboard requires an approved template.
 - Active custom-quote services may have no numeric price, but must contain approved quotation instructions.
 - The AI cannot mark a lead converted. Conversion requires confirmation by the external payment process or an authorised administrator.
 - Refunds, disputes, complaints, special discounts, custom quotations, and unavailable verified information trigger human assistance.

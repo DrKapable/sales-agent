@@ -1,6 +1,6 @@
 import { after, NextRequest, NextResponse } from "next/server";
 import { replyToClient } from "@/lib/ai/sales-agent";
-import { addMessage, updateLead } from "@/lib/store";
+import { addMessage, getOrCreateLead, updateLead } from "@/lib/store";
 import { humanReplyDelayMs, wait } from "@/lib/timing";
 import { parseIncomingMessages, sendWhatsAppText, verifyWhatsAppSignature } from "@/lib/whatsapp";
 
@@ -25,7 +25,13 @@ export async function POST(request: NextRequest) {
         console.info("WhatsApp message received", { messageId: message.id, phoneSuffix: message.phone.slice(-4) });
         const isNew = await addMessage(message.phone, "user", message.text, message.id);
         if (!isNew) continue;
-        if (message.name) await updateLead(message.phone, { name: message.name });
+        const lead = message.name
+          ? await updateLead(message.phone, { name: message.name })
+          : await getOrCreateLead(message.phone, "whatsapp");
+        if (lead.aiPaused) {
+          console.info("WhatsApp AI reply skipped for human-managed conversation", { messageId: message.id, assignedTo: lead.assignedTo });
+          continue;
+        }
         const result = await replyToClient(message.phone, message.text, "whatsapp");
         console.info("WhatsApp client reply generated", { messageId: message.id, hasReferral: Boolean(result.referralNotification) });
         const replyDelayMs = humanReplyDelayMs(Date.now() - processingStartedAt);

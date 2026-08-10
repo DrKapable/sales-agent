@@ -14,6 +14,9 @@ const lead: Lead = {
   packageName: null,
   status: "HUMAN ASSISTANCE REQUIRED",
   handoffReason: "Discount request",
+  aiPaused: true,
+  assignedTo: "Dr. Mustafa Juma Phiri",
+  internalNote: null,
   source: "whatsapp",
   createdAt: "2026-08-10T00:00:00.000Z",
   updatedAt: "2026-08-10T00:00:00.000Z"

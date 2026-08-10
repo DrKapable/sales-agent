@@ -24,6 +24,9 @@ export type Lead = {
   packageName: string | null;
   status: LeadStatus;
   handoffReason: string | null;
+  aiPaused: boolean;
+  assignedTo: string | null;
+  internalNote: string | null;
   source: "whatsapp" | "simulator";
   createdAt: string;
   updatedAt: string;
@@ -54,5 +57,6 @@ export type Offer = {
 
 export type LeadPatch = Partial<Pick<Lead,
   "name" | "email" | "institution" | "programme" | "serviceInterest" |
-  "deadline" | "packageName" | "status" | "handoffReason"
+  "deadline" | "packageName" | "status" | "handoffReason" | "aiPaused" |
+  "assignedTo" | "internalNote"
 >>;
