@@ -111,12 +111,16 @@ td strong, td small { display: block; }
 td small { margin-top: 4px; color: var(--muted); }
 td select { max-width: 205px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: white; font-size: 11px; }
 .offerGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.offerToolbar { display: grid; grid-template-columns: minmax(220px,1fr) minmax(190px,.45fr) auto; gap: 10px; align-items: center; margin-bottom: 16px; }
+.offerToolbar input, .offerToolbar select { min-height: 43px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: white; color: var(--ink); }
+.offerToolbar span { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .offerCard { padding: 25px; border: 1px solid var(--line); border-radius: 17px; background: white; }
 .offerTop { display: flex; justify-content: space-between; gap: 20px; }
 .offerTop span { color: var(--green); font-size: 10px; text-transform: uppercase; font-weight: 800; }
 .offerTop h3 { margin: 5px 0 20px; font: 700 25px/1.2 Georgia, serif; }
 .offerCard label { margin-bottom: 14px; color: var(--muted); font-size: 11px; font-weight: 700; }
 .offerCard textarea { min-height: 74px; resize: vertical; }
+.priceGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
 .switch input { display: none; }
 .switch span { width: 42px; height: 24px; position: relative; border-radius: 30px; background: #ccd5d1; }
 .switch span::after { content: ""; position: absolute; width: 18px; height: 18px; top: 3px; left: 3px; border-radius: 50%; background: white; transition: .2s; }
@@ -167,8 +171,8 @@ td select { max-width: 205px; border: 1px solid var(--line); border-radius: 8px;
   .dashboardHeader h1 { font-size: 32px; }
   .setupBadge { max-width: 110px; text-align: center; }
   .metricGrid, .offerGrid, .setupGrid { grid-template-columns: 1fr; }
+  .offerToolbar, .priceGrid { grid-template-columns: 1fr; }
   .metricGrid { grid-template-columns: repeat(2,1fr); }
   .metricGrid div { padding: 17px; }
   .metricGrid strong { font-size: 27px; }
 }
-
