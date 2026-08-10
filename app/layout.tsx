@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import { MobileAdminEnhancer } from "@/components/mobile-admin-enhancer";
 import "./globals.css";
 import "./admin-mobile.css";
+import "./admin-mobile-v4.css";
 
 export const metadata: Metadata = {
   title: "MedMinds Sales Agent",
@@ -10,5 +12,5 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body><MobileAdminEnhancer />{children}</body></html>;
 }
