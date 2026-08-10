@@ -16,7 +16,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   let referralNotification: SalesAgentResult["referralNotification"] = null;
 
   const updateLeadTool = tool({
-    description: "Save genuinely new client details or update the sales status. Do not ask again for information already in the lead record. Never mark a lead converted without verified payment confirmation.",
+    description: "Save new client details or update the sales status. Never mark a lead converted without verified payment confirmation.",
     inputSchema: z.object({
       name: z.string().min(1).max(120).optional(),
       email: z.string().email().optional(),
@@ -35,23 +35,16 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const approvedOffersTool = tool({
-    description: "Search active management-approved MedMinds packages, prices, features and payment instructions. Use this before saying a price or service detail is unavailable. Pass ordinary service words such as 'masters research proposal', 'Pa Gym OSCE' or 'quantitative analysis'.",
-    inputSchema: z.object({ query: z.string().max(160).optional() }),
-    execute: async ({ query }) => {
-      const ignored = new Set(["the", "and", "for", "with", "how", "much", "price", "cost", "service", "services", "writing", "level"]);
-      const terms = (query ?? "").toLowerCase().replace(/[’']/g, "").split(/[^a-z0-9]+/).filter((term) => term.length > 2 && !ignored.has(term));
-      const ranked = (await listOffers(true)).map((offer) => {
-        const haystack = `${offer.name} ${offer.slug} ${offer.category} ${offer.description} ${offer.features.join(" ")}`.toLowerCase().replace(/[’']/g, "");
-        const score = terms.reduce((total, term) => total + (haystack.includes(term) ? 1 : 0), 0);
-        return { offer, score };
-      }).filter(({ score }) => !terms.length || score > 0).sort((a, b) => b.score - a.score).slice(0, 10);
-      const offers = ranked.map(({ offer }) => offer);
-      return offers.length ? offers.map(({ name, category: offerCategory, description, features, priceZmw, rushPriceZmw, paymentInstructions }) => ({ name, category: offerCategory, description, features, standardPriceZmw: priceZmw, rushPriceZmw, paymentInstructions })) : { available: false, instruction: "No direct approved offer matched. Try one broader service word before considering a human referral. Do not guess a price." };
+    description: "Retrieve currently active, management-approved packages, prices, features, and payment instructions. Use this before quoting any price or promotion.",
+    inputSchema: z.object({ category: z.string().max(80).optional() }),
+    execute: async ({ category }) => {
+      const offers = (await listOffers(true)).filter((offer) => !category || offer.category.toLowerCase().includes(category.toLowerCase()));
+      return offers.length ? offers.map(({ name, category: offerCategory, description, features, priceZmw, rushPriceZmw, paymentInstructions }) => ({ name, category: offerCategory, description, features, standardPriceZmw: priceZmw, rushPriceZmw, paymentInstructions })) : { available: false, instruction: "No verified active offer matches this request. Do not guess. Arrange human confirmation." };
     }
   });
 
   const handoffTool = tool({
-    description: "Refer a client only when a person is genuinely required: explicit human request, custom quotation or null-price service, payment confirmation/refund/dispute, discount request, serious complaint, sensitive judgement, or an unresolved issue after approved-offer search. Do not use this for ordinary greetings, thanks, service questions or pricing questions that approved offer data can answer.",
+    description: "Refer a client and notify the correct MedMinds team member. Use payment for payment confirmation, refunds or payment concerns; discount for any discount request; and general for service enquiries, custom quotations, complaints or other assistance.",
     inputSchema: z.object({
       referralType: z.enum(["payment", "discount", "general"]),
       reason: z.string().min(3).max(500),
@@ -71,23 +64,22 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
         queued: true,
         assignedTo: recipient.name,
         notificationQueued: source === "whatsapp",
-        instruction: `Acknowledge the client's specific issue briefly and say ${recipient.name} will pick it up. Mention the referral once and avoid generic waiting language.`
+        instruction: `Tell the client the referral has been recorded for ${recipient.name}, who will assist them.`
       };
     }
   });
 
   const agent = new ToolLoopAgent({
     model: gateway(process.env.AI_MODEL || "openai/gpt-5.6-luna"),
-    instructions: `${SALES_AGENT_PROMPT}\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers, prices and payment instructions.`,
+    instructions: `${SALES_AGENT_PROMPT}\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers and prices.`,
     tools: { getApprovedOffers: approvedOffersTool, updateLead: updateLeadTool, requestHumanAssistance: handoffTool }
   });
 
   const latestStored = history.at(-1)?.role === "user" && history.at(-1)?.content === text;
   const transcript = [...history, ...(latestStored ? [] : [{ role: "user" as const, content: text }])]
     .map((message) => `${message.role === "user" ? "Client" : "Agent"}: ${message.content}`).join("\n");
-  const result = await agent.generate({ prompt: `This is one chronological WhatsApp conversation. Continue naturally from the latest client message.\n\n${transcript}\n\nDo not restart the conversation, repeat an earlier canned reply, or refer routine questions to a human. If the latest message is only a nudge such as hey or ?, continue the unresolved question immediately before it. Use approved offer data before saying a price or service detail is unavailable. Reply only with the WhatsApp message to send.` });
-  const fallback = referralNotification ? `I've passed that to ${referralNotification.recipientName}. They'll pick it up from here.` : "Sorry, I missed that. Could you send that once more?";
-  const reply = (result.text.trim() || fallback).replaceAll("—", ",");
+  const result = await agent.generate({ prompt: `Conversation including the client's latest message:\n${transcript}\n\nReply only with the WhatsApp message to send.` });
+  const reply = (result.text.trim() || "I'll refer this to a member of the MedMinds team so they can assist you properly.").replaceAll("—", ",");
   await addMessage(phone, "assistant", reply);
   return { reply, referralNotification: referralNotification as SalesAgentResult["referralNotification"] };
 }
