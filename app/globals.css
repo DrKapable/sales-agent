@@ -450,3 +450,210 @@ td select { max-width: 205px; border: 1px solid var(--line); border-radius: 8px;
   .timelineBubble p { font-size: 14px; }
   .replyComposer textarea { min-height: 96px; font-size: 16px; }
 }
+
+/* Conversation workspace usability audit */
+.conversationPanel {
+  overflow: hidden;
+}
+.conversationHeader,
+.controlStrip,
+.conversationMeta,
+.followUpTools,
+.conversationError,
+.conversationNotice,
+.internalNoteDetails,
+.replyComposer {
+  flex: 0 0 auto;
+}
+.leadList,
+.messageTimeline {
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+.messageTimeline {
+  flex: 1 1 auto;
+  min-height: 0;
+  scroll-behavior: smooth;
+}
+.replyComposer {
+  position: relative;
+  z-index: 5;
+  padding-bottom: max(17px, env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 32px rgba(16,43,40,.09);
+}
+.composerInputRow {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 10px;
+}
+.composerInputRow textarea {
+  min-height: 96px;
+  max-height: 140px;
+  margin: 0;
+  resize: none;
+}
+.sendReplyButton {
+  min-width: 142px;
+  min-height: 96px;
+  align-self: stretch;
+}
+.composerFooter {
+  align-items: center;
+  margin-top: 8px;
+}
+.composerFooter > span {
+  flex: none;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.internalNoteDetails {
+  border-top: 1px solid var(--line);
+  background: #fffdf7;
+}
+.internalNoteDetails summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 20px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.internalNoteDetails summary::-webkit-details-marker {
+  display: none;
+}
+.internalNoteDetails summary::after {
+  content: "+";
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--green-dark);
+  background: white;
+  font-size: 17px;
+  line-height: 1;
+}
+.internalNoteDetails[open] summary::after {
+  content: "−";
+}
+.internalNoteDetails summary > span {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+.internalNoteDetails summary strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+.internalNoteDetails summary small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.internalNoteDetails summary b {
+  color: var(--green-dark);
+  font-size: 10px;
+}
+.internalNoteDetails .internalNote {
+  grid-template-columns: minmax(0,1fr) auto;
+  padding: 0 20px 14px;
+  border: 0;
+}
+.internalNoteDetails .internalNote textarea {
+  grid-column: auto;
+  min-height: 64px;
+}
+.button:focus-visible,
+.iconButton:focus-visible,
+.leadListItem:focus-visible,
+.pipeline button:focus-visible,
+.sidebar button:focus-visible,
+.quickReplies button:focus-visible,
+.followUpTools button:focus-visible,
+.internalNoteDetails summary:focus-visible,
+.conversationPanel input:focus-visible,
+.conversationPanel select:focus-visible,
+.conversationPanel textarea:focus-visible {
+  outline: 3px solid rgba(42,157,143,.32);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .conversationPanel {
+    height: 820px;
+    min-height: 820px;
+    max-height: 820px;
+  }
+  .messageTimeline {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .conversationPanel {
+    height: min(820px, calc(100dvh - 108px));
+    min-height: 660px;
+    max-height: 820px;
+  }
+  .controlStrip {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    padding: 11px 12px;
+  }
+  .controlStrip > .button {
+    grid-column: 1 / -1;
+  }
+  .followUpTools {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .messageTimeline {
+    min-height: 0;
+    padding: 14px 10px;
+  }
+  .internalNoteDetails summary {
+    padding-inline: 12px;
+  }
+  .internalNoteDetails .internalNote {
+    grid-template-columns: 1fr;
+    padding-inline: 12px;
+  }
+  .replyComposer {
+    padding: 13px 12px max(13px, env(safe-area-inset-bottom));
+  }
+  .composerInputRow {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .composerInputRow textarea {
+    min-height: 76px;
+    max-height: 108px;
+  }
+  .sendReplyButton {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+  }
+  .composerFooter {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+  .composerFooter small {
+    max-width: none;
+  }
+  .composerFooter > span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .messageTimeline {
+    scroll-behavior: auto;
+  }
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import type { getSetupState } from "@/lib/env";
 import { leadPriorities, leadStatuses, type ConversationMessage, type Lead, type Offer } from "@/lib/types";
@@ -166,20 +166,46 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
 
 function ConversationPanel(props: { conversation: ConversationState | null; loading: boolean; error: string; notice: string; sender: (typeof staffMembers)[number]; note: string; replyText: string; saving: boolean; onSender: (value: (typeof staffMembers)[number]) => void; onNote: (value: string) => void; onReply: (value: string) => void; onPatch: (id: string, patch: Partial<Pick<Lead, "status" | "aiPaused" | "assignedTo" | "internalNote" | "priority" | "followUpAt">>) => Promise<Lead | null>; onSend: () => Promise<void> }) {
   const { conversation, loading } = props;
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const conversationId = conversation?.lead.id ?? null;
+  const messageCount = conversation?.messages.length ?? 0;
+
+  useEffect(() => {
+    const timeline = timelineRef.current;
+    if (timeline) timeline.scrollTop = timeline.scrollHeight;
+  }, [conversationId, messageCount]);
+
   if (loading && !conversation) return <section className="conversationPanel"><div className="panelState">Loading conversation...</div></section>;
   if (!conversation) return <section className="conversationPanel"><div className="panelState"><strong>Select a client</strong><p>Review their history and manage the conversation here.</p></div></section>;
   const lead = conversation.lead;
   const canFreeReply = lead.source !== "whatsapp" || conversation.replyWindow.open;
+  const replyDisabled = !lead.aiPaused || !canFreeReply || !props.replyText.trim() || props.saving;
+
+  function handleReplyShortcut(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && !replyDisabled) {
+      event.preventDefault();
+      void props.onSend();
+    }
+  }
+
   return <section className="conversationPanel">
-    <header className="conversationHeader"><div className="clientIdentity"><span className="clientAvatar large">{initials(lead.name)}</span><div><strong>{lead.name || "Unnamed client"}</strong><span>{lead.phone} · {lead.serviceInterest || "Service not established"}</span></div></div><div className="conversationActions"><button className="iconButton" onClick={() => navigator.clipboard.writeText(lead.phone)}>Copy number</button><a className="iconButton" href={`https://wa.me/${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">Open WhatsApp</a></div></header>
+    <header className="conversationHeader"><div className="clientIdentity"><span className="clientAvatar large">{initials(lead.name)}</span><div><strong>{lead.name || "Unnamed client"}</strong><span>{lead.phone} · {lead.serviceInterest || "Service not established"}</span></div></div><div className="conversationActions"><button type="button" className="iconButton" onClick={() => navigator.clipboard.writeText(lead.phone)}>Copy number</button><a className="iconButton" href={`https://wa.me/${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">Open WhatsApp</a></div></header>
     <div className="controlStrip"><label>Assigned to<select value={lead.assignedTo ?? ""} onChange={(event) => void props.onPatch(lead.id, { assignedTo: event.target.value ? event.target.value as Lead["assignedTo"] : null })}><option value="">Unassigned</option>{staffMembers.map((staff) => <option key={staff}>{staff}</option>)}</select></label><label>Status<select value={lead.status} onChange={(event) => void props.onPatch(lead.id, { status: event.target.value as Lead["status"] })}>{leadStatuses.map((status) => <option key={status}>{status}</option>)}</select></label><label>Priority<select value={lead.priority} onChange={(event) => void props.onPatch(lead.id, { priority: event.target.value as Lead["priority"] })}>{leadPriorities.map((priority) => <option key={priority}>{priority}</option>)}</select></label>{lead.aiPaused ? <button className="button resumeButton" disabled={props.saving} onClick={() => void props.onPatch(lead.id, { aiPaused: false, assignedTo: null, status: "FOLLOW-UP REQUIRED" })}>Resume AI</button> : <button className="button takeoverButton" disabled={props.saving} onClick={() => void props.onPatch(lead.id, { aiPaused: true, assignedTo: props.sender, status: "HUMAN ASSISTANCE REQUIRED" })}>Take over</button>}</div>
     <div className="conversationMeta"><span className={lead.aiPaused ? "humanMode" : "aiMode"}>{lead.aiPaused ? `AI paused${lead.assignedTo ? ` for ${lead.assignedTo}` : ""}` : "AI responding"}</span><span className={canFreeReply ? "windowOpen" : "windowClosed"}>{lead.source !== "whatsapp" ? "Simulator conversation" : conversation.replyWindow.open ? `Reply window open${conversation.replyWindow.expiresAt ? ` until ${new Date(conversation.replyWindow.expiresAt).toLocaleString()}` : ""}` : "24-hour window closed"}</span></div>
     <div className={`followUpTools ${isFollowUpDue(lead) ? "overdue" : ""}`}><label>Next follow-up<input type="datetime-local" value={toLocalDateTimeInput(lead.followUpAt)} onChange={(event) => void props.onPatch(lead.id, { followUpAt: event.target.value ? new Date(event.target.value).toISOString() : null })} /></label><div><button type="button" onClick={() => void props.onPatch(lead.id, { followUpAt: futureIso(24), status: "FOLLOW-UP REQUIRED" })}>Tomorrow</button><button type="button" onClick={() => void props.onPatch(lead.id, { followUpAt: futureIso(72), status: "FOLLOW-UP REQUIRED" })}>In 3 days</button>{lead.followUpAt && <button type="button" onClick={() => void props.onPatch(lead.id, { followUpAt: null })}>Clear</button>}</div><span>{lead.followUpAt ? followUpLabel(lead.followUpAt) : "No follow-up scheduled"}</span></div>
-    <div className="messageTimeline">{conversation.messages.map((message) => <MessageBubble key={message.id} message={message} />)}{!conversation.messages.length && <div className="emptyState"><p>No messages yet.</p></div>}</div>
+    <div ref={timelineRef} className="messageTimeline" aria-live="polite" aria-label={`Conversation with ${lead.name || lead.phone}`}>{conversation.messages.map((message) => <MessageBubble key={message.id} message={message} />)}{!conversation.messages.length && <div className="emptyState"><p>No messages yet.</p></div>}</div>
     {props.error && <div className="conversationError">{props.error}</div>}
     {props.notice && <div className="conversationNotice">{props.notice}</div>}
-    <div className="replyComposer"><div className="composerTop"><label>Send as<select value={props.sender} onChange={(event) => props.onSender(event.target.value as (typeof staffMembers)[number])}>{staffMembers.map((staff) => <option key={staff}>{staff}</option>)}</select></label><span>{props.replyText.length}/4000</span></div><div className="quickReplies" aria-label="Quick replies">{quickReplies.map((reply) => <button key={reply.label} type="button" onClick={() => props.onReply(reply.text)} disabled={!lead.aiPaused || !canFreeReply}>{reply.label}</button>)}</div><textarea value={props.replyText} maxLength={4000} onChange={(event) => props.onReply(event.target.value)} placeholder={lead.aiPaused ? "Write a personal reply..." : "Take over the conversation to reply as a human."} disabled={!lead.aiPaused || !canFreeReply} /><div className="composerFooter"><small>{lead.source !== "whatsapp" ? "Simulator replies stay in the dashboard and are not sent through WhatsApp." : !canFreeReply ? "An approved Meta template is required before you can reply." : lead.aiPaused ? "The AI remains paused while you manage this conversation." : "Take over first to prevent simultaneous AI and human replies."}</small><button className="button buttonPrimary" disabled={!lead.aiPaused || !canFreeReply || !props.replyText.trim() || props.saving} onClick={() => void props.onSend()}>{props.saving ? (lead.source === "whatsapp" ? "Sending..." : "Saving...") : (lead.source === "whatsapp" ? "Send reply" : "Add simulator reply")}</button></div></div>
-    <div className="internalNote"><div><strong>Internal note</strong><span>Visible only to administrators</span></div><textarea value={props.note} maxLength={2000} onChange={(event) => props.onNote(event.target.value)} placeholder="Add context, a follow-up reminder or next action." /><button className="button buttonGhost" disabled={props.saving || props.note === (lead.internalNote ?? "")} onClick={() => void props.onPatch(lead.id, { internalNote: props.note || null })}>Save note</button></div>
+    <details className="internalNoteDetails">
+      <summary><span><strong>Internal note</strong><small>Visible only to administrators</small></span><b>{props.note ? "Saved context" : "Add note"}</b></summary>
+      <div className="internalNote"><textarea aria-label="Internal note" value={props.note} maxLength={2000} onChange={(event) => props.onNote(event.target.value)} placeholder="Add context, a follow-up reminder or next action." /><button type="button" className="button buttonGhost" disabled={props.saving || props.note === (lead.internalNote ?? "")} onClick={() => void props.onPatch(lead.id, { internalNote: props.note || null })}>Save note</button></div>
+    </details>
+    <div className="replyComposer">
+      <div className="composerTop"><label>Send as<select value={props.sender} onChange={(event) => props.onSender(event.target.value as (typeof staffMembers)[number])}>{staffMembers.map((staff) => <option key={staff}>{staff}</option>)}</select></label><span>{props.replyText.length}/4000</span></div>
+      <div className="quickReplies" aria-label="Quick replies">{quickReplies.map((reply) => <button key={reply.label} type="button" onClick={() => props.onReply(reply.text)} disabled={!lead.aiPaused || !canFreeReply}>{reply.label}</button>)}</div>
+      <div className="composerInputRow"><textarea aria-label="Reply to client" value={props.replyText} maxLength={4000} onChange={(event) => props.onReply(event.target.value)} onKeyDown={handleReplyShortcut} placeholder={lead.aiPaused ? "Write a personal reply..." : "Take over the conversation to reply as a human."} disabled={!lead.aiPaused || !canFreeReply} /><button type="button" className="button buttonPrimary sendReplyButton" disabled={replyDisabled} onClick={() => void props.onSend()}>{props.saving ? (lead.source === "whatsapp" ? "Sending..." : "Saving...") : (lead.source === "whatsapp" ? "Send reply" : "Add simulator reply")}</button></div>
+      <div className="composerFooter"><small>{lead.source !== "whatsapp" ? "Simulator replies stay in the dashboard and are not sent through WhatsApp." : !canFreeReply ? "An approved Meta template is required before you can reply." : lead.aiPaused ? "The AI remains paused while you manage this conversation." : "Take over first to prevent simultaneous AI and human replies."}</small><span>Ctrl + Enter to send</span></div>
+    </div>
   </section>;
 }
 
