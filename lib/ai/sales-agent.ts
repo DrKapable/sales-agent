@@ -1,6 +1,8 @@
 import { gateway, tool, ToolLoopAgent } from "ai";
 import { z } from "zod";
 import { SALES_AGENT_PROMPT } from "@/lib/ai/prompt";
+import { getAiModel } from "@/lib/env";
+import { restoreChat } from "@/lib/chat-lifecycle";
 import { addMessage, getConversation, getOrCreateLead, listOffers, updateLead } from "@/lib/store";
 import { buildReferralMessage, recipientForReferral } from "@/lib/referrals";
 import { leadStatuses, type LeadPatch } from "@/lib/types";
@@ -11,6 +13,7 @@ export type SalesAgentResult = {
 };
 
 export async function replyToClient(phone: string, text: string, source: "whatsapp" | "simulator"): Promise<SalesAgentResult> {
+  await restoreChat(phone).catch(() => undefined);
   const lead = await getOrCreateLead(phone, source);
   const history = await getConversation(phone);
   let referralNotification: SalesAgentResult["referralNotification"] = null;
@@ -73,7 +76,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const agent = new ToolLoopAgent({
-    model: gateway(process.env.AI_MODEL || "openai/gpt-5.6-luna"),
+    model: gateway(getAiModel()),
     instructions: `${SALES_AGENT_PROMPT}\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers and prices.`,
     tools: { getApprovedOffers: approvedOffersTool, updateLead: updateLeadTool, requestHumanAssistance: handoffTool }
   });
@@ -82,7 +85,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const transcript = [...history, ...(latestStored ? [] : [{ role: "user" as const, content: text }])]
     .map((message) => `${message.role === "user" ? "Client" : "Agent"}: ${message.content}`).join("\n");
   const result = await agent.generate({ prompt: `Conversation including the client's latest message:\n${transcript}\n\nReply only with the WhatsApp message to send.` });
-  const reply = (result.text.trim() || "I'll refer this to a member of the MedMinds team so they can assist you properly.").replaceAll("—", ",");
+  const reply = (result.text.trim() || "I’ll make sure a MedMinds team member helps with that.").replaceAll("—", ",");
   await addMessage(phone, "assistant", reply);
   return { reply, referralNotification: referralNotification as SalesAgentResult["referralNotification"] };
 }
