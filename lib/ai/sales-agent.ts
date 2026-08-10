@@ -3,46 +3,12 @@ import { z } from "zod";
 import { SALES_AGENT_PROMPT } from "@/lib/ai/prompt";
 import { addMessage, getConversation, getOrCreateLead, listOffers, updateLead } from "@/lib/store";
 import { buildReferralMessage, recipientForReferral } from "@/lib/referrals";
-import { leadStatuses, type LeadPatch, type Offer } from "@/lib/types";
+import { leadStatuses, type LeadPatch } from "@/lib/types";
 
 export type SalesAgentResult = {
   reply: string;
   referralNotification: { phone: string; recipientName: string; body: string } | null;
 };
-
-const OFFER_SEARCH_STOP_WORDS = new Set([
-  "a", "an", "and", "are", "cost", "do", "does", "for", "how", "is", "it", "level", "much", "of", "price", "service", "services", "the", "to", "what", "with", "writing"
-]);
-
-function normalizeOfferSearch(value: string) {
-  return value.toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function offerSearchTerms(value: string) {
-  return normalizeOfferSearch(value).split(/\s+/).filter((term) => term.length > 1 && !OFFER_SEARCH_STOP_WORDS.has(term));
-}
-
-function rankApprovedOffers(offers: Offer[], query?: string) {
-  if (!query?.trim()) return offers;
-  const normalizedQuery = normalizeOfferSearch(query);
-  const terms = offerSearchTerms(query);
-  if (!terms.length) return offers;
-
-  return offers
-    .map((offer) => {
-      const name = normalizeOfferSearch(offer.name);
-      const slug = normalizeOfferSearch(offer.slug);
-      const searchable = normalizeOfferSearch([offer.name, offer.slug, offer.category, offer.description, ...offer.features].join(" "));
-      const matchedTerms = terms.filter((term) => searchable.includes(term)).length;
-      const exactNameBonus = normalizedQuery && name.includes(normalizedQuery) ? 8 : 0;
-      const exactSlugBonus = normalizedQuery && slug.includes(normalizedQuery) ? 5 : 0;
-      return { offer, score: matchedTerms * 3 + exactNameBonus + exactSlugBonus };
-    })
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score || a.offer.name.localeCompare(b.offer.name))
-    .slice(0, 8)
-    .map(({ offer }) => offer);
-}
 
 export async function replyToClient(phone: string, text: string, source: "whatsapp" | "simulator"): Promise<SalesAgentResult> {
   const lead = await getOrCreateLead(phone, source);
@@ -50,7 +16,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   let referralNotification: SalesAgentResult["referralNotification"] = null;
 
   const updateLeadTool = tool({
-    description: "Save genuinely new client details or update the sales status. Do not ask for information that is already in the lead record. Never mark a lead converted without verified payment confirmation.",
+    description: "Save genuinely new client details or update the sales status. Do not ask again for information already in the lead record. Never mark a lead converted without verified payment confirmation.",
     inputSchema: z.object({
       name: z.string().min(1).max(120).optional(),
       email: z.string().email().optional(),
@@ -69,27 +35,18 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const approvedOffersTool = tool({
-    description: "Search management-approved MedMinds services, packages, prices, features and payment instructions using ordinary client wording. Use this before saying a service detail or price is unavailable. Example queries: 'master research proposal', 'Pa Gym OSCE', 'quantitative analysis'. Omit query to list all active offers.",
+    description: "Search active management-approved MedMinds packages, prices, features and payment instructions. Use this before saying a price or service detail is unavailable. Pass ordinary service words such as 'masters research proposal', 'Pa Gym OSCE' or 'quantitative analysis'.",
     inputSchema: z.object({ query: z.string().max(160).optional() }),
     execute: async ({ query }) => {
-      const activeOffers = await listOffers(true);
-      const offers = rankApprovedOffers(activeOffers, query);
-      if (!offers.length) {
-        return {
-          available: false,
-          instruction: "No direct approved-offer match was found. Before referring the client, search once more using a broader main service term such as research, proposal, Pa Gym, course, analysis, editing or software, or omit the query to review all active offers. Do not guess a price."
-        };
-      }
-      return offers.map(({ slug, name, category, description, features, priceZmw, rushPriceZmw, paymentInstructions }) => ({
-        slug,
-        name,
-        category,
-        description,
-        features,
-        standardPriceZmw: priceZmw,
-        rushPriceZmw,
-        paymentInstructions
-      }));
+      const ignored = new Set(["the", "and", "for", "with", "how", "much", "price", "cost", "service", "services", "writing", "level"]);
+      const terms = (query ?? "").toLowerCase().replace(/[’']/g, "").split(/[^a-z0-9]+/).filter((term) => term.length > 2 && !ignored.has(term));
+      const ranked = (await listOffers(true)).map((offer) => {
+        const haystack = `${offer.name} ${offer.slug} ${offer.category} ${offer.description} ${offer.features.join(" ")}`.toLowerCase().replace(/[’']/g, "");
+        const score = terms.reduce((total, term) => total + (haystack.includes(term) ? 1 : 0), 0);
+        return { offer, score };
+      }).filter(({ score }) => !terms.length || score > 0).sort((a, b) => b.score - a.score).slice(0, 10);
+      const offers = ranked.map(({ offer }) => offer);
+      return offers.length ? offers.map(({ name, category: offerCategory, description, features, priceZmw, rushPriceZmw, paymentInstructions }) => ({ name, category: offerCategory, description, features, standardPriceZmw: priceZmw, rushPriceZmw, paymentInstructions })) : { available: false, instruction: "No direct approved offer matched. Try one broader service word before considering a human referral. Do not guess a price." };
     }
   });
 
@@ -128,14 +85,8 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const latestStored = history.at(-1)?.role === "user" && history.at(-1)?.content === text;
   const transcript = [...history, ...(latestStored ? [] : [{ role: "user" as const, content: text }])]
     .map((message) => `${message.role === "user" ? "Client" : "Agent"}: ${message.content}`).join("\n");
-
-  const result = await agent.generate({
-    prompt: `This is a chronological WhatsApp conversation. Continue it naturally from the client's latest message.\n\n${transcript}\n\nImportant:\n- Answer the unresolved client need rather than restarting the conversation.\n- If the latest message is only a nudge or repeated greeting, continue the immediately preceding unresolved issue.\n- Do not substantially repeat wording from an earlier Agent message unless the client explicitly asks you to repeat it.\n- Use approved offer data before saying a price or service detail is unavailable.\n- Reply only with the WhatsApp message to send.`
-  });
-
-  const fallback = referralNotification
-    ? `I've passed that to ${referralNotification.recipientName}. They'll pick it up from here.`
-    : "Sorry, I missed that. Could you send that once more?";
+  const result = await agent.generate({ prompt: `This is one chronological WhatsApp conversation. Continue naturally from the latest client message.\n\n${transcript}\n\nDo not restart the conversation, repeat an earlier canned reply, or refer routine questions to a human. If the latest message is only a nudge such as hey or ?, continue the unresolved question immediately before it. Use approved offer data before saying a price or service detail is unavailable. Reply only with the WhatsApp message to send.` });
+  const fallback = referralNotification ? `I've passed that to ${referralNotification.recipientName}. They'll pick it up from here.` : "Sorry, I missed that. Could you send that once more?";
   const reply = (result.text.trim() || fallback).replaceAll("—", ",");
   await addMessage(phone, "assistant", reply);
   return { reply, referralNotification: referralNotification as SalesAgentResult["referralNotification"] };
