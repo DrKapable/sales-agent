@@ -8,7 +8,7 @@ type MemoryStore = {
   offers: Map<string, Offer>;
 };
 
-const CATALOGUE_VERSION = 1;
+const CATALOGUE_VERSION = 2;
 
 declare global {
   var __medmindsMemoryStore: MemoryStore | undefined;
