@@ -66,6 +66,7 @@ Use the same value for Meta's verify token and `WHATSAPP_VERIFY_TOKEN`. Subscrib
 
 - The versioned catalogue is loaded once into new or existing databases. Later admin edits are preserved.
 - Research ranges use their midpoint for a 14-day deadline and their upper limit for deadlines under 14 days.
+- Payments use the approved Juma Phiri account on 0977259132. Dr. Mustafa Juma Phiri handles payment confirmation and discounts; Dr Kanyembo Ng'andwe handles other enquiries.
 - Active custom-quote services may have no numeric price, but must contain approved quotation instructions.
 - The AI cannot mark a lead converted. Conversion requires confirmation by the external payment process or an authorised administrator.
 - Refunds, disputes, complaints, special discounts, custom quotations, and unavailable verified information trigger human assistance.
