@@ -46,6 +46,7 @@ export type Offer = {
   description: string;
   features: string[];
   priceZmw: number | null;
+  rushPriceZmw: number | null;
   paymentInstructions: string | null;
   active: boolean;
   updatedAt: string;
@@ -55,4 +56,3 @@ export type LeadPatch = Partial<Pick<Lead,
   "name" | "email" | "institution" | "programme" | "serviceInterest" |
   "deadline" | "packageName" | "status" | "handoffReason"
 >>;
-
