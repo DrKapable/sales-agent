@@ -7,8 +7,8 @@ A production-oriented WhatsApp sales assistant for MedMinds Learning Centre. It 
 - Meta WhatsApp Cloud API webhook verification and incoming-message handling
 - HMAC verification of every webhook payload
 - Vercel AI Gateway agent with controlled tools for offers, leads, and handover
-- Pa Gym, research, data analysis, and tutorial offer templates
-- Admin-controlled prices, features, payment instructions, and offer activation
+- A management-approved catalogue for research, Pa Gym, courses, academic support and digital services
+- Admin-controlled standard and rush prices, features, payment instructions, and offer activation
 - Lead pipeline with MedMinds sales statuses
 - Persistent Postgres support, with clearly marked temporary memory mode
 - Secure signed administrator session
@@ -33,7 +33,7 @@ Add your local credentials to `.env.local`. Never commit this file.
 2. Add a Neon or compatible Postgres database and expose its connection string as `DATABASE_URL`.
 3. Configure the environment variables listed in `.env.example`.
 4. Deploy. Vercel AI Gateway can authenticate through the deployment's automatically managed OIDC token; an AI Gateway API key is an alternative.
-5. Open `/admin`, sign in, enter verified offer details, and activate only approved offers.
+5. Open `/admin` to review, search or edit the approved service catalogue and lead pipeline.
 
 ### Required production variables
 
@@ -64,8 +64,9 @@ Use the same value for Meta's verify token and `WHATSAPP_VERIFY_TOKEN`. Subscrib
 
 ## Operational controls
 
-- Offers are inactive by default and have no price. This prevents the assistant from inventing commercial information.
-- An active offer requires both a verified price and approved payment instructions.
+- The versioned catalogue is loaded once into new or existing databases. Later admin edits are preserved.
+- Research ranges use their midpoint for a 14-day deadline and their upper limit for deadlines under 14 days.
+- Active custom-quote services may have no numeric price, but must contain approved quotation instructions.
 - The AI cannot mark a lead converted. Conversion requires confirmation by the external payment process or an authorised administrator.
 - Refunds, disputes, complaints, special discounts, custom quotations, and unavailable verified information trigger human assistance.
 - Memory mode is for evaluation only. It is not durable on serverless deployments.
