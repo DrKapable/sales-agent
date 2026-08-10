@@ -14,6 +14,9 @@ export async function POST(request: Request) {
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Please enter a valid message." }, { status: 400 });
   await addMessage(parsed.data.sessionId, "user", parsed.data.message);
-  try { return NextResponse.json({ reply: await replyToClient(parsed.data.sessionId, parsed.data.message, "simulator") }); }
+  try {
+    const result = await replyToClient(parsed.data.sessionId, parsed.data.message, "simulator");
+    return NextResponse.json({ reply: result.reply });
+  }
   catch (error) { console.error("Simulator reply failed", error); return NextResponse.json({ error: "The assistant is temporarily unavailable." }, { status: 500 }); }
 }
