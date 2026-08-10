@@ -4,11 +4,16 @@ import { SALES_AGENT_PROMPT } from "@/lib/ai/prompt";
 import { addMessage, getConversation, getOrCreateLead, listOffers, updateLead } from "@/lib/store";
 import { buildReferralMessage, recipientForReferral } from "@/lib/referrals";
 import { leadStatuses, type LeadPatch } from "@/lib/types";
-import { sendWhatsAppText } from "@/lib/whatsapp";
 
-export async function replyToClient(phone: string, text: string, source: "whatsapp" | "simulator") {
+export type SalesAgentResult = {
+  reply: string;
+  referralNotification: { phone: string; recipientName: string; body: string } | null;
+};
+
+export async function replyToClient(phone: string, text: string, source: "whatsapp" | "simulator"): Promise<SalesAgentResult> {
   const lead = await getOrCreateLead(phone, source);
   const history = await getConversation(phone);
+  let referralNotification: SalesAgentResult["referralNotification"] = null;
 
   const updateLeadTool = tool({
     description: "Save new client details or update the sales status. Never mark a lead converted without verified payment confirmation.",
@@ -48,19 +53,17 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
     execute: async ({ referralType, reason, summary }) => {
       const savedLead = await updateLead(phone, { status: "HUMAN ASSISTANCE REQUIRED", handoffReason: reason });
       const recipient = recipientForReferral(referralType);
-      let notificationSent = false;
       if (source === "whatsapp") {
-        try {
-          await sendWhatsAppText(recipient.phone, buildReferralMessage({ recipientName: recipient.name, lead: savedLead, reason, summary }));
-          notificationSent = true;
-        } catch (error) {
-          console.error("WhatsApp referral notification failed", { clientPhone: phone, recipient: recipient.name, error });
-        }
+        referralNotification = {
+          phone: recipient.phone,
+          recipientName: recipient.name,
+          body: buildReferralMessage({ recipientName: recipient.name, lead: savedLead, reason, summary })
+        };
       }
       return {
         queued: true,
         assignedTo: recipient.name,
-        notificationSent,
+        notificationQueued: source === "whatsapp",
         instruction: `Tell the client the referral has been recorded for ${recipient.name}, who will assist them.`
       };
     }
@@ -78,5 +81,5 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const result = await agent.generate({ prompt: `Conversation including the client's latest message:\n${transcript}\n\nReply only with the WhatsApp message to send.` });
   const reply = (result.text.trim() || "I'll refer this to a member of the MedMinds team so they can assist you properly.").replaceAll("—", ",");
   await addMessage(phone, "assistant", reply);
-  return reply;
+  return { reply, referralNotification: referralNotification as SalesAgentResult["referralNotification"] };
 }
