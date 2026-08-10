@@ -1,6 +1,7 @@
 import { after, NextRequest, NextResponse } from "next/server";
 import { replyToClient } from "@/lib/ai/sales-agent";
 import { addMessage, updateLead } from "@/lib/store";
+import { humanReplyDelayMs, wait } from "@/lib/timing";
 import { parseIncomingMessages, sendWhatsAppText, verifyWhatsAppSignature } from "@/lib/whatsapp";
 
 export async function GET(request: NextRequest) {
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
   const messages = parseIncomingMessages(payload);
   after(async () => {
     for (const message of messages) {
+      const processingStartedAt = Date.now();
       try {
         console.info("WhatsApp message received", { messageId: message.id, phoneSuffix: message.phone.slice(-4) });
         const isNew = await addMessage(message.phone, "user", message.text, message.id);
@@ -26,6 +28,9 @@ export async function POST(request: NextRequest) {
         if (message.name) await updateLead(message.phone, { name: message.name });
         const result = await replyToClient(message.phone, message.text, "whatsapp");
         console.info("WhatsApp client reply generated", { messageId: message.id, hasReferral: Boolean(result.referralNotification) });
+        const replyDelayMs = humanReplyDelayMs(Date.now() - processingStartedAt);
+        console.info("WhatsApp client reply scheduled", { messageId: message.id, delayMs: replyDelayMs });
+        await wait(replyDelayMs);
         await sendWhatsAppText(message.phone, result.reply);
         console.info("WhatsApp client reply sent", { messageId: message.id });
         if (result.referralNotification) {
