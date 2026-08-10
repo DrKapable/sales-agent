@@ -1,0 +1,180 @@
+/* Final mobile Agent Admin polish: persistent reply affordance + clear brand rendering. */
+@media (max-width: 820px) {
+  /* Keep the full-colour logo on a neutral surface so its original colours remain legible. */
+  .mobileAdminLogo {
+    min-width: 0;
+    min-height: 42px;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 8px !important;
+    border: 1px solid rgba(16,43,40,.08);
+    border-radius: 10px;
+    background: #fff !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  }
+  .mobileAdminLogo .brandLogoImage {
+    width: 110px !important;
+    max-width: 110px !important;
+    max-height: 36px !important;
+    object-fit: contain !important;
+    object-position: center !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+  .sidebarLogo {
+    background: #fff !important;
+  }
+  .sidebarLogo .brandLogoImage {
+    filter: none !important;
+    opacity: 1 !important;
+  }
+
+  /* When client controls are closed, expose only the action needed to reply. */
+  .conversationPanel:not(.mobileToolsOpen) > .controlStrip {
+    display: contents !important;
+  }
+  .conversationPanel:not(.mobileToolsOpen) > .controlStrip > label,
+  .conversationPanel:not(.mobileToolsOpen) > .controlStrip > .resumeButton {
+    display: none !important;
+  }
+  .conversationPanel:not(.mobileToolsOpen) > .controlStrip > .takeoverButton {
+    position: fixed !important;
+    left: 10px;
+    right: 10px;
+    bottom: max(9px, env(safe-area-inset-bottom));
+    z-index: 76;
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 52px !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px !important;
+    border: 1px solid rgba(122,87,6,.12);
+    border-radius: 15px !important;
+    background: #e8bb50 !important;
+    color: #102b28 !important;
+    box-shadow: 0 12px 30px rgba(16,43,40,.18) !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+  .conversationPanel:not(.mobileToolsOpen) > .controlStrip > .takeoverButton::after {
+    content: " & reply";
+  }
+
+  /* Opening Client controls restores the normal inline management layout. */
+  .conversationPanel.mobileToolsOpen > .controlStrip {
+    display: grid !important;
+  }
+  .conversationPanel.mobileToolsOpen > .controlStrip > .button {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    box-shadow: none !important;
+  }
+  .conversationPanel.mobileToolsOpen > .controlStrip > .takeoverButton::after {
+    content: "";
+  }
+
+  /* AI mode: the bottom takeover action replaces the non-interactive disabled composer. */
+  .replyComposer:has(textarea:disabled) {
+    display: none !important;
+  }
+
+  /* Human mode: use one compact, fixed composer in the same predictable bottom position. */
+  .replyComposer:has(textarea:not(:disabled)) {
+    position: fixed !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    z-index: 76 !important;
+    width: auto !important;
+    max-width: calc(100vw - 20px) !important;
+    padding: 8px !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 16px !important;
+    background: rgba(255,255,255,.98) !important;
+    box-shadow: 0 12px 34px rgba(16,43,40,.20) !important;
+    backdrop-filter: blur(10px);
+  }
+  .replyComposer:has(textarea:not(:disabled)) .composerTop {
+    display: flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    margin-bottom: 5px !important;
+  }
+  .replyComposer:has(textarea:not(:disabled)) .composerTop label {
+    min-width: 0;
+    flex: 1 1 auto !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    font-size: 8px !important;
+    white-space: nowrap;
+  }
+  .replyComposer:has(textarea:not(:disabled)) .composerTop select {
+    min-width: 0;
+    max-width: 200px;
+    min-height: 30px !important;
+    padding: 4px 7px !important;
+    font-size: 10px !important;
+  }
+  .replyComposer:has(textarea:not(:disabled)) .composerTop > span {
+    flex: 0 0 auto;
+    font-size: 8px !important;
+  }
+  .replyComposer:has(textarea:not(:disabled)) .quickReplies,
+  .replyComposer:has(textarea:not(:disabled)) .composerFooter {
+    display: none !important;
+  }
+  .replyComposer:has(textarea:not(:disabled)) .composerInputRow {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) 88px !important;
+    gap: 7px !important;
+    margin-top: 0 !important;
+  }
+  .replyComposer:has(textarea:not(:disabled)) .composerInputRow textarea {
+    width: 100% !important;
+    min-height: 52px !important;
+    max-height: 84px !important;
+    margin: 0 !important;
+    padding: 9px 10px !important;
+    border-radius: 12px !important;
+    font-size: 14px !important;
+    resize: none !important;
+  }
+  .replyComposer:has(textarea:not(:disabled)) .sendReplyButton {
+    width: 88px !important;
+    min-width: 88px !important;
+    min-height: 52px !important;
+    padding: 0 8px !important;
+    border-radius: 12px !important;
+    font-size: 10px !important;
+  }
+
+  /* Keep the last message clear of whichever persistent reply control is active. */
+  .conversationPanel:has(.takeoverButton) .messageTimeline {
+    padding-bottom: 82px !important;
+    scroll-padding-bottom: 82px;
+  }
+  .conversationPanel:has(.resumeButton) .messageTimeline {
+    padding-bottom: 128px !important;
+    scroll-padding-bottom: 128px;
+  }
+}
+
+@media (max-width: 430px) {
+  .mobileAdminLogo {
+    padding-inline: 6px !important;
+  }
+  .mobileAdminLogo .brandLogoImage {
+    width: 98px !important;
+    max-width: 98px !important;
+  }
+  .replyComposer:has(textarea:not(:disabled)) .composerTop select {
+    max-width: 170px;
+  }
+}

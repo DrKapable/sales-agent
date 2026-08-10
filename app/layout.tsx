@@ -4,6 +4,7 @@ import { MobileAdminEnhancer } from "@/components/mobile-admin-enhancer";
 import "./globals.css";
 import "./admin-mobile.css";
 import "./admin-mobile-v4.css";
+import "./admin-mobile-v5.css";
 
 export const metadata: Metadata = {
   title: "MedMinds Sales Agent",
