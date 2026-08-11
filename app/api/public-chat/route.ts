@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
-import { addMessage, getConversation, listOffers, updateLead } from "@/lib/store";
-import { getSetupState } from "@/lib/env";
+import { addMessage, updateLead } from "@/lib/store";
+import { getAiModelCandidates, getSetupState } from "@/lib/env";
+import { verifiedConversationFallback } from "@/lib/recovery-reply";
 import { allowRequest } from "@/lib/rate-limit";
+import { wait } from "@/lib/timing";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 
 const requestSchema = z.object({
@@ -20,63 +22,6 @@ function normalizeWhatsAppNumber(value: string) {
   return /^\d{8,15}$/.test(digits) ? digits : null;
 }
 
-function money(value: number) {
-  return `K${Math.round(value).toLocaleString("en-US")}`;
-}
-
-function naturalOfferReply(message: string, offer: Awaited<ReturnType<typeof listOffers>>[number]) {
-  if (/how much|price|cost|charge/i.test(message)) {
-    if (offer.priceZmw != null) {
-      if (offer.rushPriceZmw != null && offer.rushPriceZmw !== offer.priceZmw) {
-        return `${offer.name} is ${money(offer.priceZmw)} on the standard timeline and ${money(offer.rushPriceZmw)} for rush work. Tell me your deadline and I’ll help work out which one applies.`;
-      }
-      return `${offer.name} is ${money(offer.priceZmw)} based on the current MedMinds price.`;
-    }
-    return `${offer.name} needs a tailored quotation. Tell me your programme and deadline, and I’ll guide you to the right next step.`;
-  }
-
-  if (/research/i.test(offer.category) && /topic/i.test(offer.name)) {
-    return "Yes, we can help with research topic development. Tell me your programme or level and the broad area you’re interested in, if you already have one. We can take it from there.";
-  }
-
-  const description = /approved fixed-price|approved service/i.test(offer.description) ? "" : offer.description.trim();
-  return description
-    ? `Yes, we can help with ${offer.name.toLowerCase()}. ${description}`
-    : `Yes, we can help with ${offer.name.toLowerCase()}. Tell me what you need help with and I’ll guide you from there.`;
-}
-
-async function verifiedFallback(message: string) {
-  const trimmed = message.trim();
-  if (/^(sorry|apologies|my bad)[.! ]*$/i.test(trimmed)) return "No worries at all. We can continue from where we left off.";
-  if (/^(thanks|thank you|alright|okay|ok)[.! ]*$/i.test(trimmed)) return "You’re welcome. I’m here if you need anything else.";
-  if (/^(hi|hello|hey|hello\?|hey\?|\?)[.! ]*$/i.test(trimmed)) return "Hi 👋 I’m here. What would you like help with?";
-  if ((/research/i.test(trimmed) && /topic/i.test(trimmed)) || /topic development/i.test(trimmed)) {
-    return "Yes, we can help with research topic development. Tell me your programme or level and the broad area you’re interested in, if you already have one. We can take it from there.";
-  }
-
-  const ignored = new Set(["the", "and", "for", "with", "how", "much", "price", "cost", "service", "services", "writing", "level", "want", "need", "about", "help"]);
-  const terms = trimmed.toLowerCase().replace(/[’']/g, "").split(/[^a-z0-9]+/).filter((term) => term.length > 2 && !ignored.has(term));
-  if (!terms.length) return null;
-  const ranked = (await listOffers(true)).map((offer) => {
-    const haystack = `${offer.name} ${offer.slug} ${offer.category} ${offer.description} ${offer.features.join(" ")}`.toLowerCase().replace(/[’']/g, "");
-    const score = terms.reduce((total, term) => total + (haystack.includes(term) ? 1 : 0), 0);
-    return { offer, score };
-  }).sort((a, b) => b.score - a.score);
-  const best = ranked[0];
-  if (!best || best.score < Math.min(2, terms.length)) return null;
-  return naturalOfferReply(trimmed, best.offer);
-}
-
-async function recoverStoredReply(phone: string) {
-  try {
-    const history = await getConversation(phone);
-    const last = history.at(-1);
-    return last?.role === "assistant" ? last.content : null;
-  } catch {
-    return null;
-  }
-}
-
 async function sendReferralNotification(result: SalesAgentResult) {
   if (!result.referralNotification || !getSetupState().whatsappConfigured) return;
   try {
@@ -86,8 +31,22 @@ async function sendReferralNotification(result: SalesAgentResult) {
   }
 }
 
+async function generateWithFailover(phone: string, message: string) {
+  if (!getSetupState().aiConfigured) return null;
+  const models = getAiModelCandidates();
+  for (let index = 0; index < models.length; index += 1) {
+    const model = models[index];
+    try {
+      return await replyToClient(phone, message, "simulator", model);
+    } catch (error) {
+      console.warn("Public chat AI generation failed", { phoneSuffix: phone.slice(-4), model, attempt: index + 1, error });
+      if (index < models.length - 1) await wait(250);
+    }
+  }
+  return null;
+}
+
 export async function POST(request: Request) {
-  if (!getSetupState().aiConfigured) return NextResponse.json({ error: "The MedMinds assistant is temporarily unavailable." }, { status: 503 });
   const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   if (!allowRequest(`public-chat:${clientIp}`, 30, 10 * 60 * 1000)) return NextResponse.json({ error: "You have sent several messages quickly. Please try again shortly." }, { status: 429 });
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
@@ -98,25 +57,14 @@ export async function POST(request: Request) {
 
   await updateLead(phone, { name: parsed.data.name });
   await addMessage(phone, "user", parsed.data.message);
-  let result: SalesAgentResult | null = null;
-  try {
-    result = await replyToClient(phone, parsed.data.message, "simulator");
-  } catch (firstError) {
-    console.warn("Public chat generation failed; attempting recovery", { phoneSuffix: phone.slice(-4), error: firstError });
-    const storedReply = await recoverStoredReply(phone);
-    if (storedReply) return NextResponse.json({ reply: storedReply });
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    try {
-      result = await replyToClient(phone, parsed.data.message, "simulator");
-    } catch (secondError) {
-      console.error("Public chat retry failed", { phoneSuffix: phone.slice(-4), error: secondError });
-      const fallback = await verifiedFallback(parsed.data.message).catch(() => null);
-      const reply = fallback || "I’m still with you. Please send that request once more in a few words and I’ll continue from there.";
-      await addMessage(phone, "assistant", reply).catch(() => undefined);
-      return NextResponse.json({ reply, recovered: true });
-    }
+
+  const result = await generateWithFailover(phone, parsed.data.message);
+  if (result) {
+    await sendReferralNotification(result);
+    return NextResponse.json({ reply: result.reply });
   }
 
-  await sendReferralNotification(result);
-  return NextResponse.json({ reply: result.reply });
+  const reply = await verifiedConversationFallback(phone, parsed.data.message).catch(() => "I’m here and I can help. Tell me a little more about what you need and I’ll continue from there.");
+  await addMessage(phone, "assistant", reply).catch(() => undefined);
+  return NextResponse.json({ reply, recovered: true });
 }

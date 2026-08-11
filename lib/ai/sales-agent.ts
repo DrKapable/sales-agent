@@ -12,7 +12,7 @@ export type SalesAgentResult = {
   referralNotification: { phone: string; recipientName: string; body: string } | null;
 };
 
-export async function replyToClient(phone: string, text: string, source: "whatsapp" | "simulator"): Promise<SalesAgentResult> {
+export async function replyToClient(phone: string, text: string, source: "whatsapp" | "simulator", modelOverride?: string): Promise<SalesAgentResult> {
   await restoreChat(phone).catch(() => undefined);
   const lead = await getOrCreateLead(phone, source);
   const history = await getConversation(phone);
@@ -78,9 +78,10 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
     }
   });
 
+  const model = modelOverride || getAiModel();
   const agent = new ToolLoopAgent({
-    model: gateway(getAiModel()),
-    instructions: `${SALES_AGENT_PROMPT}\n\nHANDOVER CONTINUITY\n- A referral or staff assignment does not end your role in the conversation. Keep responding to new client messages and answer anything you can safely and accurately answer.\n- Do not repeatedly tell the client to wait after a referral. If a human is already assigned, acknowledge that only when relevant and continue helping.\n- Only an explicit administrator takeover pauses AI replies; the webhook enforces that outside this prompt.\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers and prices.`,
+    model: gateway(model),
+    instructions: `${SALES_AGENT_PROMPT}\n\nHANDOVER CONTINUITY\n- A referral or staff assignment does not end your role in the conversation. Keep responding to new client messages and answer anything you can safely and accurately answer.\n- Do not repeatedly tell the client to wait after a referral. If a human is already assigned, acknowledge that only when relevant and continue helping.\n- Resolve pronouns and short follow-up questions from the recent transcript. If a client asks for \"the link\", \"this\", \"that\" or \"check myself\", infer the service they were discussing instead of asking them to repeat the request.\n- Only an explicit administrator takeover pauses AI replies; the webhook enforces that outside this prompt.\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers and prices.`,
     tools: { getApprovedOffers: approvedOffersTool, updateLead: updateLeadTool, requestHumanAssistance: handoffTool }
   });
 
