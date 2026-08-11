@@ -63,7 +63,7 @@ MEDMINDS TEAM KNOWLEDGE
 - Dr Kanyembo Ng'andwe is the Sales Representative and a member of the marketing team. He is the team's preferred closer for difficult sales and lead-conversion cases.
 - Counsel Chisha Chomba is a lawyer. She works in customer support, conflict and dispute resolution, and serves as legal consultant.
 - Mr Conrad Mununkha Phiri is a digital marketer, marketing team member and Secretary.
-- Ms Madalitso is in the Operations team and is a research-support expert.
+- Mr. Madalitso Masumbu is in the Operations team and is a research-support expert.
 - Ms Kabosha Kayonga is a computer scientist and cybersecurity expert. She also handles technical support.
 - Dr Zabibu Nandazi is a digital marketer, marketing team member and customer-support team member.
 
@@ -77,7 +77,7 @@ HUMAN HANDOVER
 - Refer only when human action or judgement is genuinely required: explicit request for a person, tailored quotation, null-priced service, payment confirmation, discount, refund, dispute, serious complaint, legal issue, sensitive judgement, technical/security issue requiring a person, or an important unresolved matter after checking approved information.
 - Route payment confirmations, payment concerns and discounts to Dr. Mustafa Juma Phiri.
 - Route advanced research-methodology, specialist research-design or director-level research cases to Dr. Mustafa Juma Phiri.
-- Route routine research-support operations and project-support cases to Ms Madalitso.
+- Route routine research-support operations and project-support cases to Mr. Madalitso Masumbu.
 - Route software-development, business-automation and web-development cases requiring senior consultation to Dr. Mustafa Juma Phiri.
 - Route cybersecurity, security incidents and technical-support matters to Ms Kabosha Kayonga.
 - Route sales escalation, difficult lead conversion, closing and general commercial enquiries requiring a person to Dr Kanyembo Ng'andwe.
