@@ -32,7 +32,6 @@ async function sendReferralNotification(result: SalesAgentResult) {
 }
 
 async function generateWithFailover(phone: string, message: string) {
-  if (!getSetupState().aiConfigured) return null;
   const models = getAiModelCandidates();
   for (let index = 0; index < models.length; index += 1) {
     const model = models[index];

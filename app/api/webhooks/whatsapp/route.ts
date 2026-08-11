@@ -26,6 +26,15 @@ export async function POST(request: NextRequest) {
       const processingStartedAt = Date.now();
       try {
         console.info("WhatsApp message received", { messageId: message.id, phoneSuffix: message.phone.slice(-4) });
+
+        const configuredPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+        if (message.phoneNumberId && configuredPhoneNumberId && message.phoneNumberId !== configuredPhoneNumberId) {
+          console.warn("WhatsApp phone number ID mismatch; using webhook phone number ID", {
+            webhookPhoneNumberIdSuffix: message.phoneNumberId.slice(-4),
+            configuredPhoneNumberIdSuffix: configuredPhoneNumberId.slice(-4)
+          });
+        }
+
         const isNew = await addMessage(message.phone, "user", message.text, message.id);
         if (!isNew) continue;
 
@@ -57,12 +66,12 @@ export async function POST(request: NextRequest) {
         const replyDelayMs = humanReplyDelayMs(Date.now() - processingStartedAt);
         console.info("WhatsApp client reply scheduled", { messageId: message.id, delayMs: replyDelayMs });
         await wait(replyDelayMs);
-        await sendWhatsAppTextWithRetry(message.phone, result.reply);
+        await sendWhatsAppTextWithRetry(message.phone, result.reply, message.phoneNumberId);
         console.info("WhatsApp client reply sent", { messageId: message.id });
 
         if (result.referralNotification) {
           try {
-            await sendWhatsAppText(result.referralNotification.phone, result.referralNotification.body);
+            await sendWhatsAppText(result.referralNotification.phone, result.referralNotification.body, message.phoneNumberId ?? undefined);
             console.info("WhatsApp referral notification sent", { messageId: message.id, recipient: result.referralNotification.recipientName });
           } catch (error) {
             console.error("WhatsApp referral notification failed", { messageId: message.id, recipient: result.referralNotification.recipientName, error });

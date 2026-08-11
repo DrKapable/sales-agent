@@ -1,21 +1,19 @@
 import { addMessage } from "@/lib/store";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
-import { getAiModelCandidates, getSetupState } from "@/lib/env";
+import { getAiModelCandidates } from "@/lib/env";
 import { verifiedConversationFallback } from "@/lib/recovery-reply";
 import { wait } from "@/lib/timing";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 
 export async function generateWhatsAppReplyWithRecovery(phone: string, text: string): Promise<SalesAgentResult> {
-  if (getSetupState().aiConfigured) {
-    const models = getAiModelCandidates();
-    for (let index = 0; index < models.length; index += 1) {
-      const model = models[index];
-      try {
-        return await replyToClient(phone, text, "whatsapp", model);
-      } catch (error) {
-        console.warn("WhatsApp AI generation failed", { phoneSuffix: phone.slice(-4), model, attempt: index + 1, error });
-        if (index < models.length - 1) await wait(250);
-      }
+  const models = getAiModelCandidates();
+  for (let index = 0; index < models.length; index += 1) {
+    const model = models[index];
+    try {
+      return await replyToClient(phone, text, "whatsapp", model);
+    } catch (error) {
+      console.warn("WhatsApp AI generation failed", { phoneSuffix: phone.slice(-4), model, attempt: index + 1, error });
+      if (index < models.length - 1) await wait(250);
     }
   }
 
@@ -26,12 +24,12 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
   return { reply, referralNotification: null };
 }
 
-export async function sendWhatsAppTextWithRetry(phone: string, body: string) {
+export async function sendWhatsAppTextWithRetry(phone: string, body: string, phoneNumberId?: string | null) {
   try {
-    return await sendWhatsAppText(phone, body);
+    return await sendWhatsAppText(phone, body, phoneNumberId ?? undefined);
   } catch (firstError) {
     console.warn("WhatsApp delivery failed; retrying", { phoneSuffix: phone.slice(-4), error: firstError });
   }
   await wait(600);
-  return sendWhatsAppText(phone, body);
+  return sendWhatsAppText(phone, body, phoneNumberId ?? undefined);
 }

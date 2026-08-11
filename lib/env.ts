@@ -22,7 +22,12 @@ export function getAiModelCandidates() {
 
 export function getSetupState() {
   const missingWhatsApp = whatsappKeys.filter((key) => !process.env[key]);
-  const aiConfigured = Boolean(process.env.VERCEL_OIDC_TOKEN || process.env.AI_GATEWAY_API_KEY);
+  const aiConfigured = Boolean(
+    process.env.VERCEL ||
+    process.env.VERCEL_ENV ||
+    process.env.VERCEL_OIDC_TOKEN ||
+    process.env.AI_GATEWAY_API_KEY
+  );
 
   return {
     database: process.env.DATABASE_URL ? "postgres" as const : "memory" as const,
