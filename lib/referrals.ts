@@ -47,7 +47,7 @@ export const referralRecipients: Record<string, ReferralRecipient> = {
     roles: ["Digital marketing", "Marketing team", "Secretary"]
   },
   madalitso: {
-    name: "Ms Madalitso",
+    name: "Mr. Madalitso Masumbu",
     phone: "260979104893",
     roles: ["Operations team", "Research support expert"]
   },
@@ -69,7 +69,7 @@ function namedRecipient(context: string) {
   if (/\bkanyembo\b|\bng['’]?andwe\b/.test(text)) return referralRecipients.kanyembo;
   if (/\bchisha\b|\bchomba\b|\bcounsel chisha\b/.test(text)) return referralRecipients.chisha;
   if (/\bconrad\b|\bmununkha\b/.test(text)) return referralRecipients.conrad;
-  if (/\bmadalitso\b/.test(text)) return referralRecipients.madalitso;
+  if (/\bmadalitso\b|\bmasumbu\b/.test(text)) return referralRecipients.madalitso;
   if (/\bkabosha\b|\bkayonga\b/.test(text)) return referralRecipients.kabosha;
   if (/\bzabibu\b|\bnandazi\b/.test(text)) return referralRecipients.zabibu;
   return null;
