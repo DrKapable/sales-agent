@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { humanMessageContent, replyWindow } from "@/lib/conversation";
+import { staffNames } from "@/lib/team-directory";
 import { addMessage, getConversation, listLeads, updateLead } from "@/lib/store";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 
 const sendSchema = z.object({
   text: z.string().trim().min(1).max(4000),
-  sender: z.enum(["Dr. Mustafa Juma Phiri", "Dr Kanyembo Ng'andwe"])
+  sender: z.enum(staffNames)
 });
 
 async function leadAndMessages(id: string) {
