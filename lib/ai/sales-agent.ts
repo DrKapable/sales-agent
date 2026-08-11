@@ -47,7 +47,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const handoffTool = tool({
-    description: "Refer a client only when human help is genuinely required. If the client explicitly asks for a named MedMinds person, preserve that name in the reason or summary so the request can be routed correctly.",
+    description: "Refer a client only when human help is genuinely required. Referral assigns a human but does not stop the AI from continuing to assist. If the client explicitly asks for a named MedMinds person, preserve that name in the reason or summary so the request can be routed correctly.",
     inputSchema: z.object({
       referralType: z.enum(["payment", "discount", "general"]),
       reason: z.string().min(3).max(500),
@@ -57,8 +57,9 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
       const referralText = `${reason} ${summary}`;
       const specificallyAskedForMustafa = /\b(dr\.?\s*)?mustafa\b|\bjuma\s+phiri\b/i.test(referralText);
       const recipient = specificallyAskedForMustafa ? recipientForReferral("payment") : recipientForReferral(referralType);
-      const savedLead = await updateLead(phone, { status: "HUMAN ASSISTANCE REQUIRED", handoffReason: reason, aiPaused: true, assignedTo: recipient.name });
-      const canNotifyTeam = source === "whatsapp" || /^\d{8,15}$/.test(phone);
+      const alreadyAssigned = lead.status === "HUMAN ASSISTANCE REQUIRED" && lead.assignedTo === recipient.name;
+      const savedLead = await updateLead(phone, { status: "HUMAN ASSISTANCE REQUIRED", handoffReason: reason, aiPaused: false, assignedTo: recipient.name });
+      const canNotifyTeam = !alreadyAssigned && (source === "whatsapp" || /^\d{8,15}$/.test(phone));
       if (canNotifyTeam) {
         referralNotification = {
           phone: recipient.phone,
@@ -67,17 +68,19 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
         };
       }
       return {
-        queued: true,
+        queued: !alreadyAssigned,
         assignedTo: recipient.name,
         notificationQueued: canNotifyTeam,
-        instruction: `Tell the client the referral has been recorded for ${recipient.name}, who will assist them.`
+        instruction: alreadyAssigned
+          ? `${recipient.name} is already assigned. Do not repeat the referral. Continue helping the client with anything you can answer while they wait.`
+          : `Tell the client ${recipient.name} has been assigned. Keep helping the client normally while they wait, unless an administrator explicitly takes over the conversation.`
       };
     }
   });
 
   const agent = new ToolLoopAgent({
     model: gateway(getAiModel()),
-    instructions: `${SALES_AGENT_PROMPT}\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers and prices.`,
+    instructions: `${SALES_AGENT_PROMPT}\n\nHANDOVER CONTINUITY\n- A referral or staff assignment does not end your role in the conversation. Keep responding to new client messages and answer anything you can safely and accurately answer.\n- Do not repeatedly tell the client to wait after a referral. If a human is already assigned, acknowledge that only when relevant and continue helping.\n- Only an explicit administrator takeover pauses AI replies; the webhook enforces that outside this prompt.\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers and prices.`,
     tools: { getApprovedOffers: approvedOffersTool, updateLead: updateLeadTool, requestHumanAssistance: handoffTool }
   });
 

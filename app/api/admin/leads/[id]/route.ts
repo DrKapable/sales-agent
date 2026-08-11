@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { leadPriorities, leadStatuses } from "@/lib/types";
+import { leadPriorities, leadStatuses, type LeadPatch } from "@/lib/types";
 import { listLeads, updateLead } from "@/lib/store";
+
+const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 
 const schema = z.object({
   status: z.enum(leadStatuses).optional(),
@@ -17,5 +19,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const lead = (await listLeads()).find((item) => item.id === id);
   if (!lead) return NextResponse.json({ error: "Lead not found." }, { status: 404 });
   if (!parsed.success) return NextResponse.json({ error: "Invalid lead update." }, { status: 400 });
-  return NextResponse.json(await updateLead(lead.phone, parsed.data));
+
+  const patch: LeadPatch = { ...parsed.data };
+  if (parsed.data.aiPaused === true) {
+    const existingReason = lead.handoffReason?.replace(/^\[HUMAN TAKEOVER]\s*/, "").trim();
+    patch.handoffReason = existingReason ? `${HUMAN_TAKEOVER_PREFIX} ${existingReason}` : HUMAN_TAKEOVER_PREFIX;
+  }
+  if (parsed.data.aiPaused === false && lead.handoffReason?.startsWith(HUMAN_TAKEOVER_PREFIX)) {
+    const restoredReason = lead.handoffReason.slice(HUMAN_TAKEOVER_PREFIX.length).trim();
+    patch.handoffReason = restoredReason || null;
+  }
+
+  return NextResponse.json(await updateLead(lead.phone, patch));
 }

@@ -1,8 +1,10 @@
 import { after, NextRequest, NextResponse } from "next/server";
 import { replyToClient } from "@/lib/ai/sales-agent";
-import { addMessage, getOrCreateLead, updateLead } from "@/lib/store";
+import { addMessage, getConversation, getOrCreateLead, updateLead } from "@/lib/store";
 import { humanReplyDelayMs, wait } from "@/lib/timing";
 import { parseIncomingMessages, sendWhatsAppText, verifyWhatsAppSignature } from "@/lib/whatsapp";
+
+const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 
 export async function GET(request: NextRequest) {
   const mode = request.nextUrl.searchParams.get("hub.mode");
@@ -25,13 +27,28 @@ export async function POST(request: NextRequest) {
         console.info("WhatsApp message received", { messageId: message.id, phoneSuffix: message.phone.slice(-4) });
         const isNew = await addMessage(message.phone, "user", message.text, message.id);
         if (!isNew) continue;
-        const lead = message.name
+        let lead = message.name
           ? await updateLead(message.phone, { name: message.name })
           : await getOrCreateLead(message.phone, "whatsapp");
+
         if (lead.aiPaused) {
-          console.info("WhatsApp AI reply skipped for human-managed conversation", { messageId: message.id, assignedTo: lead.assignedTo });
-          continue;
+          const markedHumanTakeover = lead.handoffReason?.startsWith(HUMAN_TAKEOVER_PREFIX) ?? false;
+          const history = markedHumanTakeover ? [] : await getConversation(message.phone, 30);
+          const humanHasReplied = history.some((item) => item.role === "assistant" && /^\[Human: [^\]]+]\s*/.test(item.content));
+
+          if (markedHumanTakeover || humanHasReplied) {
+            if (!markedHumanTakeover && humanHasReplied) {
+              const reason = lead.handoffReason ? `${HUMAN_TAKEOVER_PREFIX} ${lead.handoffReason}` : HUMAN_TAKEOVER_PREFIX;
+              lead = await updateLead(message.phone, { handoffReason: reason });
+            }
+            console.info("WhatsApp AI reply skipped for explicit human takeover", { messageId: message.id, assignedTo: lead.assignedTo });
+            continue;
+          }
+
+          lead = await updateLead(message.phone, { aiPaused: false });
+          console.info("Legacy AI referral resumed without waiting for human takeover", { messageId: message.id, assignedTo: lead.assignedTo });
         }
+
         const result = await replyToClient(message.phone, message.text, "whatsapp");
         console.info("WhatsApp client reply generated", { messageId: message.id, hasReferral: Boolean(result.referralNotification) });
         const replyDelayMs = humanReplyDelayMs(Date.now() - processingStartedAt);
