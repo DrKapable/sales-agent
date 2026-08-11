@@ -3,7 +3,9 @@ import type { Lead } from "@/lib/types";
 export type ReferralType =
   | "payment"
   | "discount"
+  | "sales"
   | "research"
+  | "research_specialist"
   | "operations"
   | "customer_support"
   | "dispute"
@@ -11,6 +13,8 @@ export type ReferralType =
   | "marketing"
   | "administrative"
   | "software"
+  | "business_automation"
+  | "web_development"
   | "cybersecurity"
   | "general";
 
@@ -22,23 +26,51 @@ type ReferralRecipient = {
 };
 
 export const referralRecipients: Record<string, ReferralRecipient> = {
-  mustafa: { name: "Dr. Mustafa Juma Phiri", phone: "260977259132", roles: ["Management", "Payments", "Discount approvals"] },
-  kanyembo: { name: "Dr Kanyembo Ng'andwe", phone: "260974634555", roles: ["General escalation", "Operations support"] },
-  chisha: { name: "Chisha", phone: "260970623913", roles: ["Customer support", "Conflict and dispute resolution", "Legal consultant"] },
-  conrad: { name: "Conrad Mununkha Phiri", phone: "260979235018", roles: ["Digital marketing", "Marketing team", "Secretary"] },
-  madalitso: { name: "Madalitso", phone: "260979104893", roles: ["Operations team", "Research support expert"] },
-  kabosha: { name: "Kabosha", phone: "260776037567", roles: ["Computer scientist", "Cybersecurity expert", "Technical support"] },
-  zabibu: { name: "Dr Zabibu Nandazi", phone: "260975352801", roles: ["Digital marketing", "Marketing team", "Customer support"] }
+  mustafa: {
+    name: "Dr. Mustafa Juma Phiri",
+    phone: "260977259132",
+    roles: ["Director", "Research specialist", "Research support", "Software development", "Business automation", "Web development", "Payments", "Discount approvals"]
+  },
+  kanyembo: {
+    name: "Dr Kanyembo Ng'andwe",
+    phone: "260974634555",
+    roles: ["Sales representative", "Lead conversion", "Marketing team", "Senior sales escalation"]
+  },
+  chisha: {
+    name: "Counsel Chisha Chomba",
+    phone: "260970623913",
+    roles: ["Customer support", "Conflict and dispute resolution", "Legal consultant"]
+  },
+  conrad: {
+    name: "Mr Conrad Mununkha Phiri",
+    phone: "260979235018",
+    roles: ["Digital marketing", "Marketing team", "Secretary"]
+  },
+  madalitso: {
+    name: "Ms Madalitso",
+    phone: "260979104893",
+    roles: ["Operations team", "Research support expert"]
+  },
+  kabosha: {
+    name: "Ms Kabosha Kayonga",
+    phone: "260776037567",
+    roles: ["Computer scientist", "Cybersecurity expert", "Technical support"]
+  },
+  zabibu: {
+    name: "Dr Zabibu Nandazi",
+    phone: "260975352801",
+    roles: ["Digital marketing", "Marketing team", "Customer support"]
+  }
 };
 
 function namedRecipient(context: string) {
   const text = context.toLowerCase();
-  if (/\bmustafa\b|\bjuma phiri\b/.test(text)) return referralRecipients.mustafa;
+  if (/\bmustafa\b|\bjuma phiri\b|\bdirector\b/.test(text)) return referralRecipients.mustafa;
   if (/\bkanyembo\b|\bng['’]?andwe\b/.test(text)) return referralRecipients.kanyembo;
-  if (/\bchisha\b/.test(text)) return referralRecipients.chisha;
+  if (/\bchisha\b|\bchomba\b|\bcounsel chisha\b/.test(text)) return referralRecipients.chisha;
   if (/\bconrad\b|\bmununkha\b/.test(text)) return referralRecipients.conrad;
   if (/\bmadalitso\b/.test(text)) return referralRecipients.madalitso;
-  if (/\bkabosha\b/.test(text)) return referralRecipients.kabosha;
+  if (/\bkabosha\b|\bkayonga\b/.test(text)) return referralRecipients.kabosha;
   if (/\bzabibu\b|\bnandazi\b/.test(text)) return referralRecipients.zabibu;
   return null;
 }
@@ -50,7 +82,13 @@ export function recipientForReferral(type: ReferralType, context = "") {
   switch (type) {
     case "payment":
     case "discount":
+    case "research_specialist":
+    case "software":
+    case "business_automation":
+    case "web_development":
       return referralRecipients.mustafa;
+    case "sales":
+      return referralRecipients.kanyembo;
     case "research":
     case "operations":
       return referralRecipients.madalitso;
@@ -62,7 +100,6 @@ export function recipientForReferral(type: ReferralType, context = "") {
     case "marketing":
     case "administrative":
       return referralRecipients.conrad;
-    case "software":
     case "cybersecurity":
       return referralRecipients.kabosha;
     default:
