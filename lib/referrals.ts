@@ -26,7 +26,7 @@ export const referralRecipients: Record<string, ReferralRecipient> = {
   kanyembo: { name: "Dr Kanyembo Ng'andwe", phone: "260974634555", roles: ["General escalation", "Operations support"] },
   chisha: { name: "Chisha", phone: "260970623913", roles: ["Customer support", "Conflict and dispute resolution", "Legal consultant"] },
   conrad: { name: "Conrad Mununkha Phiri", phone: "260979235018", roles: ["Digital marketing", "Marketing team", "Secretary"] },
-  madalitso: { name: "Madalitso", phone: null, contactProvided: "09779104893", roles: ["Operations team", "Research support expert"] },
+  madalitso: { name: "Madalitso", phone: "260979104893", roles: ["Operations team", "Research support expert"] },
   kabosha: { name: "Kabosha", phone: "260776037567", roles: ["Computer scientist", "Cybersecurity expert", "Technical support"] },
   zabibu: { name: "Dr Zabibu Nandazi", phone: "260975352801", roles: ["Digital marketing", "Marketing team", "Customer support"] }
 };
