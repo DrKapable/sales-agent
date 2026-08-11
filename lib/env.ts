@@ -9,15 +9,15 @@ const whatsappKeys = [
 export const DEFAULT_AI_MODEL = "openai/gpt-5.6-luna";
 
 export function getAiModel() {
-  return process.env.AI_MODEL?.trim() || DEFAULT_AI_MODEL;
+  return DEFAULT_AI_MODEL;
 }
 
 export function getAiModelCandidates() {
-  return Array.from(new Set([
-    getAiModel(),
+  return [
     "openai/gpt-5.6-luna",
+    "openai/gpt-5.6-sol",
     "openai/gpt-5.4"
-  ]));
+  ];
 }
 
 export function getSetupState() {

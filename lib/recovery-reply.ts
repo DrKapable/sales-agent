@@ -14,6 +14,7 @@ export async function verifiedConversationFallback(phone: string, text: string) 
   const lower = message.toLowerCase();
   const history = await getConversation(phone, 14).catch(() => []);
   const recentContext = history.map((item) => item.content).join(" ").toLowerCase();
+  const lastAssistant = [...history].reverse().find((item) => item.role === "assistant")?.content.toLowerCase() || "";
 
   if (/^(hi|hello|hey|hello\?|hey\?|\?)[.! ]*$/i.test(message)) {
     return "Hi 👋 I’m here. What would you like help with?";
@@ -23,6 +24,14 @@ export async function verifiedConversationFallback(phone: string, text: string) 
   }
   if (/^(sorry|apologies|my bad)[.! ]*$/i.test(message)) {
     return "No worries at all. We can continue from where we left off.";
+  }
+
+  if (/software development|web development|website|whatsapp automation|digital service/.test(lower)) {
+    return "Yes. MedMinds offers custom software development, web development, WhatsApp automation and ZaTafa MedStats. Software projects are quoted after the requirements are understood. What would you like the system to do?";
+  }
+
+  if (/^(yes|yes please|please|sure)[.! ]*$/i.test(message) && /list|options|category|categories/.test(lastAssistant)) {
+    return "Sure. MedMinds services include research and writing, data analysis, editing and quality assurance, plagiarism and AI checks, courses and training, Pa Gym, academic support, and digital services. Which category would you like me to show first?";
   }
 
   const asksForLink = /\blink\b|check (it|this) myself|website|web page|page for this|where can i (check|see)|online/i.test(lower);
