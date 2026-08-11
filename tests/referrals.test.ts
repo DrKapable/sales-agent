@@ -25,32 +25,33 @@ const lead: Lead = {
 };
 
 describe("referral notifications", () => {
-  it("routes payment and discount matters to Mustafa", () => {
-    expect(recipientForReferral("payment").phone).toBe("260977259132");
-    expect(recipientForReferral("discount").phone).toBe("260977259132");
+  it("routes payment, senior research and business automation to Dr Mustafa", () => {
+    expect(recipientForReferral("payment").name).toBe("Dr. Mustafa Juma Phiri");
+    expect(recipientForReferral("research_specialist").name).toBe("Dr. Mustafa Juma Phiri");
+    expect(recipientForReferral("business_automation").name).toBe("Dr. Mustafa Juma Phiri");
   });
 
-  it("routes specialist cases by team role", () => {
-    expect(recipientForReferral("research").name).toBe("Madalitso");
-    expect(recipientForReferral("customer_support").name).toBe("Dr Zabibu Nandazi");
-    expect(recipientForReferral("dispute").name).toBe("Chisha");
-    expect(recipientForReferral("legal").name).toBe("Chisha");
-    expect(recipientForReferral("marketing").name).toBe("Conrad Mununkha Phiri");
-    expect(recipientForReferral("software").name).toBe("Kabosha");
-    expect(recipientForReferral("cybersecurity").name).toBe("Kabosha");
-    expect(recipientForReferral("general").name).toBe("Dr Kanyembo Ng'andwe");
+  it("routes sales escalation to Dr Kanyembo", () => {
+    expect(recipientForReferral("sales").name).toBe("Dr Kanyembo Ng'andwe");
   });
 
-  it("honours an explicitly requested team member", () => {
-    expect(recipientForReferral("general", "Client specifically asked to speak to Dr Zabibu Nandazi").name).toBe("Dr Zabibu Nandazi");
-    expect(recipientForReferral("research", "Please refer me to Chisha about a contract dispute").name).toBe("Chisha");
+  it("routes routine research support to Ms Madalitso", () => {
+    expect(recipientForReferral("research").name).toBe("Ms Madalitso");
+    expect(recipientForReferral("research").phone).toBe("260979104893");
   });
 
-  it("keeps Madalitso assignable while the supplied number is unverified", () => {
-    const recipient = recipientForReferral("research");
-    expect(recipient.name).toBe("Madalitso");
-    expect(recipient.phone).toBeNull();
-    expect(recipient.contactProvided).toBe("09779104893");
+  it("routes legal disputes to Counsel Chisha Chomba", () => {
+    expect(recipientForReferral("legal").name).toBe("Counsel Chisha Chomba");
+    expect(recipientForReferral("dispute").name).toBe("Counsel Chisha Chomba");
+  });
+
+  it("routes cybersecurity to Ms Kabosha Kayonga", () => {
+    expect(recipientForReferral("cybersecurity").name).toBe("Ms Kabosha Kayonga");
+  });
+
+  it("honours an explicitly requested staff member", () => {
+    expect(recipientForReferral("general", "Client asked for Counsel Chisha Chomba").name).toBe("Counsel Chisha Chomba");
+    expect(recipientForReferral("general", "Please connect me with Dr Mustafa").name).toBe("Dr. Mustafa Juma Phiri");
   });
 
   it("includes client identity, contact and case summary", () => {
