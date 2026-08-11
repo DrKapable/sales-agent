@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { leadPriorities, leadStatuses, type LeadPatch } from "@/lib/types";
+import { staffNames } from "@/lib/team-directory";
 import { listLeads, updateLead } from "@/lib/store";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
@@ -8,7 +9,7 @@ const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 const schema = z.object({
   status: z.enum(leadStatuses).optional(),
   aiPaused: z.boolean().optional(),
-  assignedTo: z.enum(["Dr. Mustafa Juma Phiri", "Dr Kanyembo Ng'andwe"]).nullable().optional(),
+  assignedTo: z.enum(staffNames).nullable().optional(),
   internalNote: z.string().trim().max(2000).nullable().optional(),
   priority: z.enum(leadPriorities).optional(),
   followUpAt: z.string().datetime().nullable().optional()

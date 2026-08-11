@@ -30,8 +30,27 @@ describe("referral notifications", () => {
     expect(recipientForReferral("discount").phone).toBe("260977259132");
   });
 
-  it("routes other enquiries to Kanyembo", () => {
-    expect(recipientForReferral("general").phone).toBe("260974634555");
+  it("routes specialist cases by team role", () => {
+    expect(recipientForReferral("research").name).toBe("Madalitso");
+    expect(recipientForReferral("customer_support").name).toBe("Dr Zabibu Nandazi");
+    expect(recipientForReferral("dispute").name).toBe("Chisha");
+    expect(recipientForReferral("legal").name).toBe("Chisha");
+    expect(recipientForReferral("marketing").name).toBe("Conrad Mununkha Phiri");
+    expect(recipientForReferral("software").name).toBe("Kabosha");
+    expect(recipientForReferral("cybersecurity").name).toBe("Kabosha");
+    expect(recipientForReferral("general").name).toBe("Dr Kanyembo Ng'andwe");
+  });
+
+  it("honours an explicitly requested team member", () => {
+    expect(recipientForReferral("general", "Client specifically asked to speak to Dr Zabibu Nandazi").name).toBe("Dr Zabibu Nandazi");
+    expect(recipientForReferral("research", "Please refer me to Chisha about a contract dispute").name).toBe("Chisha");
+  });
+
+  it("keeps Madalitso assignable while the supplied number is unverified", () => {
+    const recipient = recipientForReferral("research");
+    expect(recipient.name).toBe("Madalitso");
+    expect(recipient.phone).toBeNull();
+    expect(recipient.contactProvided).toBe("09779104893");
   });
 
   it("includes client identity, contact and case summary", () => {

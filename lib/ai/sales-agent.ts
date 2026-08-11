@@ -47,20 +47,18 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const handoffTool = tool({
-    description: "Refer a client only when human help is genuinely required. Referral assigns a human but does not stop the AI from continuing to assist. If the client explicitly asks for a named MedMinds person, preserve that name in the reason or summary so the request can be routed correctly.",
+    description: "Assign genuine human escalations to the most appropriate MedMinds team member. Use payment/discount for Dr Mustafa; research/operations for Madalitso; routine customer support for Dr Zabibu; dispute/legal for Chisha; marketing/administrative for Conrad; software/cybersecurity for Kabosha; general only when no specialist category fits. Preserve any explicitly requested staff member in the reason or summary.",
     inputSchema: z.object({
-      referralType: z.enum(["payment", "discount", "general"]),
+      referralType: z.enum(["payment", "discount", "research", "operations", "customer_support", "dispute", "legal", "marketing", "administrative", "software", "cybersecurity", "general"]),
       reason: z.string().min(3).max(500),
       summary: z.string().min(10).max(900).describe("A concise factual summary of the client's request and relevant conversation details.")
     }),
     execute: async ({ referralType, reason, summary }) => {
-      const referralText = `${reason} ${summary}`;
-      const specificallyAskedForMustafa = /\b(dr\.?\s*)?mustafa\b|\bjuma\s+phiri\b/i.test(referralText);
-      const recipient = specificallyAskedForMustafa ? recipientForReferral("payment") : recipientForReferral(referralType);
+      const recipient = recipientForReferral(referralType, `${reason} ${summary} ${lead.serviceInterest ?? ""}`);
       const alreadyAssigned = lead.status === "HUMAN ASSISTANCE REQUIRED" && lead.assignedTo === recipient.name;
       const savedLead = await updateLead(phone, { status: "HUMAN ASSISTANCE REQUIRED", handoffReason: reason, aiPaused: false, assignedTo: recipient.name });
-      const canNotifyTeam = !alreadyAssigned && (source === "whatsapp" || /^\d{8,15}$/.test(phone));
-      if (canNotifyTeam) {
+      const canNotifyTeam = !alreadyAssigned && Boolean(recipient.phone) && (source === "whatsapp" || /^\d{8,15}$/.test(phone));
+      if (canNotifyTeam && recipient.phone) {
         referralNotification = {
           phone: recipient.phone,
           recipientName: recipient.name,
@@ -73,7 +71,9 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
         notificationQueued: canNotifyTeam,
         instruction: alreadyAssigned
           ? `${recipient.name} is already assigned. Do not repeat the referral. Continue helping the client with anything you can answer while they wait.`
-          : `Tell the client ${recipient.name} has been assigned. Keep helping the client normally while they wait, unless an administrator explicitly takes over the conversation.`
+          : canNotifyTeam
+            ? `${recipient.name} has been assigned and the referral notification is queued. Keep helping the client normally while they wait, unless an administrator explicitly takes over the conversation.`
+            : `${recipient.name} is the correct specialist and has been assigned internally. Do not claim a WhatsApp notification was sent. Keep helping the client normally while the admin team sees the assignment.`
       };
     }
   });
@@ -81,7 +81,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const model = modelOverride || getAiModel();
   const agent = new ToolLoopAgent({
     model: gateway(model),
-    instructions: `${SALES_AGENT_PROMPT}\n\nHANDOVER CONTINUITY\n- A referral or staff assignment does not end your role in the conversation. Keep responding to new client messages and answer anything you can safely and accurately answer.\n- Do not repeatedly tell the client to wait after a referral. If a human is already assigned, acknowledge that only when relevant and continue helping.\n- Resolve pronouns and short follow-up questions from the recent transcript. If a client asks for \"the link\", \"this\", \"that\" or \"check myself\", infer the service they were discussing instead of asking them to repeat the request.\n- Only an explicit administrator takeover pauses AI replies; the webhook enforces that outside this prompt.\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers and prices.`,
+    instructions: `${SALES_AGENT_PROMPT}\n\nTEAM ROUTING - THESE RULES OVERRIDE ANY EARLIER GENERAL HANDOVER ROUTING\n- Payments, payment confirmation, payment concerns and discount approvals: Dr. Mustafa Juma Phiri.\n- Research support, proposal/dissertation support requiring a person, and operations-related research cases: Madalitso.\n- Routine customer support and ordinary client assistance that genuinely needs a person: Dr Zabibu Nandazi.\n- Complaints involving conflict, disputes, legal questions, contracts, terms or sensitive resolution: Chisha.\n- Marketing, advertising, campaigns, partnerships, promotion and administrative/secretarial matters: Conrad Mununkha Phiri.\n- Software development, websites, automation, technical systems, cybersecurity or security incidents: Kabosha.\n- Use Dr Kanyembo Ng'andwe only for genuine general escalations that do not fit a specialist category.\n- If the client explicitly asks for a named team member, preserve that name in the referral summary so the routing system honours the request.\n- Do not refer ordinary questions just because a specialist exists. Answer from approved information first and escalate only when human action or judgement is actually needed.\n\nHANDOVER CONTINUITY\n- A referral or staff assignment does not end your role in the conversation. Keep responding to new client messages and answer anything you can safely and accurately answer.\n- Do not repeatedly tell the client to wait after a referral. If a human is already assigned, acknowledge that only when relevant and continue helping.\n- Resolve pronouns and short follow-up questions from the recent transcript. If a client asks for \"the link\", \"this\", \"that\" or \"check myself\", infer the service they were discussing instead of asking them to repeat the request.\n- Only an explicit administrator takeover pauses AI replies; the webhook enforces that outside this prompt.\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers and prices.`,
     tools: { getApprovedOffers: approvedOffersTool, updateLead: updateLeadTool, requestHumanAssistance: handoffTool }
   });
 
