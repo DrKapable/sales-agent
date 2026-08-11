@@ -1,7 +1,7 @@
 import { after, NextRequest, NextResponse } from "next/server";
-import { replyToClient } from "@/lib/ai/sales-agent";
 import { addMessage, getConversation, getOrCreateLead, updateLead } from "@/lib/store";
 import { humanReplyDelayMs, wait } from "@/lib/timing";
+import { generateWhatsAppReplyWithRecovery, sendWhatsAppTextWithRetry } from "@/lib/whatsapp-recovery";
 import { parseIncomingMessages, sendWhatsAppText, verifyWhatsAppSignature } from "@/lib/whatsapp";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
   let payload: unknown;
   try { payload = JSON.parse(rawBody); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
   const messages = parseIncomingMessages(payload);
+
   after(async () => {
     for (const message of messages) {
       const processingStartedAt = Date.now();
@@ -27,6 +28,7 @@ export async function POST(request: NextRequest) {
         console.info("WhatsApp message received", { messageId: message.id, phoneSuffix: message.phone.slice(-4) });
         const isNew = await addMessage(message.phone, "user", message.text, message.id);
         if (!isNew) continue;
+
         let lead = message.name
           ? await updateLead(message.phone, { name: message.name })
           : await getOrCreateLead(message.phone, "whatsapp");
@@ -49,13 +51,15 @@ export async function POST(request: NextRequest) {
           console.info("Legacy AI referral resumed without waiting for human takeover", { messageId: message.id, assignedTo: lead.assignedTo });
         }
 
-        const result = await replyToClient(message.phone, message.text, "whatsapp");
-        console.info("WhatsApp client reply generated", { messageId: message.id, hasReferral: Boolean(result.referralNotification) });
+        const result = await generateWhatsAppReplyWithRecovery(message.phone, message.text);
+        console.info("WhatsApp client reply prepared", { messageId: message.id, hasReferral: Boolean(result.referralNotification) });
+
         const replyDelayMs = humanReplyDelayMs(Date.now() - processingStartedAt);
         console.info("WhatsApp client reply scheduled", { messageId: message.id, delayMs: replyDelayMs });
         await wait(replyDelayMs);
-        await sendWhatsAppText(message.phone, result.reply);
+        await sendWhatsAppTextWithRetry(message.phone, result.reply);
         console.info("WhatsApp client reply sent", { messageId: message.id });
+
         if (result.referralNotification) {
           try {
             await sendWhatsAppText(result.referralNotification.phone, result.referralNotification.body);
@@ -64,8 +68,11 @@ export async function POST(request: NextRequest) {
             console.error("WhatsApp referral notification failed", { messageId: message.id, recipient: result.referralNotification.recipientName, error });
           }
         }
-      } catch (error) { console.error("WhatsApp message processing failed", { messageId: message.id, error }); }
+      } catch (error) {
+        console.error("WhatsApp message processing failed after recovery", { messageId: message.id, phoneSuffix: message.phone.slice(-4), error });
+      }
     }
   });
+
   return NextResponse.json({ received: true });
 }
