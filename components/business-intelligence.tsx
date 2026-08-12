@@ -50,7 +50,7 @@ export function BusinessIntelligence() {
     finally { setBusy(false); }
   }
 
-  const topLeads = useMemo(() => data?.leads?.filter((lead: any) => lead.status !== "CONVERTED").slice(0, 12) || [], [data]);
+  const visibleLeads = useMemo(() => data?.leads?.slice(0, 30) || [], [data]);
 
   function newTask(lead?: any) {
     const title = window.prompt("Task to create", lead ? `Follow up ${lead.name || lead.phone}` : "");
@@ -59,21 +59,38 @@ export function BusinessIntelligence() {
     void action({ action: "task", leadId: lead?.id, title, assignedTo });
   }
 
-  function newQuote(lead: any) {
+  async function newQuote(lead: any) {
     const service = window.prompt("Service", lead.serviceInterest || lead.packageName || "") || "";
     if (!service) return;
     const amountText = window.prompt("Amount in ZMW (leave blank for tailored quote)", "");
     const details = window.prompt("Quotation details", `${service} for ${lead.name || "client"}`) || "";
     if (!details) return;
-    void action({ action: "quote", leadId: lead.id, service, amountZmw: amountText ? Number(amountText) : undefined, details });
+    const quote = await action({ action: "quote", leadId: lead.id, service, amountZmw: amountText ? Number(amountText) : undefined, details });
+    if (quote) {
+      const quoteText = `MedMinds quotation\nClient: ${lead.name || lead.phone}\nService: ${service}\nAmount: ${amountText ? `K${Number(amountText).toLocaleString()}` : "Tailored quotation"}\nDetails: ${details}`;
+      await navigator.clipboard?.writeText(quoteText).catch(() => undefined);
+      window.alert("Quotation saved. A ready-to-send quotation has also been copied to your clipboard.");
+    }
   }
 
-  function recordPayment(lead: any) {
+  async function recordPayment(lead: any) {
     const amount = Number(window.prompt("Amount received in ZMW", ""));
     if (!amount) return;
     const reference = window.prompt("Payment reference / note", "") || undefined;
     const verified = window.confirm("Has this payment been verified?");
-    void action({ action: "payment", leadId: lead.id, amountZmw: amount, reference, verified, verifiedBy: "Admin" });
+    const payment = await action({ action: "payment", leadId: lead.id, amountZmw: amount, reference, verified, verifiedBy: "Admin" });
+    if (payment && verified) {
+      const receipt = `MM-${String(payment.id).slice(0, 8).toUpperCase()}`;
+      const receiptText = `MedMinds receipt\nReceipt: ${receipt}\nClient: ${lead.name || lead.phone}\nAmount received: K${amount.toLocaleString()}\nReference: ${reference || "Not provided"}\nStatus: Verified`;
+      await navigator.clipboard?.writeText(receiptText).catch(() => undefined);
+      window.alert(`Payment verified. Receipt ${receipt} has been copied to your clipboard.`);
+    }
+  }
+
+  async function requestReview(lead: any) {
+    if (!window.confirm(`Send an honest-review request to ${lead.name || lead.phone}?`)) return;
+    const result = await action({ action: "review_request", leadId: lead.id });
+    if (result) window.alert("Review request sent successfully.");
   }
 
   if (!data) return <main style={{ padding: 28, fontFamily: "system-ui" }}><Link href="/admin">← Agent Admin</Link><h1>Business Intelligence</h1><p>{error || "Loading MedMinds business data..."}</p></main>;
@@ -93,14 +110,14 @@ export function BusinessIntelligence() {
         <article style={card}><h3>Services generating enquiries</h3>{data.services.slice(0,8).map((row:any)=><div key={row.service} style={rowStyle}><span>{row.service}</span><strong>{row.leads} leads · {row.conversionRate}%</strong></div>)}</article>
         <article style={card}><h3>Why leads are being lost</h3>{data.lostReasons.length ? data.lostReasons.slice(0,8).map((row:any)=><div key={row.reason} style={rowStyle}><span>{row.reason}</span><strong>{row.count}</strong></div>) : <p>No lost-lead patterns yet.</p>}</article>
       </section>
-      <article style={card}><h3>Google reputation tools</h3><p style={{ color: "#61736f" }}>Use reviews to reassure hesitant clients and request reviews after satisfactory service.</p><div style={{ display:"flex",gap:10,flexWrap:"wrap" }}><a href={reviewsUrl} target="_blank" rel="noreferrer" style={linkButton}>View MedMinds reviews</a><a href={collectReviewUrl} target="_blank" rel="noreferrer" style={linkButton}>Collect a Google review</a></div></article>
+      <article style={card}><h3>Google reputation tools</h3><p style={{ color: "#61736f" }}>The agent may offer public reviews when a client has a genuine credibility concern. After satisfactory completion, administrators can request an honest review from the client profile.</p><div style={{ display:"flex",gap:10,flexWrap:"wrap" }}><a href={reviewsUrl} target="_blank" rel="noreferrer" style={linkButton}>View MedMinds reviews</a><a href={collectReviewUrl} target="_blank" rel="noreferrer" style={linkButton}>Open review form</a></div></article>
     </>}
 
-    {view === "leads" && <section style={{ display: "grid", gap: 10 }}>{topLeads.map((lead:any)=><article key={lead.id} style={{...card,display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:12,alignItems:"center"}}><div><strong>{lead.name || "Unnamed client"}</strong><div style={{color:"#61736f",fontSize:13,marginTop:4}}>{lead.phone} · {lead.serviceInterest || "Service not established"}</div><div style={{marginTop:7}}><b>{lead.scoreBand} {lead.leadScore}/100</b> · {lead.status} · {lead.messageCount} messages{lead.lostReason ? ` · ${lead.lostReason}` : ""}</div><small style={{color:"#82908d"}}>Last: {lead.lastMessage || "No message"}</small></div><div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}><button style={buttonStyle} onClick={()=>newTask(lead)}>Task</button><button style={buttonStyle} onClick={()=>newQuote(lead)}>Quote</button><button style={buttonStyle} onClick={()=>recordPayment(lead)}>Payment</button></div></article>)}</section>}
+    {view === "leads" && <section style={{ display: "grid", gap: 10 }}>{visibleLeads.map((lead:any)=><article key={lead.id} style={{...card,display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:12,alignItems:"center"}}><div><strong>{lead.name || "Unnamed client"}</strong><div style={{color:"#61736f",fontSize:13,marginTop:4}}>{lead.phone} · {lead.serviceInterest || "Service not established"}</div><div style={{marginTop:7}}><b>{lead.scoreBand} {lead.leadScore}/100</b> · {lead.status} · {lead.messageCount} messages{lead.lostReason ? ` · ${lead.lostReason}` : ""}</div><small style={{color:"#82908d"}}>Last: {lead.lastMessage || "No message"}</small></div><div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}><button style={buttonStyle} onClick={()=>newTask(lead)}>Task</button><button style={buttonStyle} onClick={()=>void newQuote(lead)}>Quote</button><button style={buttonStyle} onClick={()=>void recordPayment(lead)}>Payment</button>{lead.status === "CONVERTED" && <button style={buttonStyle} disabled={busy} onClick={()=>void requestReview(lead)}>Request review</button>}</div></article>)}</section>}
 
     {view === "operations" && <section style={twoCol}>
       <article style={card}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><h3>Tasks</h3><button style={buttonStyle} onClick={()=>newTask()}>+ Task</button></div>{data.tasks.length ? data.tasks.slice(0,20).map((task:any)=><div key={task.id} style={rowStyle}><span>{task.title}<small style={{display:"block",color:"#82908d"}}>{task.assigned_to || "Unassigned"}</small></span><strong>{task.status}</strong></div>) : <p>No tasks yet.</p>}</article>
-      <article style={card}><h3>Payments</h3>{data.payments.length ? data.payments.slice(0,20).map((payment:any)=><div key={payment.id} style={rowStyle}><span>K{Number(payment.amount_zmw).toLocaleString()}<small style={{display:"block",color:"#82908d"}}>{payment.reference || "No reference"}</small></span><strong>{payment.status}</strong></div>) : <p>No payment records yet.</p>}<h3 style={{marginTop:24}}>Quotations</h3>{data.quotes.slice(0,12).map((quote:any)=><div key={quote.id} style={rowStyle}><span>{quote.service}<small style={{display:"block",color:"#82908d"}}>{quote.details}</small></span><strong>{quote.amount_zmw == null ? "Tailored" : `K${Number(quote.amount_zmw).toLocaleString()}`}</strong></div>)}</article>
+      <article style={card}><h3>Payments and receipts</h3>{data.payments.length ? data.payments.slice(0,20).map((payment:any)=><div key={payment.id} style={rowStyle}><span>K{Number(payment.amount_zmw).toLocaleString()}<small style={{display:"block",color:"#82908d"}}>{payment.reference || "No reference"} · Receipt MM-{String(payment.id).slice(0,8).toUpperCase()}</small></span><strong>{payment.status}</strong></div>) : <p>No payment records yet.</p>}<h3 style={{marginTop:24}}>Quotations</h3>{data.quotes.slice(0,12).map((quote:any)=><div key={quote.id} style={rowStyle}><span>{quote.service}<small style={{display:"block",color:"#82908d"}}>{quote.details}</small></span><strong>{quote.amount_zmw == null ? "Tailored" : `K${Number(quote.amount_zmw).toLocaleString()}`}</strong></div>)}</article>
     </section>}
 
     {view === "intelligence" && <section style={twoCol}>
