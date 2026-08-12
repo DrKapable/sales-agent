@@ -1,6 +1,5 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
-const TEST_DATA_RESET_MIGRATION = "2026-08-12-clear-test-client-records-v1";
 const CLIENT_BUSINESS_TABLES = ["business_tasks", "client_payments", "sales_quotes", "client_feedback"] as const;
 
 type Database = NeonQueryFunction<false, false>;
@@ -70,29 +69,4 @@ export async function deleteAllClientRecords() {
   if (await tableExists(db, "leads")) await db.query(`DELETE FROM leads`);
 
   return { deletedClients };
-}
-
-export async function runOneTimeTestDataReset() {
-  const db = database();
-  if (!db) return { applied: false, alreadyApplied: false, deletedClients: 0 };
-
-  await db.query(`CREATE TABLE IF NOT EXISTS app_migrations (
-    id TEXT PRIMARY KEY,
-    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  )`);
-
-  const claimed = await db.query(
-    `INSERT INTO app_migrations (id) VALUES ($1) ON CONFLICT (id) DO NOTHING RETURNING id`,
-    [TEST_DATA_RESET_MIGRATION]
-  );
-
-  if (!claimed.length) return { applied: false, alreadyApplied: true, deletedClients: 0 };
-
-  try {
-    const result = await deleteAllClientRecords();
-    return { applied: true, alreadyApplied: false, deletedClients: result.deletedClients };
-  } catch (error) {
-    await db.query(`DELETE FROM app_migrations WHERE id=$1`, [TEST_DATA_RESET_MIGRATION]).catch(() => undefined);
-    throw error;
-  }
 }
