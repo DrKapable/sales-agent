@@ -42,6 +42,18 @@ async function leadById(leadId?: string | null) {
   return leadId ? (await listLeads()).find((item) => item.id === leadId) || null : null;
 }
 
+async function trySendReceipt(lead: Awaited<ReturnType<typeof leadById>>, payment: any) {
+  if (!lead) return { receiptSent: false, receiptError: "Client not found." };
+  try {
+    const receipt = await sendBrandedReceiptPdf({ lead, payment });
+    return { receiptSent: true, receipt };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Receipt could not be sent.";
+    console.error("Branded PDF receipt delivery failed", { paymentId: payment?.id, phoneSuffix: lead.phone.slice(-4), error });
+    return { receiptSent: false, receiptError: message };
+  }
+}
+
 async function sendReviewRequest(leadId: string) {
   const lead = await leadById(leadId);
   if (!lead) throw new Error("Client not found.");
@@ -81,13 +93,14 @@ export async function POST(request: Request) {
       const lead = await leadById(input.leadId);
       const type = input.verified ? "payment_verified" : "payment_pending";
       void notifyBusinessEvent({ type, eventKey: `${type}:${String((payment as { id?: string }).id)}`, title: input.verified ? "Payment verified" : "Payment recorded, verification pending", body: `Amount: K${input.amountZmw.toLocaleString()}${input.reference ? `\nReference: ${input.reference}` : ""}`, lead }).catch(() => undefined);
+      if (input.verified) return NextResponse.json({ ...payment, ...(await trySendReceipt(lead, payment)) });
       return NextResponse.json(payment);
     }
     if (input.action === "verify_payment") {
-      const payment = await verifyPayment(input) as { id?: string; lead_id?: string; amount_zmw?: number; reference?: string };
+      const payment = await verifyPayment(input) as { id?: string; lead_id?: string; amount_zmw?: number; reference?: string; status?: string; verified_at?: string; verified_by?: string };
       const lead = await leadById(payment.lead_id);
       void notifyBusinessEvent({ type: "payment_verified", eventKey: `payment_verified:${String(payment.id)}`, title: "Payment verified", body: `Amount: K${Number(payment.amount_zmw || 0).toLocaleString()}${payment.reference ? `\nReference: ${payment.reference}` : ""}`, lead }).catch(() => undefined);
-      return NextResponse.json(payment);
+      return NextResponse.json({ ...payment, ...(await trySendReceipt(lead, payment)) });
     }
     if (input.action === "send_receipt") {
       const snapshot = await getBusinessSnapshot();
@@ -101,7 +114,7 @@ export async function POST(request: Request) {
     if (input.action === "quote") {
       const quote = await createQuote(input);
       const lead = await leadById(input.leadId);
-      void notifyBusinessEvent({ type: "quote_created", eventKey: `quote_created:${String((quote as { id?: string }).id)}`, title: "New MedMinds quotation", body: `Service: ${input.service}\nAmount: ${input.amountZmw == null ? "Tailored quotation" : `K${input.amountZmw.toLocaleString()}`}\n${input.details}`, lead }).catch(() => undefined);
+      void notifyBusinessEvent({ type: "quote_created", eventKey: `quote_created:${String((quote as { id?: string }).id)}`, title: "New MedMinds quotation", body: `Service: ${input.service}\nAmount: ${input.amountZmw == null ? "Tailored quotation" : `K${input.amountZmw.toLocaleString()}\n${input.details}`}`, lead }).catch(() => undefined);
       return NextResponse.json(quote);
     }
     if (input.action === "review_request") return NextResponse.json(await sendReviewRequest(input.leadId));
