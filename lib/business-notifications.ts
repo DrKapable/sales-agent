@@ -3,13 +3,14 @@ import { sendWhatsAppText } from "@/lib/whatsapp";
 import { listLeads } from "@/lib/store";
 import type { Lead } from "@/lib/types";
 
-export type BusinessEventType = "hot_lead" | "quote_created" | "payment_pending" | "payment_verified" | "research_task_created" | "review_requested" | "operations_task";
+export type BusinessEventType = "hot_lead" | "quote_created" | "payment_pending" | "payment_verified" | "receipt_sent" | "research_task_created" | "review_requested" | "operations_task";
 
 const recipientMap: Record<BusinessEventType, { primary: string; cc: string[] }> = {
   hot_lead: { primary: "kanyembo", cc: ["mustafa"] },
   quote_created: { primary: "kanyembo", cc: ["mustafa"] },
   payment_pending: { primary: "mustafa", cc: ["kanyembo"] },
   payment_verified: { primary: "mustafa", cc: ["kanyembo"] },
+  receipt_sent: { primary: "mustafa", cc: ["kanyembo"] },
   research_task_created: { primary: "madalitso", cc: ["mustafa"] },
   review_requested: { primary: "zabibu", cc: ["conrad"] },
   operations_task: { primary: "madalitso", cc: ["mustafa"] }
