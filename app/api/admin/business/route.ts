@@ -6,12 +6,14 @@ import { MEDMINDS_REVIEW_COLLECTION_URL } from "@/lib/reputation";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 import { sendNamedWhatsAppTemplate } from "@/lib/whatsapp-template";
 import { notifyBusinessEvent } from "@/lib/business-notifications";
+import { sendBrandedReceiptPdf } from "@/lib/receipt-delivery";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("task"), leadId: z.string().optional(), title: z.string().min(2).max(240), assignedTo: z.string().max(160).optional(), dueAt: z.string().datetime().optional(), notes: z.string().max(1200).optional() }),
   z.object({ action: z.literal("task_status"), taskId: z.string().uuid(), status: z.enum(["OPEN", "COMPLETED"]) }),
   z.object({ action: z.literal("payment"), leadId: z.string().min(1), amountZmw: z.number().positive(), reference: z.string().max(160).optional(), verified: z.boolean().optional(), verifiedBy: z.string().max(160).optional() }),
   z.object({ action: z.literal("verify_payment"), paymentId: z.string().uuid(), verifiedBy: z.string().max(160).optional() }),
+  z.object({ action: z.literal("send_receipt"), paymentId: z.string().uuid() }),
   z.object({ action: z.literal("quote"), leadId: z.string().min(1), service: z.string().min(2).max(240), amountZmw: z.number().nonnegative().optional(), details: z.string().min(3).max(1800) }),
   z.object({ action: z.literal("feedback"), leadId: z.string().min(1), rating: z.number().int().min(1).max(5).optional(), comment: z.string().max(1200).optional(), reviewRequested: z.boolean().optional() }),
   z.object({ action: z.literal("review_request"), leadId: z.string().min(1) })
@@ -86,6 +88,15 @@ export async function POST(request: Request) {
       const lead = await leadById(payment.lead_id);
       void notifyBusinessEvent({ type: "payment_verified", eventKey: `payment_verified:${String(payment.id)}`, title: "Payment verified", body: `Amount: K${Number(payment.amount_zmw || 0).toLocaleString()}${payment.reference ? `\nReference: ${payment.reference}` : ""}`, lead }).catch(() => undefined);
       return NextResponse.json(payment);
+    }
+    if (input.action === "send_receipt") {
+      const snapshot = await getBusinessSnapshot();
+      const payment = snapshot.payments.find((item: any) => item.id === input.paymentId);
+      if (!payment) throw new Error("Payment record not found.");
+      if (payment.status !== "VERIFIED") throw new Error("Only verified payments can be sent as receipts.");
+      const lead = await leadById(payment.lead_id);
+      if (!lead) throw new Error("The client linked to this payment could not be found.");
+      return NextResponse.json(await sendBrandedReceiptPdf({ lead, payment }));
     }
     if (input.action === "quote") {
       const quote = await createQuote(input);
