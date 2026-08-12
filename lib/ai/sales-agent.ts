@@ -1,11 +1,12 @@
 import { gateway, tool, ToolLoopAgent } from "ai";
 import { z } from "zod";
 import { SALES_AGENT_PROMPT } from "@/lib/ai/prompt";
-import { REPUTATION_GUIDANCE } from "@/lib/reputation";
 import { getAiModel } from "@/lib/env";
 import { restoreChat } from "@/lib/chat-lifecycle";
 import { addMessage, getConversation, getOrCreateLead, listOffers, updateLead } from "@/lib/store";
 import { buildReferralMessage, recipientForReferral } from "@/lib/referrals";
+import { createResearchPortalTask } from "@/lib/research-portal";
+import { maybeNotifyHotLead } from "@/lib/business-notifications";
 import { leadStatuses, type LeadPatch } from "@/lib/types";
 
 export type SalesAgentResult = {
@@ -22,14 +23,9 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const updateLeadTool = tool({
     description: "Save new client details or update the sales status. Never mark a lead converted without verified payment confirmation.",
     inputSchema: z.object({
-      name: z.string().min(1).max(120).optional(),
-      email: z.string().email().optional(),
-      institution: z.string().min(1).max(180).optional(),
-      programme: z.string().min(1).max(180).optional(),
-      serviceInterest: z.string().min(1).max(180).optional(),
-      deadline: z.string().min(1).max(120).optional(),
-      packageName: z.string().min(1).max(180).optional(),
-      status: z.enum(leadStatuses).optional()
+      name: z.string().min(1).max(120).optional(), email: z.string().email().optional(), institution: z.string().min(1).max(180).optional(),
+      programme: z.string().min(1).max(180).optional(), serviceInterest: z.string().min(1).max(180).optional(), deadline: z.string().min(1).max(120).optional(),
+      packageName: z.string().min(1).max(180).optional(), status: z.enum(leadStatuses).optional()
     }),
     execute: async (patch) => {
       if (patch.status === "CONVERTED") return { saved: false, reason: "Payment confirmation is required before conversion." };
@@ -48,49 +44,49 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const handoffTool = tool({
-    description: "Assign genuine human escalations to the most appropriate MedMinds team member. Use payment/discount, advanced research-specialist, software, business-automation and web-development cases for Dr Mustafa; sales and lead-conversion cases for Dr Kanyembo; routine research/operations for Mr. Madalitso Masumbu; routine customer support for Dr Zabibu; dispute/legal for Counsel Chisha Chomba; marketing/administrative for Mr Conrad; cybersecurity for Ms Kabosha Kayonga; general only when no specialist category fits. Preserve any explicitly requested staff member in the reason or summary.",
+    description: "Assign genuine human escalations to the most appropriate MedMinds team member. Preserve any explicitly requested staff member in the reason or summary.",
     inputSchema: z.object({
       referralType: z.enum(["payment", "discount", "sales", "research", "research_specialist", "operations", "customer_support", "dispute", "legal", "marketing", "administrative", "software", "business_automation", "web_development", "cybersecurity", "general"]),
-      reason: z.string().min(3).max(500),
-      summary: z.string().min(10).max(900).describe("A concise factual summary of the client's request and relevant conversation details.")
+      reason: z.string().min(3).max(500), summary: z.string().min(10).max(900)
     }),
     execute: async ({ referralType, reason, summary }) => {
       const recipient = recipientForReferral(referralType, `${reason} ${summary} ${lead.serviceInterest ?? ""}`);
       const alreadyAssigned = lead.status === "HUMAN ASSISTANCE REQUIRED" && lead.assignedTo === recipient.name;
       const savedLead = await updateLead(phone, { status: "HUMAN ASSISTANCE REQUIRED", handoffReason: reason, aiPaused: false, assignedTo: recipient.name });
       const canNotifyTeam = !alreadyAssigned && Boolean(recipient.phone) && (source === "whatsapp" || /^\d{8,15}$/.test(phone));
-      if (canNotifyTeam && recipient.phone) {
-        referralNotification = {
-          phone: recipient.phone,
-          recipientName: recipient.name,
-          body: buildReferralMessage({ recipientName: recipient.name, lead: savedLead, reason, summary })
-        };
-      }
+      if (canNotifyTeam && recipient.phone) referralNotification = { phone: recipient.phone, recipientName: recipient.name, body: buildReferralMessage({ recipientName: recipient.name, lead: savedLead, reason, summary }) };
       return {
-        queued: !alreadyAssigned,
-        assignedTo: recipient.name,
-        notificationQueued: canNotifyTeam,
-        instruction: alreadyAssigned
-          ? `${recipient.name} is already assigned. Do not repeat the referral. Continue helping the client with anything you can answer while they wait.`
-          : canNotifyTeam
-            ? `${recipient.name} has been assigned and the referral notification is queued. Keep helping the client normally while they wait, unless an administrator explicitly takes over the conversation.`
-            : `${recipient.name} is the correct specialist and has been assigned internally. Do not claim a WhatsApp notification was sent. Keep helping the client normally while the admin team sees the assignment.`
+        queued: !alreadyAssigned, assignedTo: recipient.name, notificationQueued: canNotifyTeam,
+        instruction: alreadyAssigned ? `${recipient.name} is already assigned. Continue helping the client.` : canNotifyTeam ? `${recipient.name} has been assigned and notified. Continue helping the client where possible.` : `${recipient.name} has been assigned internally. Do not claim a WhatsApp notification was sent.`
       };
     }
+  });
+
+  const researchTaskTool = tool({
+    description: "Create an UNASSIGNED research task in the MedMinds Research Portal when a concrete research deliverable needs operational follow-through. Use only after the client has clearly requested/proceeded with a specific piece of research work or when an agreed research action must enter the work queue. Do not use for casual enquiries, price questions, greetings or vague interest. This tool never links the task to a client and never assigns operations staff.",
+    inputSchema: z.object({
+      title: z.string().min(3).max(240),
+      brief: z.string().min(10).max(2500),
+      priority: z.enum(["low", "standard", "high", "urgent"]).default("standard"),
+      dueDate: z.string().max(80).optional(),
+      program: z.string().max(180).optional(),
+      academicLevel: z.string().max(180).optional()
+    }),
+    execute: async (task) => createResearchPortalTask({ ...task, lead })
   });
 
   const model = modelOverride || getAiModel();
   const agent = new ToolLoopAgent({
     model: gateway(model),
-    instructions: `${SALES_AGENT_PROMPT}\n\n${REPUTATION_GUIDANCE}\n\nTEAM ROUTING - THESE RULES OVERRIDE ANY EARLIER GENERAL HANDOVER ROUTING\n- Dr. Mustafa Juma Phiri is the Director. He is also a research specialist with experience in research support, software development, business automation and web development. Route payments, discount approvals, advanced or specialist research cases, software-development consultations, business automation and web-development cases requiring senior input to him.\n- Dr Kanyembo Ng'andwe is the Sales Representative and a member of the marketing team. He is the preferred person for sales escalation, lead conversion, closing difficult sales and general commercial enquiries that need a person.\n- Mr. Madalitso Masumbu is in Operations and is a research-support expert. Route routine research-support operations and project-support cases to him.\n- Dr Zabibu Nandazi is a digital marketer, marketing team member and customer-support team member. Route routine customer-support cases requiring a person to her.\n- Counsel Chisha Chomba is a lawyer, customer-support member, conflict/dispute-resolution specialist and legal consultant. Route legal questions, contractual disputes, serious complaints and conflict-resolution matters to her.\n- Mr Conrad Mununkha Phiri is a digital marketer, marketing team member and Secretary. Route marketing execution, advertising, campaigns, partnerships and administrative/secretarial matters to him.\n- Ms Kabosha Kayonga is a computer scientist and cybersecurity expert. Route cybersecurity, security incidents and technical-support cases to her.\n- If the client explicitly asks for a named team member, preserve that name in the referral summary so the routing system honours the request.\n- Do not refer ordinary questions just because a specialist exists. Answer from approved information first and escalate only when human action or judgement is actually needed.\n\nHANDOVER CONTINUITY\n- A referral or staff assignment does not end your role in the conversation. Keep responding to new client messages and answer anything you can safely and accurately answer.\n- Do not repeatedly tell the client to wait after a referral. If a human is already assigned, acknowledge that only when relevant and continue helping.\n- Resolve pronouns and short follow-up questions from the recent transcript. If a client asks for \"the link\", \"this\", \"that\" or \"check myself\", infer the service they were discussing instead of asking them to repeat the request.\n- Only an explicit administrator takeover pauses AI replies; the webhook enforces that outside this prompt.\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers and prices.`,
-    tools: { getApprovedOffers: approvedOffersTool, updateLead: updateLeadTool, requestHumanAssistance: handoffTool }
+    instructions: `${SALES_AGENT_PROMPT}\n\nRESEARCH PORTAL ASSISTANT-ADMIN CAPABILITY\n- You have one restricted research-portal action: create an unassigned research task using createResearchPortalTask.\n- Create a portal task only when there is a concrete research deliverable or operational action that should enter the work queue, not for ordinary enquiries or price questions.\n- The task MUST remain unlinked to a client and unassigned to operations/marketing. Humans will review, link and assign it later.\n- Never tell a client that a writer, operations member or client account has been assigned merely because you created the task.\n- After successful creation, you may say the request has been placed in the MedMinds research work queue for team review.\n- Avoid duplicate tasks for the same agreed deliverable in one conversation.\n\nTEAM ROUTING\n- Dr. Mustafa Juma Phiri: Director, specialist research, payments/discounts, software, business automation and web development.\n- Dr Kanyembo Ng'andwe: Sales Representative, marketing team and preferred closer for sales/lead conversion.\n- Mr. Madalitso Masumbu: Operations and routine research support.\n- Dr Zabibu Nandazi: customer support and marketing.\n- Counsel Chisha Chomba: disputes, legal and conflict resolution.\n- Mr Conrad Mununkha Phiri: marketing, advertising, partnerships and secretary/administration.\n- Ms Kabosha Kayonga: cybersecurity and technical support.\n- Explicit requests for a named person take precedence.\n\nHANDOVER CONTINUITY\n- A referral does not end your role. Keep answering new client messages where possible.\n- Do not repeatedly tell a referred client to wait.\n- Resolve short follow-ups from recent context.\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers, portal-task creation and prices.`,
+    tools: { getApprovedOffers: approvedOffersTool, updateLead: updateLeadTool, requestHumanAssistance: handoffTool, createResearchPortalTask: researchTaskTool }
   });
 
   const latestStored = history.at(-1)?.role === "user" && history.at(-1)?.content === text;
-  const transcript = [...history, ...(latestStored ? [] : [{ role: "user" as const, content: text }])]
-    .map((message) => `${message.role === "user" ? "Client" : "Agent"}: ${message.content}`).join("\n");
+  const transcript = [...history, ...(latestStored ? [] : [{ role: "user" as const, content: text }])].map((message) => `${message.role === "user" ? "Client" : "Agent"}: ${message.content}`).join("\n");
   const result = await agent.generate({ prompt: `Conversation including the client's latest message:\n${transcript}\n\nReply only with the WhatsApp message to send.` });
   const reply = (result.text.trim() || "I’ll make sure a MedMinds team member helps with that.").replaceAll("—", ",");
   await addMessage(phone, "assistant", reply);
+  void maybeNotifyHotLead(phone).catch((error) => console.error("Hot-lead notification check failed", { phoneSuffix: phone.slice(-4), error }));
   return { reply, referralNotification: referralNotification as SalesAgentResult["referralNotification"] };
 }

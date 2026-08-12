@@ -27,22 +27,21 @@ export async function runDailyManagementBrief() {
     `Hot unconverted leads: ${snapshot.metrics.hotLeads}`,
     `Follow-ups due: ${snapshot.metrics.followUpsDue}`,
     `Payment pending: ${snapshot.metrics.paymentPending}`,
-    "",
-    "Top services",
-    topServices,
-    "",
-    "Highest-priority leads",
-    hot,
-    "",
-    "Lost-lead signals",
-    lost
+    "", "Top services", topServices,
+    "", "Highest-priority leads", hot,
+    "", "Lost-lead signals", lost
   ].join("\n");
 
-  const recipients = [referralRecipients.mustafa, referralRecipients.kanyembo];
+  const recipients = [
+    { recipient: referralRecipients.kanyembo, label: "PRIMARY" },
+    { recipient: referralRecipients.mustafa, label: "CC" },
+    { recipient: referralRecipients.conrad, label: "CC" },
+    { recipient: referralRecipients.zabibu, label: "CC" }
+  ];
   const results = [];
-  for (const recipient of recipients) {
+  for (const { recipient, label } of recipients) {
     if (!recipient.phone) continue;
-    try { await sendWhatsAppText(recipient.phone, body); results.push({ recipient: recipient.name, sent: true }); }
+    try { await sendWhatsAppText(recipient.phone, `${label} - ${body}`); results.push({ recipient: recipient.name, sent: true }); }
     catch (error) { console.error("Daily management brief failed", { recipient: recipient.name, error }); results.push({ recipient: recipient.name, sent: false }); }
   }
   return { sent: results.some((item) => item.sent), results };

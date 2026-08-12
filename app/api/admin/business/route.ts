@@ -5,6 +5,7 @@ import { addMessage, getConversation, listLeads } from "@/lib/store";
 import { MEDMINDS_REVIEW_COLLECTION_URL } from "@/lib/reputation";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 import { sendNamedWhatsAppTemplate } from "@/lib/whatsapp-template";
+import { notifyBusinessEvent } from "@/lib/business-notifications";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("task"), leadId: z.string().optional(), title: z.string().min(2).max(240), assignedTo: z.string().max(160).optional(), dueAt: z.string().datetime().optional(), notes: z.string().max(1200).optional() }),
@@ -15,23 +16,22 @@ const actionSchema = z.discriminatedUnion("action", [
 ]);
 
 export async function GET() {
-  try {
-    return NextResponse.json(await getBusinessSnapshot());
-  } catch (error) {
-    console.error("Business snapshot failed", { error });
-    return NextResponse.json({ error: "Unable to load business intelligence." }, { status: 500 });
-  }
+  try { return NextResponse.json(await getBusinessSnapshot()); }
+  catch (error) { console.error("Business snapshot failed", { error }); return NextResponse.json({ error: "Unable to load business intelligence." }, { status: 500 }); }
+}
+
+async function leadById(leadId?: string) {
+  return leadId ? (await listLeads()).find((item) => item.id === leadId) || null : null;
 }
 
 async function sendReviewRequest(leadId: string) {
-  const lead = (await listLeads()).find((item) => item.id === leadId);
+  const lead = await leadById(leadId);
   if (!lead) throw new Error("Client not found.");
   const history = await getConversation(lead.phone, 30);
   const lastUser = [...history].reverse().find((message) => message.role === "user");
   const within24h = Boolean(lastUser && Date.now() - new Date(lastUser.createdAt).getTime() < 24 * 60 * 60 * 1000);
   const firstName = lead.name?.split(/\s+/)[0];
   const message = `${firstName ? `Hi ${firstName}, ` : "Hi, "}thank you for choosing MedMinds. If you have a moment, we’d appreciate an honest Google review about your experience: ${MEDMINDS_REVIEW_COLLECTION_URL}`;
-
   if (within24h) {
     await sendWhatsAppText(lead.phone, message);
     await addMessage(lead.phone, "assistant", `[Review request] ${message}`);
@@ -42,6 +42,7 @@ async function sendReviewRequest(leadId: string) {
     await addMessage(lead.phone, "assistant", `[Review request sent using approved WhatsApp template: ${template}]`);
   }
   await recordFeedback({ leadId, reviewRequested: true });
+  void notifyBusinessEvent({ type: "review_requested", eventKey: `review_requested:${leadId}`, title: "Client review request sent", body: `Google review request sent to ${lead.name || lead.phone}.`, lead }).catch(() => undefined);
   return { sent: true, mode: within24h ? "freeform" : "template", reviewUrl: MEDMINDS_REVIEW_COLLECTION_URL };
 }
 
@@ -50,9 +51,25 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid business action." }, { status: 400 });
   try {
     const input = parsed.data;
-    if (input.action === "task") return NextResponse.json(await createBusinessTask(input));
-    if (input.action === "payment") return NextResponse.json(await recordPayment(input));
-    if (input.action === "quote") return NextResponse.json(await createQuote(input));
+    if (input.action === "task") {
+      const task = await createBusinessTask(input);
+      const lead = await leadById(input.leadId);
+      void notifyBusinessEvent({ type: "operations_task", eventKey: `operations_task:${String((task as { id?: string }).id)}`, title: "New MedMinds operations task", body: `Task: ${input.title}\nAssigned to: ${input.assignedTo || "Unassigned"}${input.dueAt ? `\nDue: ${input.dueAt}` : ""}`, lead }).catch(() => undefined);
+      return NextResponse.json(task);
+    }
+    if (input.action === "payment") {
+      const payment = await recordPayment(input);
+      const lead = await leadById(input.leadId);
+      const type = input.verified ? "payment_verified" : "payment_pending";
+      void notifyBusinessEvent({ type, eventKey: `${type}:${String((payment as { id?: string }).id)}`, title: input.verified ? "Payment verified" : "Payment recorded, verification pending", body: `Amount: K${input.amountZmw.toLocaleString()}${input.reference ? `\nReference: ${input.reference}` : ""}`, lead }).catch(() => undefined);
+      return NextResponse.json(payment);
+    }
+    if (input.action === "quote") {
+      const quote = await createQuote(input);
+      const lead = await leadById(input.leadId);
+      void notifyBusinessEvent({ type: "quote_created", eventKey: `quote_created:${String((quote as { id?: string }).id)}`, title: "New MedMinds quotation", body: `Service: ${input.service}\nAmount: ${input.amountZmw == null ? "Tailored quotation" : `K${input.amountZmw.toLocaleString()}`}\n${input.details}`, lead }).catch(() => undefined);
+      return NextResponse.json(quote);
+    }
     if (input.action === "review_request") return NextResponse.json(await sendReviewRequest(input.leadId));
     return NextResponse.json(await recordFeedback(input));
   } catch (error) {
