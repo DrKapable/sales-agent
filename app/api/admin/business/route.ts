@@ -18,8 +18,22 @@ const actionSchema = z.discriminatedUnion("action", [
 ]);
 
 export async function GET() {
-  try { return NextResponse.json(await getBusinessSnapshot()); }
-  catch (error) { console.error("Business snapshot failed", { error }); return NextResponse.json({ error: "Unable to load business intelligence." }, { status: 500 }); }
+  try {
+    const snapshot = await getBusinessSnapshot();
+    return NextResponse.json({
+      ...snapshot,
+      capabilities: {
+        persistentDatabase: Boolean(process.env.DATABASE_URL),
+        whatsapp: Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
+        researchPortal: Boolean(process.env.RESEARCH_ASSISTANT_SECRET && (process.env.RESEARCH_PORTAL_TASK_URL || true)),
+        reviewOutside24h: Boolean(process.env.WHATSAPP_REVIEW_TEMPLATE_NAME),
+        scheduledAutomation: true
+      }
+    });
+  } catch (error) {
+    console.error("Business snapshot failed", { error });
+    return NextResponse.json({ error: "Unable to load business intelligence." }, { status: 500 });
+  }
 }
 
 async function leadById(leadId?: string | null) {
