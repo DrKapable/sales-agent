@@ -5,6 +5,7 @@ import { getBusinessSnapshot, createBusinessTask, createQuote } from "@/lib/busi
 import { getConversation, addMessage } from "@/lib/store";
 import { getAiModelCandidates } from "@/lib/env";
 import { createResearchPortalTask } from "@/lib/research-portal";
+import { notifyBusinessEvent } from "@/lib/business-notifications";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 import { sendNamedWhatsAppTemplate, sendWhatsAppFollowUpTemplate } from "@/lib/whatsapp-template";
 
@@ -28,13 +29,10 @@ function resolveLead(snapshot: Snapshot, query: string): SnapshotLead {
   const needle = query.trim().toLowerCase();
   const phoneNeedle = normalizePhone(query);
   if (!needle) throw new Error("Specify the client by name or WhatsApp number.");
-
   const exactPhone = snapshot.leads.filter((lead) => normalizePhone(lead.phone) === phoneNeedle && phoneNeedle.length >= 8);
   if (exactPhone.length === 1) return exactPhone[0];
-
   const exactName = snapshot.leads.filter((lead) => lead.name?.trim().toLowerCase() === needle);
   if (exactName.length === 1) return exactName[0];
-
   const partial = snapshot.leads.filter((lead) => {
     const fields = [lead.name, lead.phone, lead.email, lead.institution, lead.programme].filter(Boolean).map((value) => String(value).toLowerCase());
     return fields.some((value) => value.includes(needle)) || (phoneNeedle.length >= 5 && normalizePhone(lead.phone).includes(phoneNeedle));
@@ -64,15 +62,7 @@ async function sendFollowUp(lead: SnapshotLead, message?: string) {
 
 function receiptText(lead: SnapshotLead, payment: any) {
   const receipt = `MM-${String(payment.id).slice(0, 8).toUpperCase()}`;
-  return [
-    "MedMinds receipt",
-    `Receipt: ${receipt}`,
-    `Client: ${lead.name || lead.phone}`,
-    `Amount received: K${Number(payment.amount_zmw).toLocaleString()}`,
-    `Reference: ${payment.reference || "Not provided"}`,
-    `Status: Verified`,
-    payment.verified_at ? `Verified: ${new Date(payment.verified_at).toLocaleDateString("en-GB")}` : ""
-  ].filter(Boolean).join("\n");
+  return ["MedMinds receipt", `Receipt: ${receipt}`, `Client: ${lead.name || lead.phone}`, `Amount received: K${Number(payment.amount_zmw).toLocaleString()}`, `Reference: ${payment.reference || "Not provided"}`, "Status: Verified", payment.verified_at ? `Verified: ${new Date(payment.verified_at).toLocaleDateString("en-GB")}` : ""].filter(Boolean).join("\n");
 }
 
 async function sendReceipt(snapshot: Snapshot, lead: SnapshotLead) {
@@ -107,7 +97,6 @@ function analyticalFallback(snapshot: Snapshot, question: string) {
 export async function POST(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Enter a business question or command." }, { status: 400 });
-
   const snapshot = await getBusinessSnapshot();
 
   const findClientTool = tool({
@@ -135,6 +124,7 @@ export async function POST(request: Request) {
     execute: async ({ client, ...task }) => {
       const lead = client ? resolveLead(snapshot, client) : null;
       const created = await createBusinessTask({ ...task, leadId: lead?.id });
+      void notifyBusinessEvent({ type: "operations_task", eventKey: `operations_task:${String((created as any).id)}`, title: "New MedMinds operations task", body: `Task: ${task.title}\nAssigned to: ${task.assignedTo || "Unassigned"}${task.dueAt ? `\nDue: ${task.dueAt}` : ""}`, lead }).catch(() => undefined);
       return { created: true, taskId: (created as any).id, title: task.title, client: lead ? displayLead(lead) : "No client linked", assignedTo: task.assignedTo || "Unassigned" };
     }
   });
@@ -163,6 +153,7 @@ export async function POST(request: Request) {
     execute: async ({ client, ...quote }) => {
       const lead = resolveLead(snapshot, client);
       const saved = await createQuote({ ...quote, leadId: lead.id });
+      void notifyBusinessEvent({ type: "quote_created", eventKey: `quote_created:${String((saved as any).id)}`, title: "New MedMinds quotation", body: `Service: ${quote.service}\nAmount: ${quote.amountZmw == null ? "Tailored quotation" : `K${quote.amountZmw.toLocaleString()}`}\n${quote.details}`, lead }).catch(() => undefined);
       return { created: true, quoteId: (saved as any).id, client: displayLead(lead), service: quote.service, amountZmw: quote.amountZmw ?? null };
     }
   });
@@ -180,18 +171,7 @@ export async function POST(request: Request) {
   let lastError: unknown = null;
   for (const model of models) {
     try {
-      const agent = new ToolLoopAgent({
-        model: gateway(model),
-        instructions,
-        tools: {
-          findClient: findClientTool,
-          followUpClient: followUpTool,
-          createInternalTask: createTaskTool,
-          createResearchPortalTask: researchTaskTool,
-          sendVerifiedReceipt: sendReceiptTool,
-          createQuotation: createQuoteTool
-        }
-      });
+      const agent = new ToolLoopAgent({ model: gateway(model), instructions, tools: { findClient: findClientTool, followUpClient: followUpTool, createInternalTask: createTaskTool, createResearchPortalTask: researchTaskTool, sendVerifiedReceipt: sendReceiptTool, createQuotation: createQuoteTool } });
       const result = await agent.generate({ prompt: parsed.data.question });
       return NextResponse.json({ answer: result.text.trim() || "Done.", mode: "agent", model });
     } catch (error) {
@@ -199,7 +179,6 @@ export async function POST(request: Request) {
       console.warn("Ask Intelligence agent attempt failed", { model, error });
     }
   }
-
   console.error("Ask Intelligence agent failed across all models", { error: lastError });
   return NextResponse.json({ answer: analyticalFallback(snapshot, parsed.data.question), mode: "fallback" });
 }
