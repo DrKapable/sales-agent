@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createBusinessTask, createQuote, getBusinessSnapshot, recordFeedback, recordPayment } from "@/lib/business-ops";
+import { createBusinessTask, createQuote, getBusinessSnapshot, recordFeedback, recordPayment, updateBusinessTask, verifyPayment } from "@/lib/business-ops";
 import { addMessage, getConversation, listLeads } from "@/lib/store";
 import { MEDMINDS_REVIEW_COLLECTION_URL } from "@/lib/reputation";
 import { sendWhatsAppText } from "@/lib/whatsapp";
@@ -9,7 +9,9 @@ import { notifyBusinessEvent } from "@/lib/business-notifications";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("task"), leadId: z.string().optional(), title: z.string().min(2).max(240), assignedTo: z.string().max(160).optional(), dueAt: z.string().datetime().optional(), notes: z.string().max(1200).optional() }),
+  z.object({ action: z.literal("task_status"), taskId: z.string().uuid(), status: z.enum(["OPEN", "COMPLETED"]) }),
   z.object({ action: z.literal("payment"), leadId: z.string().min(1), amountZmw: z.number().positive(), reference: z.string().max(160).optional(), verified: z.boolean().optional(), verifiedBy: z.string().max(160).optional() }),
+  z.object({ action: z.literal("verify_payment"), paymentId: z.string().uuid(), verifiedBy: z.string().max(160).optional() }),
   z.object({ action: z.literal("quote"), leadId: z.string().min(1), service: z.string().min(2).max(240), amountZmw: z.number().nonnegative().optional(), details: z.string().min(3).max(1800) }),
   z.object({ action: z.literal("feedback"), leadId: z.string().min(1), rating: z.number().int().min(1).max(5).optional(), comment: z.string().max(1200).optional(), reviewRequested: z.boolean().optional() }),
   z.object({ action: z.literal("review_request"), leadId: z.string().min(1) })
@@ -20,7 +22,7 @@ export async function GET() {
   catch (error) { console.error("Business snapshot failed", { error }); return NextResponse.json({ error: "Unable to load business intelligence." }, { status: 500 }); }
 }
 
-async function leadById(leadId?: string) {
+async function leadById(leadId?: string | null) {
   return leadId ? (await listLeads()).find((item) => item.id === leadId) || null : null;
 }
 
@@ -57,11 +59,18 @@ export async function POST(request: Request) {
       void notifyBusinessEvent({ type: "operations_task", eventKey: `operations_task:${String((task as { id?: string }).id)}`, title: "New MedMinds operations task", body: `Task: ${input.title}\nAssigned to: ${input.assignedTo || "Unassigned"}${input.dueAt ? `\nDue: ${input.dueAt}` : ""}`, lead }).catch(() => undefined);
       return NextResponse.json(task);
     }
+    if (input.action === "task_status") return NextResponse.json(await updateBusinessTask(input));
     if (input.action === "payment") {
       const payment = await recordPayment(input);
       const lead = await leadById(input.leadId);
       const type = input.verified ? "payment_verified" : "payment_pending";
       void notifyBusinessEvent({ type, eventKey: `${type}:${String((payment as { id?: string }).id)}`, title: input.verified ? "Payment verified" : "Payment recorded, verification pending", body: `Amount: K${input.amountZmw.toLocaleString()}${input.reference ? `\nReference: ${input.reference}` : ""}`, lead }).catch(() => undefined);
+      return NextResponse.json(payment);
+    }
+    if (input.action === "verify_payment") {
+      const payment = await verifyPayment(input) as { id?: string; lead_id?: string; amount_zmw?: number; reference?: string };
+      const lead = await leadById(payment.lead_id);
+      void notifyBusinessEvent({ type: "payment_verified", eventKey: `payment_verified:${String(payment.id)}`, title: "Payment verified", body: `Amount: K${Number(payment.amount_zmw || 0).toLocaleString()}${payment.reference ? `\nReference: ${payment.reference}` : ""}`, lead }).catch(() => undefined);
       return NextResponse.json(payment);
     }
     if (input.action === "quote") {
