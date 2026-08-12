@@ -1,13 +1,11 @@
 import { sanitizeWhatsAppApiError } from "@/lib/whatsapp";
 
-export async function sendWhatsAppFollowUpTemplate(phone: string) {
+export async function sendNamedWhatsAppTemplate(phone: string, templateName: string, languageCode = "en_US") {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const version = process.env.WHATSAPP_GRAPH_VERSION;
-  const templateName = process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME;
-  const languageCode = process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE || "en_US";
 
-  if (!token || !phoneNumberId || !version || !templateName) throw new Error("WhatsApp follow-up template is not configured.");
+  if (!token || !phoneNumberId || !version || !templateName) throw new Error("WhatsApp template is not configured.");
   if (!/^v\d+\.\d+$/.test(version) || !/^\d+$/.test(phoneNumberId)) throw new Error("Invalid WhatsApp Graph configuration.");
 
   const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
@@ -27,6 +25,13 @@ export async function sendWhatsAppFollowUpTemplate(phone: string) {
   if (!response.ok) throw new Error(`WhatsApp template API returned ${response.status}: ${JSON.stringify(sanitizeWhatsAppApiError(rawBody))}`);
   const payload = JSON.parse(rawBody) as { messages?: Array<{ id?: string }> };
   const messageId = payload.messages?.[0]?.id;
-  if (!messageId) throw new Error("WhatsApp accepted the follow-up template without returning a message ID.");
+  if (!messageId) throw new Error("WhatsApp accepted the template without returning a message ID.");
   return { messageId };
+}
+
+export async function sendWhatsAppFollowUpTemplate(phone: string) {
+  const templateName = process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME;
+  const languageCode = process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE || "en_US";
+  if (!templateName) throw new Error("WhatsApp follow-up template is not configured.");
+  return sendNamedWhatsAppTemplate(phone, templateName, languageCode);
 }
