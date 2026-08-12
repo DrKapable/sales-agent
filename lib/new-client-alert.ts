@@ -1,5 +1,4 @@
-import { referralRecipients } from "@/lib/referrals";
-import { sendWhatsAppText } from "@/lib/whatsapp";
+import { sendTeamNotification } from "@/lib/team-notifications";
 import type { Lead } from "@/lib/types";
 
 export function buildNewClientAlert(input: {
@@ -25,17 +24,15 @@ export async function notifyDirectorOfNewClient(input: {
   source: "whatsapp" | "website";
   phoneNumberIdOverride?: string;
 }) {
-  const director = referralRecipients.mustafa;
-  if (!director.phone) return false;
   try {
-    await sendWhatsAppText(
-      director.phone,
-      buildNewClientAlert(input),
-      input.phoneNumberIdOverride
-    );
-    return true;
+    const results = await sendTeamNotification({
+      kind: "new_client",
+      body: buildNewClientAlert(input),
+      phoneNumberIdOverride: input.phoneNumberIdOverride
+    });
+    return results.some((result) => result.status === "fulfilled" && result.value.sent);
   } catch (error) {
-    console.error("New client director alert failed", {
+    console.error("New client team alert failed", {
       source: input.source,
       phoneSuffix: input.lead.phone.slice(-4),
       error
