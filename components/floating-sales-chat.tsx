@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 
 type WidgetMessage = { id: string; role: "user" | "assistant"; content: string; time: string };
@@ -36,6 +36,11 @@ function whatsappHref(name: string) {
   return `https://wa.me/${MEDMINDS_WHATSAPP}?text=${encodeURIComponent(text)}`;
 }
 
+function referrerOrigin() {
+  if (typeof document === "undefined" || !document.referrer) return null;
+  try { return new URL(document.referrer).origin; } catch { return null; }
+}
+
 export function FloatingSalesChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<WidgetMessage[]>([welcome]);
@@ -47,6 +52,7 @@ export function FloatingSalesChat() {
   const [contactReady, setContactReady] = useState(false);
   const [contactError, setContactError] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const parentOrigin = useMemo(() => referrerOrigin(), []);
 
   useEffect(() => {
     document.body.classList.add("medmindsWidgetBody");
@@ -63,17 +69,20 @@ export function FloatingSalesChat() {
   }, []);
 
   useEffect(() => {
-    window.parent.postMessage({ type: "medminds-chat-resize", open }, "*");
-  }, [open]);
+    if (window.parent === window) return;
+    window.parent.postMessage({ type: "medminds-chat-resize", open }, parentOrigin || "*");
+  }, [open, parentOrigin]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      if (event.source !== window.parent) return;
+      if (parentOrigin && event.origin !== parentOrigin) return;
       if (event.data?.type === "medminds-chat-open") setOpen(true);
       if (event.data?.type === "medminds-chat-close") setOpen(false);
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [parentOrigin]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -175,7 +184,7 @@ export function FloatingSalesChat() {
         </form>
         <div className="widgetContactDivider"><span>or</span></div>
         <a className="widgetWhatsAppOption" href={whatsappHref(name)} target="_blank" rel="noopener noreferrer">Chat on WhatsApp</a>
-        <p className="widgetContactPrivacy">Your details are used only for this MedMinds enquiry and follow-up.</p>
+        <p className="widgetContactPrivacy">Your details are used to manage this enquiry and any related MedMinds follow-up.</p>
       </div>
     </div> : <>
       <div className="widgetMessages" aria-live="polite">
