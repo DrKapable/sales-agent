@@ -39,8 +39,11 @@ async function ensureTables() {
   await setup;
 }
 
-function ageDays(value: string) {
-  return Math.max(0, (Date.now() - new Date(value).getTime()) / 86400000);
+function ageDays(value?: string | null) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  if (!Number.isFinite(time)) return 0;
+  return Math.max(0, (Date.now() - time) / 86400000);
 }
 
 export async function scoreLead(lead: Lead) {
@@ -67,7 +70,6 @@ function inferLostReason(text: string) {
   if (/later|not now|next month|wait/.test(value)) return "Timing/not ready";
   if (/another|elsewhere|competitor/.test(value)) return "Alternative provider";
   if (/trust|review|legit|scam|sure/.test(value)) return "Trust/credibility concern";
-  if (/no reply|silent/.test(value)) return "No response";
   return "Reason not established";
 }
 
@@ -77,15 +79,19 @@ export async function getBusinessSnapshot() {
   const offers = await listOffers(true);
   const enriched = await Promise.all(leads.map(async (lead) => {
     const score = await scoreLead(lead);
-    const history = await getConversation(lead.phone, 20);
+    const history = await getConversation(lead.phone, 30);
+    const latest = history.at(-1);
+    const lastActivityAt = latest?.createdAt || lead.createdAt;
     return {
       ...lead,
       leadScore: score.score,
       scoreBand: score.band,
       messageCount: score.messageCount,
       lostReason: lead.status === "LOST LEAD" ? inferLostReason(history.map((m) => m.content).join(" ")) : null,
-      lastMessage: history.at(-1)?.content ?? null,
-      ageDays: Math.round(ageDays(lead.createdAt))
+      lastMessage: latest?.content ?? null,
+      lastActivityAt,
+      ageDays: Math.round(ageDays(lead.createdAt)),
+      inactiveDays: Math.round(ageDays(lastActivityAt))
     };
   }));
 
@@ -104,31 +110,58 @@ export async function getBusinessSnapshot() {
   let tasks: any[] = [], payments: any[] = [], quotes: any[] = [], feedback: any[] = [];
   if (database) {
     [tasks, payments, quotes, feedback] = await Promise.all([
-      database.query(`SELECT * FROM business_tasks ORDER BY created_at DESC LIMIT 100`),
-      database.query(`SELECT * FROM client_payments ORDER BY created_at DESC LIMIT 100`),
-      database.query(`SELECT * FROM sales_quotes ORDER BY created_at DESC LIMIT 100`),
-      database.query(`SELECT * FROM client_feedback ORDER BY created_at DESC LIMIT 100`)
+      database.query(`SELECT * FROM business_tasks ORDER BY created_at DESC LIMIT 150`),
+      database.query(`SELECT * FROM client_payments ORDER BY created_at DESC LIMIT 150`),
+      database.query(`SELECT * FROM sales_quotes ORDER BY created_at DESC LIMIT 150`),
+      database.query(`SELECT * FROM client_feedback ORDER BY created_at DESC LIMIT 150`)
     ]);
   }
 
+  const leadMap = new Map(enriched.map((lead) => [lead.id, lead]));
+  const attachLead = (row: any) => {
+    const lead = row.lead_id ? leadMap.get(row.lead_id) : null;
+    return { ...row, leadName: lead?.name || null, leadPhone: lead?.phone || null, serviceInterest: lead?.serviceInterest || lead?.packageName || null };
+  };
+  tasks = tasks.map(attachLead);
+  payments = payments.map(attachLead);
+  quotes = quotes.map(attachLead);
+  feedback = feedback.map(attachLead);
+
+  const dueFollowUps = enriched.filter((lead) => lead.followUpAt && new Date(lead.followUpAt).getTime() <= Date.now() && !["CONVERTED", "LOST LEAD"].includes(lead.status));
+  const pendingPayments = payments.filter((payment) => payment.status === "PENDING");
+  const openTasks = tasks.filter((task) => task.status !== "COMPLETED");
+  const overdueTasks = openTasks.filter((task) => task.due_at && new Date(task.due_at).getTime() < Date.now());
+  const staleWarmLeads = enriched.filter((lead) => !["CONVERTED", "LOST LEAD"].includes(lead.status) && lead.inactiveDays >= 3 && lead.leadScore >= 45);
+
   return {
+    generatedAt: new Date().toISOString(),
     metrics: {
       totalLeads: enriched.length,
       converted: converted.length,
       lost: lost.length,
       conversionRate: enriched.length ? Math.round((converted.length / enriched.length) * 100) : 0,
-      hotLeads: enriched.filter((lead) => lead.scoreBand === "HOT" && lead.status !== "CONVERTED").length,
-      followUpsDue: enriched.filter((lead) => lead.followUpAt && new Date(lead.followUpAt).getTime() <= Date.now() && !["CONVERTED", "LOST LEAD"].includes(lead.status)).length,
-      paymentPending: enriched.filter((lead) => lead.status === "PAYMENT PENDING").length
+      hotLeads: enriched.filter((lead) => lead.scoreBand === "HOT" && !["CONVERTED", "LOST LEAD"].includes(lead.status)).length,
+      followUpsDue: dueFollowUps.length,
+      paymentPending: pendingPayments.length,
+      paymentPendingLeads: enriched.filter((lead) => lead.status === "PAYMENT PENDING").length,
+      openTasks: openTasks.length,
+      overdueTasks: overdueTasks.length,
+      quotesCreated: quotes.length,
+      staleWarmLeads: staleWarmLeads.length
     },
-    leads: enriched.sort((a, b) => b.leadScore - a.leadScore),
+    leads: enriched.sort((a, b) => b.leadScore - a.leadScore || new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime()),
     services: [...serviceCounts.entries()].map(([service, values]) => ({ service, ...values, conversionRate: values.leads ? Math.round(values.converted / values.leads * 100) : 0 })).sort((a, b) => b.leads - a.leads),
-    lostReasons: [...new Map(lost.map((lead) => [lead.lostReason || "Reason not established", 0])).keys()].map((reason) => ({ reason, count: lost.filter((lead) => lead.lostReason === reason).length })).sort((a, b) => b.count - a.count),
+    lostReasons: [...new Set(lost.map((lead) => lead.lostReason || "Reason not established"))].map((reason) => ({ reason, count: lost.filter((lead) => lead.lostReason === reason).length })).sort((a, b) => b.count - a.count),
     offers: offers.map((offer) => ({ slug: offer.slug, name: offer.name, category: offer.category, priceZmw: offer.priceZmw, rushPriceZmw: offer.rushPriceZmw })),
     tasks,
     payments,
     quotes,
-    feedback
+    feedback,
+    attention: {
+      followUpsDue: dueFollowUps.slice(0, 12),
+      overdueTasks: overdueTasks.slice(0, 12),
+      staleWarmLeads: staleWarmLeads.slice(0, 12)
+    }
   };
 }
 
@@ -140,11 +173,29 @@ export async function createBusinessTask(input: { leadId?: string; title: string
   return rows[0];
 }
 
+export async function updateBusinessTask(input: { taskId: string; status: "OPEN" | "COMPLETED" }) {
+  await ensureTables();
+  const database = db();
+  if (!database) throw new Error("Persistent database storage is required.");
+  const rows = await database.query(`UPDATE business_tasks SET status=$2, completed_at=CASE WHEN $2='COMPLETED' THEN NOW() ELSE NULL END WHERE id=$1 RETURNING *`, [input.taskId, input.status]);
+  if (!rows[0]) throw new Error("Task not found.");
+  return rows[0];
+}
+
 export async function recordPayment(input: { leadId: string; amountZmw: number; reference?: string; verified?: boolean; verifiedBy?: string }) {
   await ensureTables();
   const database = db();
   if (!database) throw new Error("Persistent database storage is required.");
   const rows = await database.query(`INSERT INTO client_payments (id,lead_id,amount_zmw,reference,status,verified_by,verified_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [crypto.randomUUID(), input.leadId, input.amountZmw, input.reference || null, input.verified ? "VERIFIED" : "PENDING", input.verified ? (input.verifiedBy || "Admin") : null, input.verified ? new Date().toISOString() : null]);
+  return rows[0];
+}
+
+export async function verifyPayment(input: { paymentId: string; verifiedBy?: string }) {
+  await ensureTables();
+  const database = db();
+  if (!database) throw new Error("Persistent database storage is required.");
+  const rows = await database.query(`UPDATE client_payments SET status='VERIFIED', verified_by=$2, verified_at=NOW() WHERE id=$1 RETURNING *`, [input.paymentId, input.verifiedBy || "Admin"]);
+  if (!rows[0]) throw new Error("Payment not found.");
   return rows[0];
 }
 
