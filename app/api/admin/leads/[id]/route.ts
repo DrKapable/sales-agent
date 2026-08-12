@@ -1,5 +1,7 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { notifyConversationClosed } from "@/lib/closure-summary";
 import { leadPriorities, leadStatuses, type LeadPatch } from "@/lib/types";
 import { staffNames } from "@/lib/team-directory";
 import { listLeads, updateLead } from "@/lib/store";
@@ -31,5 +33,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     patch.handoffReason = restoredReason || null;
   }
 
-  return NextResponse.json(await updateLead(lead.phone, patch));
+  const updated = await updateLead(lead.phone, patch);
+  const terminalTransition = parsed.data.status && parsed.data.status !== lead.status && ["CONVERTED", "LOST LEAD"].includes(parsed.data.status);
+  if (terminalTransition) {
+    const reason = parsed.data.status === "CONVERTED" ? "Converted" as const : "Lost lead" as const;
+    after(async () => {
+      try {
+        await notifyConversationClosed({ lead: updated, reason });
+      } catch (error) {
+        console.error("Terminal lead closure notification failed", { phoneSuffix: updated.phone.slice(-4), status: updated.status, error });
+      }
+    });
+  }
+
+  return NextResponse.json(updated);
 }
