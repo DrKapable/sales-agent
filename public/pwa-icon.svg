@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="MedMinds Sales Agent">
+  <rect width="512" height="512" rx="108" fill="#ffffff"/>
+  <rect x="18" y="18" width="476" height="476" rx="94" fill="none" stroke="#d9e7e7" stroke-width="4"/>
+  <g transform="translate(116 82)">
+    <path d="M88 0h66v66h66v66h-66v66H88v-66H22V66h66z" fill="#2faf9f"/>
+    <path d="M66 18h50v50h50v34H116v50H82v-50H32V68h34z" fill="#203952" opacity=".96"/>
+    <path d="M12 220c76-126 192-154 278-168-78 27-177 75-224 176-13 28-20 55-25 82-17-23-29-53-29-90z" fill="#ffffff"/>
+    <path d="M30 282c96 35 205 34 292-4-76 61-202 89-306 43 3-13 7-26 14-39z" fill="#2faf9f"/>
+  </g>
+  <text x="256" y="428" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="29" font-weight="800" fill="#203952">MED-MINDS</text>
+  <text x="256" y="458" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="17" fill="#526a7e">Sales Agent</text>
+</svg>
