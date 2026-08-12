@@ -1,5 +1,6 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 
+// Keep conversation data and all lead-linked business records in sync when an administrator deletes clients.
 const CLIENT_BUSINESS_TABLES = ["business_tasks", "client_payments", "sales_quotes", "client_feedback"] as const;
 
 type Database = NeonQueryFunction<false, false>;
