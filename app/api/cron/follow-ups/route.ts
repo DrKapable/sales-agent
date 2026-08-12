@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runAutomatedFollowUps } from "@/lib/follow-up";
+import { runDailyManagementBrief } from "@/lib/daily-brief";
 
 export const maxDuration = 60;
 
@@ -11,8 +12,14 @@ export async function GET(request: Request) {
   if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const result = await runAutomatedFollowUps();
-    return NextResponse.json({ ok: true, ...result });
+    const [followUps, managementBrief] = await Promise.all([
+      runAutomatedFollowUps(),
+      runDailyManagementBrief().catch((error) => {
+        console.error("Daily management brief failed", { error });
+        return { sent: false, reason: "failed" };
+      })
+    ]);
+    return NextResponse.json({ ok: true, followUps, managementBrief });
   } catch (error) {
     console.error("Automated follow-up cron failed", { error });
     return NextResponse.json({ error: "Follow-up run failed." }, { status: 500 });
