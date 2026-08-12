@@ -1,6 +1,8 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { archiveChat, deleteChat, listArchivedLeads, restoreChat } from "@/lib/chat-lifecycle";
+import { notifyConversationClosed } from "@/lib/closure-summary";
 import { listLeads } from "@/lib/store";
 
 const actionSchema = z.object({
@@ -11,23 +13,23 @@ const actionSchema = z.object({
   message: "A client identifier is required."
 });
 
-async function resolvePhone(input: { phone?: string; leadId?: string }) {
+async function resolveLead(input: { phone?: string; leadId?: string }) {
   const leads = await listLeads();
 
   if (input.leadId) {
     const byId = leads.find((lead) => lead.id === input.leadId);
-    if (byId) return byId.phone;
+    if (byId) return byId;
   }
 
   if (!input.phone) return null;
   const raw = input.phone.split("·")[0]?.trim() || input.phone.trim();
   const exact = leads.find((lead) => lead.phone === raw);
-  if (exact) return exact.phone;
+  if (exact) return exact;
 
   const digits = raw.replace(/\D/g, "");
   if (digits) {
     const byDigits = leads.find((lead) => lead.phone.replace(/\D/g, "") === digits);
-    if (byDigits) return byDigits.phone;
+    if (byDigits) return byDigits;
   }
 
   return null;
@@ -46,24 +48,31 @@ export async function POST(request: Request) {
   }
 
   const { action } = parsed.data;
-  const phone = await resolvePhone(parsed.data);
-  if (!phone) {
+  const lead = await resolveLead(parsed.data);
+  if (!lead) {
     return NextResponse.json({ error: "Client could not be found. Refresh the inbox and try again." }, { status: 404 });
   }
 
   try {
     if (action === "archive") {
-      const archivedAt = await archiveChat(phone);
+      const archivedAt = await archiveChat(lead.phone);
+      after(async () => {
+        try {
+          await notifyConversationClosed({ lead, reason: "Archived" });
+        } catch (error) {
+          console.error("Archived chat closure notification failed", { phoneSuffix: lead.phone.slice(-4), error });
+        }
+      });
       return NextResponse.json({ ok: true, action, archivedAt });
     }
     if (action === "restore") {
-      await restoreChat(phone);
+      await restoreChat(lead.phone);
       return NextResponse.json({ ok: true, action });
     }
-    await deleteChat(phone);
+    await deleteChat(lead.phone);
     return NextResponse.json({ ok: true, action });
   } catch (error) {
-    console.error("Chat lifecycle action failed", { action, phoneSuffix: phone.slice(-4), error });
+    console.error("Chat lifecycle action failed", { action, phoneSuffix: lead.phone.slice(-4), error });
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to update this chat." }, { status: 500 });
   }
 }
