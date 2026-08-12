@@ -19,6 +19,16 @@ function syncTeamControls() {
     if (label.includes("assigned to") || label.includes("send as")) addTeamOptions(select);
   });
 
+  const nav = document.querySelector<HTMLElement>(".sidebar nav");
+  if (nav && !nav.querySelector(".businessIntelligenceLink")) {
+    const link = document.createElement("a");
+    link.href = "/admin/business";
+    link.className = "businessIntelligenceLink";
+    link.textContent = "Business Intelligence";
+    link.style.cssText = "display:block;padding:10px 12px;border-radius:10px;color:inherit;text-decoration:none;font-weight:700;margin-top:4px";
+    nav.appendChild(link);
+  }
+
   const setupGrid = document.querySelector<HTMLElement>(".setupGrid");
   if (setupGrid && !setupGrid.querySelector(".teamDirectoryCard")) {
     const card = document.createElement("div");
