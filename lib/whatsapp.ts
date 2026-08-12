@@ -87,12 +87,17 @@ export function parseIncomingMessages(payload: unknown): IncomingWhatsAppMessage
   return parsed;
 }
 
-export async function sendWhatsAppText(phone: string, body: string, phoneNumberIdOverride?: string) {
+function whatsappConfig(phoneNumberIdOverride?: string) {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = phoneNumberIdOverride || process.env.WHATSAPP_PHONE_NUMBER_ID;
   const version = process.env.WHATSAPP_GRAPH_VERSION;
   if (!token || !phoneNumberId || !version) throw new Error("WhatsApp sending is not configured.");
   if (!/^v\d+\.\d+$/.test(version) || !/^\d+$/.test(phoneNumberId)) throw new Error("Invalid WhatsApp Graph configuration.");
+  return { token, phoneNumberId, version };
+}
+
+export async function sendWhatsAppText(phone: string, body: string, phoneNumberIdOverride?: string) {
+  const { token, phoneNumberId, version } = whatsappConfig(phoneNumberIdOverride);
   const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
     method: "POST",
     signal: AbortSignal.timeout(12000),
@@ -108,4 +113,52 @@ export async function sendWhatsAppText(phone: string, body: string, phoneNumberI
   const messageId = payload.messages?.[0]?.id;
   if (!messageId) throw new Error("WhatsApp API accepted the request without returning a message ID.");
   return { messageId, waId: payload.contacts?.[0]?.wa_id ?? null };
+}
+
+export async function sendWhatsAppPdfDocument(input: {
+  phone: string;
+  pdf: Uint8Array;
+  filename: string;
+  caption?: string;
+  phoneNumberIdOverride?: string;
+}) {
+  const { token, phoneNumberId, version } = whatsappConfig(input.phoneNumberIdOverride);
+  const form = new FormData();
+  form.set("messaging_product", "whatsapp");
+  form.set("type", "application/pdf");
+  form.set("file", new Blob([input.pdf], { type: "application/pdf" }), input.filename);
+
+  const upload = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/media`, {
+    method: "POST",
+    signal: AbortSignal.timeout(20000),
+    headers: { Authorization: `Bearer ${token}` },
+    body: form
+  });
+  const uploadBody = await upload.text();
+  if (!upload.ok) throw new Error(`WhatsApp media upload returned ${upload.status}: ${JSON.stringify(sanitizeWhatsAppApiError(uploadBody))}`);
+  const mediaId = (JSON.parse(uploadBody) as { id?: string }).id;
+  if (!mediaId) throw new Error("WhatsApp media upload succeeded without returning a media ID.");
+
+  const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
+    method: "POST",
+    signal: AbortSignal.timeout(12000),
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: input.phone,
+      type: "document",
+      document: {
+        id: mediaId,
+        filename: input.filename,
+        ...(input.caption ? { caption: input.caption.slice(0, 1024) } : {})
+      }
+    })
+  });
+  const rawBody = await response.text();
+  if (!response.ok) throw new Error(`WhatsApp document API returned ${response.status}: ${JSON.stringify(sanitizeWhatsAppApiError(rawBody))}`);
+  const payload = JSON.parse(rawBody) as { messages?: Array<{ id?: string }> };
+  const messageId = payload.messages?.[0]?.id;
+  if (!messageId) throw new Error("WhatsApp accepted the document without returning a message ID.");
+  return { messageId, mediaId };
 }
