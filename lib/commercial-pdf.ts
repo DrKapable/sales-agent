@@ -1,3 +1,5 @@
+import { buildPdfWithOfficialLogo, officialLogoDrawCommand } from "@/lib/pdf-brand";
+
 type CommercialDocumentInput = {
   kind: "quotation" | "invoice";
   documentNumber: string;
@@ -45,18 +47,16 @@ export function createCommercialPdf(input: CommercialDocumentInput) {
   const pale = "0.93 0.97 0.97";
   const title = input.kind === "invoice" ? "UNPAID INVOICE" : "QUOTATION";
   const status = input.kind === "invoice" ? "PAYMENT DUE" : "VALID QUOTATION";
+  const titleX = input.kind === "invoice" ? 430 : 458;
   const pageWidth = 595;
   const detailLines = wrap(input.details || input.service);
   const content: string[] = [
     "q",
-    `${navy} rg 0 742 ${pageWidth} 100 re f`,
-    `${teal} rg 0 732 ${pageWidth} 10 re f`,
-    `${teal} rg 42 775 26 12 re f`,
-    `${teal} rg 49 768 12 26 re f`,
-    `${navy} RG 4 w 35 764 m 35 798 79 804 102 780 c S`,
-    line("MED-MINDS", 118, 792, 19, "F2", "1 1 1"),
-    line("Learning Centre", 119, 773, 10, "F1", "0.86 0.93 0.96"),
-    line(title, 400, 784, 10, "F2", "1 1 1"),
+    "1 1 1 rg 0 730 595 112 re f",
+    officialLogoDrawCommand(36, 734, 250, 114),
+    line(title, titleX, 787, 10, "F2", navy),
+    `${navy} rg 0 727 ${pageWidth} 5 re f`,
+    `${teal} rg 0 722 ${pageWidth} 5 re f`,
     line(input.kind === "invoice" ? "Invoice" : "Quotation", 42, 688, 28, "F2", navy),
     line(input.documentNumber, 42, 662, 12, "F2", teal),
     line(`Issued ${dateLabel(input.issuedAt)}`, 42, 642, 9, "F1", muted),
@@ -84,24 +84,5 @@ export function createCommercialPdf(input: CommercialDocumentInput) {
     "Q"
   );
 
-  const stream = content.join("\n");
-  const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>",
-    `<< /Length ${Buffer.byteLength(stream, "utf8")} >>\nstream\n${stream}\nendstream`,
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>"
-  ];
-  let pdf = "%PDF-1.4\n%MedMinds\n";
-  const offsets: number[] = [0];
-  for (let i = 0; i < objects.length; i += 1) {
-    offsets.push(Buffer.byteLength(pdf, "utf8"));
-    pdf += `${i + 1} 0 obj\n${objects[i]}\nendobj\n`;
-  }
-  const xrefOffset = Buffer.byteLength(pdf, "utf8");
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (let i = 1; i < offsets.length; i += 1) pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
-  return Buffer.from(pdf, "utf8");
+  return buildPdfWithOfficialLogo(content.join("\n"));
 }
