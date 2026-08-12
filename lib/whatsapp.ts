@@ -124,9 +124,10 @@ export async function sendWhatsAppPdfDocument(input: {
 }) {
   const { token, phoneNumberId, version } = whatsappConfig(input.phoneNumberIdOverride);
   const form = new FormData();
+  const pdfBytes = input.pdf.buffer.slice(input.pdf.byteOffset, input.pdf.byteOffset + input.pdf.byteLength) as ArrayBuffer;
   form.set("messaging_product", "whatsapp");
   form.set("type", "application/pdf");
-  form.set("file", new Blob([input.pdf], { type: "application/pdf" }), input.filename);
+  form.set("file", new Blob([pdfBytes], { type: "application/pdf" }), input.filename);
 
   const upload = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/media`, {
     method: "POST",
