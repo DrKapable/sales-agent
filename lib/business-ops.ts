@@ -199,11 +199,11 @@ export async function verifyPayment(input: { paymentId: string; verifiedBy?: str
   return rows[0];
 }
 
-export async function createQuote(input: { leadId: string; service: string; amountZmw?: number; details: string }) {
+export async function createQuote(input: { leadId: string; service: string; amountZmw?: number; details: string; status?: "DRAFT" | "QUOTATION" | "INVOICE_UNPAID" }) {
   await ensureTables();
   const database = db();
   if (!database) throw new Error("Persistent database storage is required.");
-  const rows = await database.query(`INSERT INTO sales_quotes (id,lead_id,service,amount_zmw,details) VALUES ($1,$2,$3,$4,$5) RETURNING *`, [crypto.randomUUID(), input.leadId, input.service, input.amountZmw ?? null, input.details]);
+  const rows = await database.query(`INSERT INTO sales_quotes (id,lead_id,service,amount_zmw,details,status) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`, [crypto.randomUUID(), input.leadId, input.service, input.amountZmw ?? null, input.details, input.status || "DRAFT"]);
   return rows[0];
 }
 
