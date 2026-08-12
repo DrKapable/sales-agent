@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import { ClientRecordManagementEnhancer } from "@/components/client-record-management-enhancer";
 import { MobileAdminEnhancer } from "@/components/mobile-admin-enhancer";
 import "./globals.css";
 import "./admin-mobile.css";
@@ -31,5 +32,5 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
-  return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><MobileAdminEnhancer />{children}</body></html>;
+  return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><MobileAdminEnhancer /><ClientRecordManagementEnhancer />{children}</body></html>;
 }

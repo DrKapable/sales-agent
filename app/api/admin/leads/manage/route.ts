@@ -1,17 +1,24 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { archiveChat, deleteChat, listArchivedLeads, restoreChat } from "@/lib/chat-lifecycle";
+import { archiveChat, deleteAllChats, deleteChat, listArchivedLeads, restoreChat } from "@/lib/chat-lifecycle";
 import { notifyConversationClosed } from "@/lib/closure-summary";
 import { listLeads } from "@/lib/store";
 
-const actionSchema = z.object({
+const targetedActionSchema = z.object({
   phone: z.string().trim().min(1).max(160).optional(),
   leadId: z.string().trim().min(1).max(160).optional(),
   action: z.enum(["archive", "restore", "delete"])
 }).refine((value) => Boolean(value.phone || value.leadId), {
   message: "A client identifier is required."
 });
+
+const deleteAllActionSchema = z.object({
+  action: z.literal("delete_all"),
+  confirmation: z.literal("DELETE ALL CLIENTS")
+});
+
+const actionSchema = z.union([targetedActionSchema, deleteAllActionSchema]);
 
 async function resolveLead(input: { phone?: string; leadId?: string }) {
   const leads = await listLeads();
@@ -45,6 +52,16 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     console.warn("Invalid chat lifecycle action", { body, issues: parsed.error.issues });
     return NextResponse.json({ error: "Invalid chat action. Refresh the inbox and try again." }, { status: 400 });
+  }
+
+  if (parsed.data.action === "delete_all") {
+    try {
+      const result = await deleteAllChats();
+      return NextResponse.json({ ok: true, action: "delete_all", deletedClients: result.deletedClients });
+    } catch (error) {
+      console.error("Bulk client deletion failed", { error });
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to delete client records." }, { status: 500 });
+    }
   }
 
   const { action } = parsed.data;

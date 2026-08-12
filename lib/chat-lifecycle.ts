@@ -1,4 +1,5 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { deleteAllClientRecords, deleteClientRecord } from "@/lib/client-records";
 import { listLeads } from "@/lib/store";
 import type { Lead } from "@/lib/types";
 
@@ -75,10 +76,9 @@ export async function restoreChat(phone: string) {
 }
 
 export async function deleteChat(phone: string) {
-  await ensureArchiveTable();
-  const db = database();
-  if (!db) throw new Error("Permanent deletion requires persistent database storage.");
-  await db.query(`DELETE FROM messages WHERE phone=$1`, [phone]);
-  await db.query(`DELETE FROM archived_chats WHERE phone=$1`, [phone]);
-  await db.query(`DELETE FROM leads WHERE phone=$1`, [phone]);
+  return deleteClientRecord(phone);
+}
+
+export async function deleteAllChats() {
+  return deleteAllClientRecords();
 }
