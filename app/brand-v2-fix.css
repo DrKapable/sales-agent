@@ -13,3 +13,58 @@
   --line: #d9e4ea;
   --shadow: 0 24px 70px rgba(32,58,90,.13);
 }
+
+/* Final public-home polish: calmer, more human, less template-like. */
+.homeNavActions { display:flex; align-items:center; gap:12px; }
+.homeNavLink { color:var(--navy); text-decoration:none; font-size:12px; font-weight:750; }
+.homeNavLink:hover, .homeNavLink:focus-visible { color:var(--teal-deep); text-decoration:underline; text-underline-offset:3px; }
+.homeNavChat { min-height:40px; padding:0 16px; }
+.homeServiceChooser { transform:none !important; padding:18px !important; background:rgba(255,255,255,.94) !important; border:1px solid #dbe7ec !important; }
+.homeServiceChooserHeader { display:flex; align-items:center; gap:11px; padding-bottom:14px; border-bottom:1px solid #e7eef1; }
+.homeServiceChooserHeader>div { display:grid; gap:3px; }
+.homeServiceChooserHeader small { color:var(--muted); font-size:11px; }
+.homeServiceList { display:grid; gap:8px; padding:14px 0 10px; }
+.homeServiceList button { width:100%; display:grid; gap:4px; padding:12px 13px; border:1px solid #dce7eb; border-radius:13px; background:#f9fbfc; color:var(--navy); text-align:left; cursor:pointer; transition:border-color .16s ease, background .16s ease, transform .16s ease; }
+.homeServiceList button:hover, .homeServiceList button:focus-visible { border-color:rgba(47,174,159,.55); background:#f2faf8; transform:translateY(-1px); }
+.homeServiceList button strong { font-size:13px; }
+.homeServiceList button span { color:var(--muted); font-size:11px; line-height:1.45; }
+.homeReviewLink { display:inline-flex; color:var(--teal-deep); font-size:11px; font-weight:800; text-decoration:none; }
+.homeReviewLink:hover, .homeReviewLink:focus-visible { text-decoration:underline; text-underline-offset:3px; }
+.homeServices { padding-top:34px; }
+.homeFeatureGrid article { min-height:220px; }
+.homeFeatureGrid article:nth-child(2) h3 { color:#fff; }
+.homeTrust { margin-block:26px 70px; padding:30px 34px; display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:28px; align-items:center; border-top:1px solid #dce7eb; border-bottom:1px solid #dce7eb; }
+.homeTrust h2 { margin:8px 0 0; color:var(--navy); font:700 clamp(27px,3.5vw,42px)/1.08 Georgia,serif; }
+.homeTrust p { margin:0; color:var(--muted); line-height:1.7; }
+.homeCtaActions, .homeFooterLinks { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.homeFooterLinks>a:not(.staffAccess) { color:var(--navy); font-size:11px; text-decoration:none; opacity:.68; }
+.homeFooterLinks>a:not(.staffAccess):hover { opacity:1; text-decoration:underline; text-underline-offset:3px; }
+
+@media (max-width: 760px) {
+  .homeNav { height:78px; }
+  .homeNavActions { gap:8px; }
+  .homeNavLink { display:none; }
+  .homeNavChat { min-height:36px; padding-inline:12px; font-size:11px; }
+  .homeHero { min-height:auto; padding-block:42px 62px; }
+  .homeHero .heroCopy { max-width:none; }
+  .homeHero .heroActions { gap:8px; }
+  .homeHero .heroActions .button { flex:1 1 150px; text-align:center; justify-content:center; }
+  .homeServiceChooser { margin-top:8px; }
+  .homeTrust { grid-template-columns:1fr; gap:14px; padding:24px 18px; margin-bottom:48px; }
+  .homeCta { padding:26px 20px !important; align-items:flex-start !important; }
+  .homeCtaActions { width:100%; }
+  .homeCtaActions .button { flex:1 1 140px; justify-content:center; text-align:center; }
+  .homeFooter { gap:12px; align-items:center; }
+}
+
+@media (max-width: 430px) {
+  .homeHero h1 { font-size:clamp(38px,12vw,54px); }
+  .trustRow { gap:7px 12px; }
+  .homeServiceChooserHeader .avatar { flex:none; }
+  .homeFeatureGrid article { min-height:0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior:auto !important; animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+  .floatingOrb, .floatingRing, .floatingChip { animation:none !important; }
+}
