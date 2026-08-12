@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 
 export default function RootTemplate({ children }: Readonly<{ children: ReactNode }>) {
   useEffect(() => {
@@ -20,11 +21,8 @@ export default function RootTemplate({ children }: Readonly<{ children: ReactNod
       }
     };
 
-    if (document.readyState === "complete") {
-      void register();
-    } else {
-      window.addEventListener("load", register, { once: true });
-    }
+    if (document.readyState === "complete") void register();
+    else window.addEventListener("load", register, { once: true });
 
     return () => {
       cancelled = true;
@@ -32,5 +30,5 @@ export default function RootTemplate({ children }: Readonly<{ children: ReactNod
     };
   }, []);
 
-  return <>{children}</>;
+  return <><PwaInstallPrompt />{children}</>;
 }

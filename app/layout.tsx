@@ -13,10 +13,23 @@ import "./public-chat-v2.css";
 
 export const metadata: Metadata = {
   title: "MedMinds Learning Centre",
-  description: "Medical learning, research support, tutorials, courses, software and digital solutions from MedMinds Learning Centre."
+  description: "Medical learning, research support, tutorials, courses, software and digital solutions from MedMinds Learning Centre.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/pwa-icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/pwa-icon-512.png", type: "image/png", sizes: "512x512" }
+    ],
+    apple: [{ url: "/pwa-icon-192.png", type: "image/png", sizes: "192x192" }]
+  },
+  appleWebApp: {
+    capable: true,
+    title: "MedMinds Agent",
+    statusBarStyle: "default"
+  }
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
-  return <html lang="en"><body><MobileAdminEnhancer />{children}</body></html>;
+  return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><MobileAdminEnhancer />{children}</body></html>;
 }

@@ -1,12 +1,14 @@
 const CACHE_PREFIX = "medminds-sales-agent";
-const SHELL_CACHE = `${CACHE_PREFIX}-shell-v1`;
-const RUNTIME_CACHE = `${CACHE_PREFIX}-runtime-v1`;
+const SHELL_CACHE = `${CACHE_PREFIX}-shell-v2`;
+const RUNTIME_CACHE = `${CACHE_PREFIX}-runtime-v2`;
 const OFFLINE_URL = "/offline.html";
 
 const PRECACHE = [
   OFFLINE_URL,
   "/medminds-logo.png",
-  "/pwa-icon.svg"
+  "/pwa-icon-192.png",
+  "/pwa-icon-512.png",
+  "/manifest.webmanifest"
 ];
 
 self.addEventListener("install", (event) => {
@@ -82,11 +84,7 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname === "/sw.js" || url.pathname.startsWith("/api/")) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      isSensitivePath(url.pathname)
-        ? networkOnlyNavigation(request)
-        : publicNavigation(request)
-    );
+    event.respondWith(isSensitivePath(url.pathname) ? networkOnlyNavigation(request) : publicNavigation(request));
     return;
   }
 
@@ -96,9 +94,7 @@ self.addEventListener("fetch", (event) => {
   const isStaticDestination = ["style", "script", "image", "font"].includes(request.destination);
   const isPwaAsset = PRECACHE.includes(url.pathname);
 
-  if (isHashedNextAsset || isStaticDestination || isPwaAsset) {
-    event.respondWith(staticAsset(request));
-  }
+  if (isHashedNextAsset || isStaticDestination || isPwaAsset) event.respondWith(staticAsset(request));
 });
 
 self.addEventListener("message", (event) => {
