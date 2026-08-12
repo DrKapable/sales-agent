@@ -3,6 +3,7 @@ import { addMessage, getConversation, getOrCreateLead, updateLead } from "@/lib/
 import { humanReplyDelayMs, wait } from "@/lib/timing";
 import { generateWhatsAppReplyWithRecovery, sendWhatsAppTextWithRetry } from "@/lib/whatsapp-recovery";
 import { parseIncomingMessages, sendWhatsAppText, verifyWhatsAppSignature } from "@/lib/whatsapp";
+import { notifyDirectorOfNewClient } from "@/lib/new-client-alert";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        const previousHistory = await getConversation(message.phone, 1);
+        const firstEverClientMessage = previousHistory.length === 0;
         const isNew = await addMessage(message.phone, "user", message.text, message.id);
         if (!isNew) continue;
 
@@ -52,6 +55,9 @@ export async function POST(request: NextRequest) {
               const reason = lead.handoffReason ? `${HUMAN_TAKEOVER_PREFIX} ${lead.handoffReason}` : HUMAN_TAKEOVER_PREFIX;
               lead = await updateLead(message.phone, { handoffReason: reason });
             }
+            if (firstEverClientMessage) {
+              await notifyDirectorOfNewClient({ lead, firstMessage: message.text, source: "whatsapp", phoneNumberIdOverride: message.phoneNumberId ?? undefined });
+            }
             console.info("WhatsApp AI reply skipped for explicit human takeover", { messageId: message.id, assignedTo: lead.assignedTo });
             continue;
           }
@@ -68,6 +74,12 @@ export async function POST(request: NextRequest) {
         await wait(replyDelayMs);
         await sendWhatsAppTextWithRetry(message.phone, result.reply, message.phoneNumberId);
         console.info("WhatsApp client reply sent", { messageId: message.id });
+
+        if (firstEverClientMessage) {
+          const currentLead = await getOrCreateLead(message.phone, "whatsapp");
+          const alerted = await notifyDirectorOfNewClient({ currentLead, lead: currentLead, firstMessage: message.text, source: "whatsapp", phoneNumberIdOverride: message.phoneNumberId ?? undefined } as never);
+          console.info("New client director alert processed", { messageId: message.id, alerted });
+        }
 
         if (result.referralNotification) {
           try {
