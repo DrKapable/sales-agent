@@ -13,7 +13,7 @@ import "./public-chat-v2.css";
 
 export const metadata: Metadata = {
   title: "MedMinds Learning Centre",
-  description: "MedMinds Learning Centre sales assistant for Pa Gym, research support, tutorials, courses and digital services"
+  description: "Medical learning, research support, tutorials, courses, software and digital solutions from MedMinds Learning Centre."
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
