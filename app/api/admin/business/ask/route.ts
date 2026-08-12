@@ -7,7 +7,8 @@ import { getAiModelCandidates } from "@/lib/env";
 import { createResearchPortalTask } from "@/lib/research-portal";
 import { notifyBusinessEvent } from "@/lib/business-notifications";
 import { sendWhatsAppText } from "@/lib/whatsapp";
-import { sendNamedWhatsAppTemplate, sendWhatsAppFollowUpTemplate } from "@/lib/whatsapp-template";
+import { sendWhatsAppFollowUpTemplate } from "@/lib/whatsapp-template";
+import { sendBrandedReceiptPdf } from "@/lib/receipt-delivery";
 
 const schema = z.object({ question: z.string().trim().min(3).max(1000) });
 
@@ -60,26 +61,13 @@ async function sendFollowUp(lead: SnapshotLead, message?: string) {
   return { sent: true, mode: "template" };
 }
 
-function receiptText(lead: SnapshotLead, payment: any) {
-  const receipt = `MM-${String(payment.id).slice(0, 8).toUpperCase()}`;
-  return ["MedMinds receipt", `Receipt: ${receipt}`, `Client: ${lead.name || lead.phone}`, `Amount received: K${Number(payment.amount_zmw).toLocaleString()}`, `Reference: ${payment.reference || "Not provided"}`, "Status: Verified", payment.verified_at ? `Verified: ${new Date(payment.verified_at).toLocaleDateString("en-GB")}` : ""].filter(Boolean).join("\n");
-}
-
 async function sendReceipt(snapshot: Snapshot, lead: SnapshotLead) {
-  const verified = snapshot.payments.filter((payment: any) => payment.lead_id === lead.id && payment.status === "VERIFIED").sort((a: any, b: any) => new Date(b.verified_at || b.created_at).getTime() - new Date(a.verified_at || a.created_at).getTime());
+  const verified = snapshot.payments
+    .filter((payment: any) => payment.lead_id === lead.id && payment.status === "VERIFIED")
+    .sort((a: any, b: any) => new Date(b.verified_at || b.created_at).getTime() - new Date(a.verified_at || a.created_at).getTime());
   const payment = verified[0];
   if (!payment) throw new Error(`There is no verified payment record for ${lead.name || lead.phone}, so I will not issue a receipt.`);
-  const body = receiptText(lead, payment);
-  if (await inside24HourWindow(lead.phone)) {
-    await sendWhatsAppText(lead.phone, body);
-    await addMessage(lead.phone, "assistant", `[Receipt sent]\n${body}`);
-    return { sent: true, mode: "freeform", receipt: `MM-${String(payment.id).slice(0, 8).toUpperCase()}` };
-  }
-  const template = process.env.WHATSAPP_RECEIPT_TEMPLATE_NAME;
-  if (!template) throw new Error("The client's 24-hour WhatsApp window is closed. Configure an approved WHATSAPP_RECEIPT_TEMPLATE_NAME before receipts can be sent outside the service window.");
-  await sendNamedWhatsAppTemplate(lead.phone, template, process.env.WHATSAPP_RECEIPT_TEMPLATE_LANGUAGE || "en_US");
-  await addMessage(lead.phone, "assistant", `[Receipt notification sent using approved WhatsApp template: ${template}]\n${body}`);
-  return { sent: true, mode: "template", receipt: `MM-${String(payment.id).slice(0, 8).toUpperCase()}` };
+  return sendBrandedReceiptPdf({ lead, payment });
 }
 
 function analyticalFallback(snapshot: Snapshot, question: string) {
@@ -139,7 +127,7 @@ export async function POST(request: Request) {
   });
 
   const sendReceiptTool = tool({
-    description: "Send the latest VERIFIED MedMinds payment receipt to a specific client. Never issue a receipt for an unverified payment.",
+    description: "Generate and send the latest VERIFIED MedMinds payment receipt to a specific client as an official branded PDF document. Never issue a receipt for an unverified payment.",
     inputSchema: z.object({ client: z.string().min(2).max(160) }),
     execute: async ({ client }) => {
       const lead = resolveLead(snapshot, client);
@@ -165,7 +153,7 @@ export async function POST(request: Request) {
     priorityLeads: snapshot.leads.slice(0, 20).map((lead) => ({ name: lead.name, phone: lead.phone, status: lead.status, score: lead.leadScore, band: lead.scoreBand, service: lead.serviceInterest || lead.packageName, followUpAt: lead.followUpAt }))
   };
 
-  const instructions = `You are the MedMinds Admin Intelligence assistant. You work for an authenticated administrator and may answer business questions or execute approved operational commands using tools.\n\nRULES\n- Distinguish questions from commands. Never execute an action unless the administrator's wording clearly asks you to do it.\n- Resolve the intended client from CRM data; if the tool reports multiple matches, ask the administrator to specify which one. Never guess.\n- Follow-ups: keep the message concise, warm and specific to the known service. Do not pressure the client.\n- Receipts: only use sendVerifiedReceipt. Never claim a receipt was sent unless the tool succeeds.\n- Research Portal tasks must remain unassigned and unlinked inside the portal.\n- Do not verify payments, delete chats, mark leads converted, or change financial records through this interface. Those remain explicit dashboard controls.\n- Do not invent prices, payments, clients, tasks or outcomes.\n- After an action, state exactly what happened in one or two concise sentences.\n- If required information is missing, ask one direct question.\n\nCURRENT BUSINESS SNAPSHOT\n${JSON.stringify(summary)}`;
+  const instructions = `You are the MedMinds Admin Intelligence assistant. You work for an authenticated administrator and may answer business questions or execute approved operational commands using tools.\n\nRULES\n- Distinguish questions from commands. Never execute an action unless the administrator's wording clearly asks you to do it.\n- Resolve the intended client from CRM data; if the tool reports multiple matches, ask the administrator to specify which one. Never guess.\n- Follow-ups: keep the message concise, warm and specific to the known service. Do not pressure the client.\n- Receipts: only use sendVerifiedReceipt. Receipts are official branded PDF documents and require a verified payment record. Never claim one was sent unless the tool succeeds.\n- Research Portal tasks must remain unassigned and unlinked inside the portal.\n- Do not verify payments, delete chats, mark leads converted, or change financial records through this interface. Those remain explicit dashboard controls.\n- Do not invent prices, payments, clients, tasks or outcomes.\n- After an action, state exactly what happened in one or two concise sentences.\n- If required information is missing, ask one direct question.\n\nCURRENT BUSINESS SNAPSHOT\n${JSON.stringify(summary)}`;
 
   const models = getAiModelCandidates();
   let lastError: unknown = null;
