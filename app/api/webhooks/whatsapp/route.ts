@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
         if (firstEverClientMessage) {
           const currentLead = await getOrCreateLead(message.phone, "whatsapp");
-          const alerted = await notifyDirectorOfNewClient({ currentLead, lead: currentLead, firstMessage: message.text, source: "whatsapp", phoneNumberIdOverride: message.phoneNumberId ?? undefined } as never);
+          const alerted = await notifyDirectorOfNewClient({ lead: currentLead, firstMessage: message.text, source: "whatsapp", phoneNumberIdOverride: message.phoneNumberId ?? undefined });
           console.info("New client director alert processed", { messageId: message.id, alerted });
         }
 
