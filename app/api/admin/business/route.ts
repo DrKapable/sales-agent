@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createBusinessTask, createQuote, getBusinessSnapshot, recordFeedback, recordPayment } from "@/lib/business-ops";
+import { addMessage, getConversation, listLeads } from "@/lib/store";
+import { MEDMINDS_REVIEW_COLLECTION_URL } from "@/lib/reputation";
+import { sendWhatsAppText } from "@/lib/whatsapp";
+import { sendNamedWhatsAppTemplate } from "@/lib/whatsapp-template";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("task"), leadId: z.string().optional(), title: z.string().min(2).max(240), assignedTo: z.string().max(160).optional(), dueAt: z.string().datetime().optional(), notes: z.string().max(1200).optional() }),
   z.object({ action: z.literal("payment"), leadId: z.string().min(1), amountZmw: z.number().positive(), reference: z.string().max(160).optional(), verified: z.boolean().optional(), verifiedBy: z.string().max(160).optional() }),
   z.object({ action: z.literal("quote"), leadId: z.string().min(1), service: z.string().min(2).max(240), amountZmw: z.number().nonnegative().optional(), details: z.string().min(3).max(1800) }),
-  z.object({ action: z.literal("feedback"), leadId: z.string().min(1), rating: z.number().int().min(1).max(5).optional(), comment: z.string().max(1200).optional(), reviewRequested: z.boolean().optional() })
+  z.object({ action: z.literal("feedback"), leadId: z.string().min(1), rating: z.number().int().min(1).max(5).optional(), comment: z.string().max(1200).optional(), reviewRequested: z.boolean().optional() }),
+  z.object({ action: z.literal("review_request"), leadId: z.string().min(1) })
 ]);
 
 export async function GET() {
@@ -18,6 +23,28 @@ export async function GET() {
   }
 }
 
+async function sendReviewRequest(leadId: string) {
+  const lead = (await listLeads()).find((item) => item.id === leadId);
+  if (!lead) throw new Error("Client not found.");
+  const history = await getConversation(lead.phone, 30);
+  const lastUser = [...history].reverse().find((message) => message.role === "user");
+  const within24h = Boolean(lastUser && Date.now() - new Date(lastUser.createdAt).getTime() < 24 * 60 * 60 * 1000);
+  const firstName = lead.name?.split(/\s+/)[0];
+  const message = `${firstName ? `Hi ${firstName}, ` : "Hi, "}thank you for choosing MedMinds. If you have a moment, we’d appreciate an honest Google review about your experience: ${MEDMINDS_REVIEW_COLLECTION_URL}`;
+
+  if (within24h) {
+    await sendWhatsAppText(lead.phone, message);
+    await addMessage(lead.phone, "assistant", `[Review request] ${message}`);
+  } else {
+    const template = process.env.WHATSAPP_REVIEW_TEMPLATE_NAME;
+    if (!template) throw new Error("The 24-hour WhatsApp window is closed. Configure WHATSAPP_REVIEW_TEMPLATE_NAME with an approved Meta review template.");
+    await sendNamedWhatsAppTemplate(lead.phone, template, process.env.WHATSAPP_REVIEW_TEMPLATE_LANGUAGE || "en_US");
+    await addMessage(lead.phone, "assistant", `[Review request sent using approved WhatsApp template: ${template}]`);
+  }
+  await recordFeedback({ leadId, reviewRequested: true });
+  return { sent: true, mode: within24h ? "freeform" : "template", reviewUrl: MEDMINDS_REVIEW_COLLECTION_URL };
+}
+
 export async function POST(request: Request) {
   const parsed = actionSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid business action." }, { status: 400 });
@@ -26,6 +53,7 @@ export async function POST(request: Request) {
     if (input.action === "task") return NextResponse.json(await createBusinessTask(input));
     if (input.action === "payment") return NextResponse.json(await recordPayment(input));
     if (input.action === "quote") return NextResponse.json(await createQuote(input));
+    if (input.action === "review_request") return NextResponse.json(await sendReviewRequest(input.leadId));
     return NextResponse.json(await recordFeedback(input));
   } catch (error) {
     console.error("Business action failed", { action: parsed.data.action, error });
