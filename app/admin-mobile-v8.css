@@ -63,4 +63,41 @@ body:has(.dashboard)>iframe[title="Chat with MedMinds"]{display:none!important}
 
   /* Hide bottom chat actions while the management sheet is open. */
   .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen .replyComposer{display:none!important}
+
+  /* The global MedMinds mobile bar sits outside .dashboard. Hide it in a focused chat so 100dvh is truly the available chat viewport. */
+  body.mobileAdminChatOpen .mobileAdminBar{display:none!important}
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen,
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .dashboardMain,
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .inboxLayout,
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationPanel{
+    height:100dvh!important;
+    min-height:100dvh!important;
+    max-height:100dvh!important;
+    overflow:hidden!important;
+  }
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationPanel{display:flex!important;flex-direction:column!important}
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationHeader{
+    position:relative!important;
+    top:auto!important;
+    flex:0 0 56px!important;
+    min-height:56px!important;
+    max-height:56px!important;
+  }
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .messageTimeline{
+    flex:1 1 auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow-y:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    overscroll-behavior-y:contain!important;
+    padding:12px 10px calc(96px + env(safe-area-inset-bottom))!important;
+    scroll-padding-bottom:calc(96px + env(safe-area-inset-bottom))!important;
+  }
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen .messageTimeline{
+    flex:1 1 auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+  }
 }
