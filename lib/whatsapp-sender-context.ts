@@ -51,18 +51,34 @@ export async function rememberWhatsAppSender(input: { phone: string; phoneNumber
   return context;
 }
 
+function configuredFallback(phone: string): WhatsAppSenderContext | null {
+  const id = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  return id && /^\d+$/.test(id)
+    ? { phone, phoneNumberId: id, displayPhoneNumber: null, updatedAt: new Date().toISOString() }
+    : null;
+}
+
 export async function getWhatsAppSender(phone: string): Promise<WhatsAppSenderContext | null> {
   await ensureTable();
   const db = database();
-  if (!db) return memory.get(phone) || null;
+  if (!db) return memory.get(phone) || configuredFallback(phone);
+
   const rows = await db.query(
-    `SELECT phone,phone_number_id,display_phone_number,updated_at FROM whatsapp_sender_context WHERE phone=$1 LIMIT 1`,
+    `SELECT phone,phone_number_id,display_phone_number,updated_at
+     FROM whatsapp_sender_context
+     WHERE phone=$1
+     UNION ALL
+     SELECT $1 AS phone,phone_number_id,display_phone_number,updated_at
+     FROM whatsapp_sender_context
+     WHERE NOT EXISTS (SELECT 1 FROM whatsapp_sender_context WHERE phone=$1)
+     ORDER BY updated_at DESC
+     LIMIT 1`,
     [phone]
   );
   const row = rows[0] as Record<string, unknown> | undefined;
-  if (!row) return memory.get(phone) || null;
+  if (!row) return configuredFallback(phone);
   return {
-    phone: String(row.phone),
+    phone,
     phoneNumberId: String(row.phone_number_id),
     displayPhoneNumber: row.display_phone_number ? String(row.display_phone_number) : null,
     updatedAt: new Date(String(row.updated_at)).toISOString()
