@@ -54,6 +54,18 @@ async function trySendReceipt(lead: Awaited<ReturnType<typeof leadById>>, paymen
   }
 }
 
+async function hasOpenWhatsAppWindow(phone: string) {
+  const history = await getConversation(phone, 50);
+  const lastUser = [...history].reverse().find((message) => message.role === "user");
+  return Boolean(lastUser && Date.now() - new Date(lastUser.createdAt).getTime() < 24 * 60 * 60 * 1000);
+}
+
+function quotationMessage(input: { service: string; amountZmw?: number; details: string }, clientName?: string | null) {
+  const firstName = clientName?.trim().split(/\s+/)[0];
+  const amount = input.amountZmw == null ? "Tailored quotation" : `K${input.amountZmw.toLocaleString()}`;
+  return `${firstName ? `Hi ${firstName},` : "Hello,"}\n\nHere is your MedMinds quotation:\n\nService: ${input.service}\nAmount: ${amount}\nDetails: ${input.details}\n\nPlease review the quotation and let us know if you would like us to proceed or if you need any clarification.`;
+}
+
 async function sendReviewRequest(leadId: string) {
   const lead = await leadById(leadId);
   if (!lead) throw new Error("Client not found.");
@@ -112,10 +124,50 @@ export async function POST(request: Request) {
       return NextResponse.json(await sendBrandedReceiptPdf({ lead, payment }));
     }
     if (input.action === "quote") {
-      const quote = await createQuote(input);
       const lead = await leadById(input.leadId);
-      void notifyBusinessEvent({ type: "quote_created", eventKey: `quote_created:${String((quote as { id?: string }).id)}`, title: "New MedMinds quotation", body: `Service: ${input.service}\nAmount: ${input.amountZmw == null ? "Tailored quotation" : `K${input.amountZmw.toLocaleString()}\n${input.details}`}`, lead }).catch(() => undefined);
-      return NextResponse.json(quote);
+      if (!lead) return NextResponse.json({ error: "The client linked to this quotation could not be found." }, { status: 404 });
+
+      const quote = await createQuote({ ...input, status: "QUOTATION" });
+      const quoteId = String((quote as { id?: string }).id || "");
+      const amount = input.amountZmw == null ? "Tailored quotation" : `K${input.amountZmw.toLocaleString()}`;
+      const message = quotationMessage(input, lead.name);
+      const within24h = await hasOpenWhatsAppWindow(lead.phone);
+
+      if (!within24h) {
+        const reason = "The quotation was saved, but the client’s 24-hour WhatsApp reply window is closed. An approved quotation template is required before Meta allows a business-initiated quotation message.";
+        void notifyBusinessEvent({
+          type: "quote_created",
+          eventKey: `quote_created:${quoteId}`,
+          title: "MedMinds quotation saved — not delivered",
+          body: `Service: ${input.service}\nAmount: ${amount}\nDetails: ${input.details}\nClient delivery: blocked by closed WhatsApp window`,
+          lead
+        }).catch(() => undefined);
+        return NextResponse.json({ ...quote, delivery: { sent: false, reason }, error: reason }, { status: 409 });
+      }
+
+      try {
+        const delivery = await sendWhatsAppText(lead.phone, message);
+        await addMessage(lead.phone, "assistant", `[Human: MedMinds Sales] ${message}`);
+        void notifyBusinessEvent({
+          type: "quote_created",
+          eventKey: `quote_created:${quoteId}`,
+          title: "New MedMinds quotation sent",
+          body: `Service: ${input.service}\nAmount: ${amount}\nDetails: ${input.details}\nClient delivery: sent on WhatsApp`,
+          lead
+        }).catch(() => undefined);
+        return NextResponse.json({ ...quote, delivery: { sent: true, mode: "freeform", messageId: delivery.messageId } });
+      } catch (error) {
+        const messageText = error instanceof Error ? error.message : "WhatsApp delivery failed.";
+        console.error("Quotation WhatsApp delivery failed", { quoteId, phoneSuffix: lead.phone.slice(-4), error });
+        void notifyBusinessEvent({
+          type: "quote_created",
+          eventKey: `quote_created:${quoteId}`,
+          title: "MedMinds quotation saved — delivery failed",
+          body: `Service: ${input.service}\nAmount: ${amount}\nDetails: ${input.details}\nClient delivery: failed`,
+          lead
+        }).catch(() => undefined);
+        return NextResponse.json({ ...quote, delivery: { sent: false, reason: messageText }, error: `Quotation saved, but WhatsApp delivery failed: ${messageText}` }, { status: 502 });
+      }
     }
     if (input.action === "review_request") return NextResponse.json(await sendReviewRequest(input.leadId));
     return NextResponse.json(await recordFeedback(input));
