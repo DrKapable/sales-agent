@@ -2,11 +2,12 @@ import { after, NextRequest, NextResponse } from "next/server";
 import { addMessage, getConversation, getOrCreateLead, updateLead } from "@/lib/store";
 import { humanReplyDelayMs, wait } from "@/lib/timing";
 import { generateWhatsAppReplyWithRecovery, sendWhatsAppTextWithRetry } from "@/lib/whatsapp-recovery";
-import { parseIncomingMessages, sendWhatsAppText, verifyWhatsAppSignature } from "@/lib/whatsapp";
+import { parseDeliveryReceipts, parseIncomingMessages, sendWhatsAppText, verifyWhatsAppSignature } from "@/lib/whatsapp";
 import { notifyDirectorOfNewClient } from "@/lib/new-client-alert";
 import { sendCommercialPdf } from "@/lib/commercial-document";
 import { getLatestPreparedQuotation, isPreparedQuotationRequest, preparedQuotationFallbackText } from "@/lib/prepared-quotation";
 import { rememberWhatsAppSender } from "@/lib/whatsapp-sender-context";
+import { applyQuoteDeliveryReceipt } from "@/lib/quotation-delivery";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 
@@ -24,8 +25,23 @@ export async function POST(request: NextRequest) {
   let payload: unknown;
   try { payload = JSON.parse(rawBody); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
   const messages = parseIncomingMessages(payload);
+  const deliveryReceipts = parseDeliveryReceipts(payload);
 
   after(async () => {
+    for (const receipt of deliveryReceipts) {
+      try {
+        const matched = await applyQuoteDeliveryReceipt({
+          messageId: receipt.id,
+          status: receipt.status,
+          timestamp: receipt.timestamp,
+          error: receipt.error
+        });
+        if (matched) console.info("Quotation delivery receipt recorded", { messageId: receipt.id, status: receipt.status });
+      } catch (error) {
+        console.error("Unable to record quotation delivery receipt", { messageId: receipt.id, status: receipt.status, error });
+      }
+    }
+
     for (const message of messages) {
       const processingStartedAt = Date.now();
       try {
@@ -128,5 +144,5 @@ export async function POST(request: NextRequest) {
     }
   });
 
-  return NextResponse.json({ received: true });
+  return NextResponse.json({ received: true, messages: messages.length, deliveryReceipts: deliveryReceipts.length });
 }
