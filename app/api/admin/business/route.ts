@@ -7,6 +7,8 @@ import { sendWhatsAppText } from "@/lib/whatsapp";
 import { sendNamedWhatsAppTemplate } from "@/lib/whatsapp-template";
 import { notifyBusinessEvent } from "@/lib/business-notifications";
 import { sendBrandedReceiptPdf } from "@/lib/receipt-delivery";
+import { sendCommercialPdf } from "@/lib/commercial-document";
+import { getWhatsAppSender } from "@/lib/whatsapp-sender-context";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("task"), leadId: z.string().optional(), title: z.string().min(2).max(240), assignedTo: z.string().max(160).optional(), dueAt: z.string().datetime().optional(), notes: z.string().max(1200).optional() }),
@@ -60,12 +62,6 @@ async function hasOpenWhatsAppWindow(phone: string) {
   return Boolean(lastUser && Date.now() - new Date(lastUser.createdAt).getTime() < 24 * 60 * 60 * 1000);
 }
 
-function quotationMessage(input: { service: string; amountZmw?: number; details: string }, clientName?: string | null) {
-  const firstName = clientName?.trim().split(/\s+/)[0];
-  const amount = input.amountZmw == null ? "Tailored quotation" : `K${input.amountZmw.toLocaleString()}`;
-  return `${firstName ? `Hi ${firstName},` : "Hello,"}\n\nHere is your MedMinds quotation:\n\nService: ${input.service}\nAmount: ${amount}\nDetails: ${input.details}\n\nPlease review the quotation and let us know if you would like us to proceed or if you need any clarification.`;
-}
-
 async function sendReviewRequest(leadId: string) {
   const lead = await leadById(leadId);
   if (!lead) throw new Error("Client not found.");
@@ -75,7 +71,8 @@ async function sendReviewRequest(leadId: string) {
   const firstName = lead.name?.split(/\s+/)[0];
   const message = `${firstName ? `Hi ${firstName}, ` : "Hi, "}thank you for choosing MedMinds. If you have a moment, we’d appreciate an honest Google review about your experience: ${MEDMINDS_REVIEW_COLLECTION_URL}`;
   if (within24h) {
-    await sendWhatsAppText(lead.phone, message);
+    const sender = await getWhatsAppSender(lead.phone);
+    await sendWhatsAppText(lead.phone, message, sender?.phoneNumberId);
     await addMessage(lead.phone, "assistant", `[Review request] ${message}`);
   } else {
     const template = process.env.WHATSAPP_REVIEW_TEMPLATE_NAME;
@@ -127,46 +124,48 @@ export async function POST(request: Request) {
       const lead = await leadById(input.leadId);
       if (!lead) return NextResponse.json({ error: "The client linked to this quotation could not be found." }, { status: 404 });
 
-      const quote = await createQuote({ ...input, status: "QUOTATION" });
-      const quoteId = String((quote as { id?: string }).id || "");
+      const quote = await createQuote({ ...input, status: "QUOTATION" }) as any;
+      const quoteId = String(quote.id || "");
       const amount = input.amountZmw == null ? "Tailored quotation" : `K${input.amountZmw.toLocaleString()}`;
-      const message = quotationMessage(input, lead.name);
       const within24h = await hasOpenWhatsAppWindow(lead.phone);
 
       if (!within24h) {
-        const reason = "The quotation was saved, but the client’s 24-hour WhatsApp reply window is closed. An approved quotation template is required before Meta allows a business-initiated quotation message.";
-        void notifyBusinessEvent({
-          type: "quote_created",
-          eventKey: `quote_created:${quoteId}`,
-          title: "MedMinds quotation saved — not delivered",
-          body: `Service: ${input.service}\nAmount: ${amount}\nDetails: ${input.details}\nClient delivery: blocked by closed WhatsApp window`,
-          lead
-        }).catch(() => undefined);
+        const reason = "The quotation was saved, but the client’s 24-hour WhatsApp reply window is closed. Ask the client to send a new WhatsApp message, then resend the quotation.";
+        return NextResponse.json({ ...quote, delivery: { sent: false, reason }, error: reason }, { status: 409 });
+      }
+
+      const sender = await getWhatsAppSender(lead.phone);
+      if (!sender?.phoneNumberId) {
+        const reason = "The quotation was saved, but this client does not yet have a verified WhatsApp sender context. Ask the client to send one new WhatsApp message so MedMinds can capture the correct business number, then resend the quotation.";
+        console.warn("Quotation delivery blocked because sender context is missing", { quoteId, phoneSuffix: lead.phone.slice(-4) });
         return NextResponse.json({ ...quote, delivery: { sent: false, reason }, error: reason }, { status: 409 });
       }
 
       try {
-        const delivery = await sendWhatsAppText(lead.phone, message);
-        await addMessage(lead.phone, "assistant", `[Human: MedMinds Sales] ${message}`);
+        const delivery = await sendCommercialPdf({ lead, record: quote, phoneNumberIdOverride: sender.phoneNumberId });
+        await addMessage(lead.phone, "assistant", `[Human: MedMinds Sales] [Quotation sent: ${delivery.filename}]`);
         void notifyBusinessEvent({
           type: "quote_created",
           eventKey: `quote_created:${quoteId}`,
-          title: "New MedMinds quotation sent",
-          body: `Service: ${input.service}\nAmount: ${amount}\nDetails: ${input.details}\nClient delivery: sent on WhatsApp`,
+          title: "New MedMinds quotation submitted to client",
+          body: `Service: ${input.service}\nAmount: ${amount}\nDetails: ${input.details}\nDocument: ${delivery.documentNumber}\nClient sender: ${sender.displayPhoneNumber || `ID …${sender.phoneNumberId.slice(-4)}`}`,
           lead
         }).catch(() => undefined);
-        return NextResponse.json({ ...quote, delivery: { sent: true, mode: "freeform", messageId: delivery.messageId } });
+        return NextResponse.json({
+          ...quote,
+          delivery: {
+            sent: true,
+            mode: "document",
+            messageId: delivery.messageId,
+            documentNumber: delivery.documentNumber,
+            filename: delivery.filename,
+            senderPhone: sender.displayPhoneNumber
+          }
+        });
       } catch (error) {
         const messageText = error instanceof Error ? error.message : "WhatsApp delivery failed.";
-        console.error("Quotation WhatsApp delivery failed", { quoteId, phoneSuffix: lead.phone.slice(-4), error });
-        void notifyBusinessEvent({
-          type: "quote_created",
-          eventKey: `quote_created:${quoteId}`,
-          title: "MedMinds quotation saved — delivery failed",
-          body: `Service: ${input.service}\nAmount: ${amount}\nDetails: ${input.details}\nClient delivery: failed`,
-          lead
-        }).catch(() => undefined);
-        return NextResponse.json({ ...quote, delivery: { sent: false, reason: messageText }, error: `Quotation saved, but WhatsApp delivery failed: ${messageText}` }, { status: 502 });
+        console.error("Quotation WhatsApp delivery failed", { quoteId, phoneSuffix: lead.phone.slice(-4), senderIdSuffix: sender.phoneNumberId.slice(-4), error });
+        return NextResponse.json({ ...quote, delivery: { sent: false, reason: messageText }, error: `Quotation saved, but client delivery failed: ${messageText}` }, { status: 502 });
       }
     }
     if (input.action === "review_request") return NextResponse.json(await sendReviewRequest(input.leadId));
