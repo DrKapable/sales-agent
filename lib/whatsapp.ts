@@ -17,6 +17,14 @@ export type IncomingWhatsAppMessage = {
   displayPhoneNumber: string | null;
 };
 
+export type WhatsAppDeliveryReceipt = {
+  id: string;
+  status: string;
+  timestamp: string | null;
+  recipientId: string | null;
+  error: string | null;
+};
+
 const redactSensitiveMetaText = (value: unknown) => {
   if (typeof value !== "string") return undefined;
   return value
@@ -87,6 +95,43 @@ export function parseIncomingMessages(payload: unknown): IncomingWhatsAppMessage
   return parsed;
 }
 
+export function parseDeliveryReceipts(payload: unknown): WhatsAppDeliveryReceipt[] {
+  if (!payload || typeof payload !== "object") return [];
+  const entries = (payload as { entry?: unknown[] }).entry;
+  if (!Array.isArray(entries)) return [];
+  const receipts: WhatsAppDeliveryReceipt[] = [];
+  for (const entry of entries) {
+    const changes = (entry as { changes?: unknown[] })?.changes;
+    if (!Array.isArray(changes)) continue;
+    for (const change of changes) {
+      const value = (change as { value?: { statuses?: unknown[] } })?.value;
+      if (!Array.isArray(value?.statuses)) continue;
+      for (const status of value.statuses) {
+        const item = status as {
+          id?: string;
+          status?: string;
+          timestamp?: string;
+          recipient_id?: string;
+          errors?: Array<{ title?: string; message?: string; error_data?: { details?: string } }>;
+        };
+        if (!item.id || !item.status) continue;
+        const firstError = item.errors?.[0];
+        const error = firstError
+          ? [firstError.title, firstError.message, firstError.error_data?.details].filter(Boolean).join(": ").slice(0, 1000)
+          : null;
+        receipts.push({
+          id: item.id,
+          status: item.status,
+          timestamp: item.timestamp ?? null,
+          recipientId: item.recipient_id ?? null,
+          error
+        });
+      }
+    }
+  }
+  return receipts;
+}
+
 function whatsappConfig(phoneNumberIdOverride?: string) {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = phoneNumberIdOverride || process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -109,10 +154,10 @@ export async function sendWhatsAppText(phone: string, body: string, phoneNumberI
     const metaError = sanitizeWhatsAppApiError(rawBody);
     throw new Error(`WhatsApp API returned ${response.status}: ${JSON.stringify(metaError)}`);
   }
-  const payload = JSON.parse(rawBody) as { contacts?: Array<{ wa_id?: string }>; messages?: Array<{ id?: string }> };
-  const messageId = payload.messages?.[0]?.id;
+  const parsed = JSON.parse(rawBody) as { contacts?: Array<{ wa_id?: string }>; messages?: Array<{ id?: string }> };
+  const messageId = parsed.messages?.[0]?.id;
   if (!messageId) throw new Error("WhatsApp API accepted the request without returning a message ID.");
-  return { messageId, waId: payload.contacts?.[0]?.wa_id ?? null };
+  return { messageId, waId: parsed.contacts?.[0]?.wa_id ?? null };
 }
 
 export async function sendWhatsAppPdfDocument(input: {
@@ -158,8 +203,8 @@ export async function sendWhatsAppPdfDocument(input: {
   });
   const rawBody = await response.text();
   if (!response.ok) throw new Error(`WhatsApp document API returned ${response.status}: ${JSON.stringify(sanitizeWhatsAppApiError(rawBody))}`);
-  const payload = JSON.parse(rawBody) as { messages?: Array<{ id?: string }> };
-  const messageId = payload.messages?.[0]?.id;
+  const parsed = JSON.parse(rawBody) as { messages?: Array<{ id?: string }> };
+  const messageId = parsed.messages?.[0]?.id;
   if (!messageId) throw new Error("WhatsApp accepted the document without returning a message ID.");
   return { messageId, mediaId };
 }

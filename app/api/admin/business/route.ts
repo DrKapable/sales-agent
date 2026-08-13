@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createBusinessTask, createQuote, getBusinessSnapshot, recordFeedback, recordPayment, updateBusinessTask, verifyPayment } from "@/lib/business-ops";
+import { createBusinessTask, createQuote, recordFeedback, recordPayment, updateBusinessTask, verifyPayment } from "@/lib/business-ops";
+import { getFastBusinessSnapshot } from "@/lib/business-snapshot-fast";
 import { addMessage, getConversation, listLeads } from "@/lib/store";
 import { MEDMINDS_REVIEW_COLLECTION_URL } from "@/lib/reputation";
 import { sendWhatsAppText } from "@/lib/whatsapp";
@@ -9,6 +10,7 @@ import { notifyBusinessEvent } from "@/lib/business-notifications";
 import { sendBrandedReceiptPdf } from "@/lib/receipt-delivery";
 import { sendCommercialPdf } from "@/lib/commercial-document";
 import { getWhatsAppSender } from "@/lib/whatsapp-sender-context";
+import { markQuoteAccepted } from "@/lib/quotation-delivery";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("task"), leadId: z.string().optional(), title: z.string().min(2).max(240), assignedTo: z.string().max(160).optional(), dueAt: z.string().datetime().optional(), notes: z.string().max(1200).optional() }),
@@ -17,15 +19,18 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("verify_payment"), paymentId: z.string().uuid(), verifiedBy: z.string().max(160).optional() }),
   z.object({ action: z.literal("send_receipt"), paymentId: z.string().uuid() }),
   z.object({ action: z.literal("quote"), leadId: z.string().min(1), service: z.string().min(2).max(240), amountZmw: z.number().nonnegative().optional(), details: z.string().min(3).max(1800) }),
+  z.object({ action: z.literal("resend_quote"), quoteId: z.string().uuid() }),
   z.object({ action: z.literal("feedback"), leadId: z.string().min(1), rating: z.number().int().min(1).max(5).optional(), comment: z.string().max(1200).optional(), reviewRequested: z.boolean().optional() }),
   z.object({ action: z.literal("review_request"), leadId: z.string().min(1) })
 ]);
 
 export async function GET() {
+  const startedAt = Date.now();
   try {
-    const snapshot = await getBusinessSnapshot();
+    const snapshot = await getFastBusinessSnapshot();
     return NextResponse.json({
       ...snapshot,
+      loadMs: Date.now() - startedAt,
       capabilities: {
         persistentDatabase: Boolean(process.env.DATABASE_URL),
         whatsapp: Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
@@ -60,6 +65,43 @@ async function hasOpenWhatsAppWindow(phone: string) {
   const history = await getConversation(phone, 50);
   const lastUser = [...history].reverse().find((message) => message.role === "user");
   return Boolean(lastUser && Date.now() - new Date(lastUser.createdAt).getTime() < 24 * 60 * 60 * 1000);
+}
+
+function quotationAmount(value: unknown) {
+  return value == null ? "Tailored quotation" : `K${Number(value).toLocaleString()}`;
+}
+
+async function submitQuotation(lead: NonNullable<Awaited<ReturnType<typeof leadById>>>, quote: any) {
+  const quoteId = String(quote.id || "");
+  if (!(await hasOpenWhatsAppWindow(lead.phone))) {
+    return { ok: false as const, status: 409, reason: "The client’s 24-hour WhatsApp reply window is closed. The quotation remains saved, but Meta will not allow this free-form document until the client replies or an approved quotation template is configured." };
+  }
+
+  const sender = await getWhatsAppSender(lead.phone);
+  if (!sender?.phoneNumberId) return { ok: false as const, status: 409, reason: "No MedMinds WhatsApp sender is configured for quotation delivery." };
+
+  try {
+    const delivery = await sendCommercialPdf({ lead, record: quote, phoneNumberIdOverride: sender.phoneNumberId });
+    await markQuoteAccepted(quoteId, delivery.messageId);
+    await addMessage(
+      lead.phone,
+      "assistant",
+      `[Human: MedMinds Sales] Quotation ${delivery.documentNumber} submitted to WhatsApp\nService: ${quote.service}\nAmount: ${quotationAmount(quote.amount_zmw)}\nDetails: ${quote.details}\nDelivery: awaiting Meta confirmation`,
+      delivery.messageId
+    );
+    void notifyBusinessEvent({
+      type: "quote_created",
+      eventKey: `quote_submitted:${quoteId}:${delivery.messageId}`,
+      title: "MedMinds quotation submitted — delivery pending",
+      body: `Service: ${quote.service}\nAmount: ${quotationAmount(quote.amount_zmw)}\nDetails: ${quote.details}\nDocument: ${delivery.documentNumber}\nMeta accepted the request. Final delivery confirmation is pending.`,
+      lead
+    }).catch(() => undefined);
+    return { ok: true as const, delivery: { status: "ACCEPTED", mode: "document", messageId: delivery.messageId, documentNumber: delivery.documentNumber, filename: delivery.filename, senderPhone: sender.displayPhoneNumber } };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "WhatsApp quotation submission failed.";
+    console.error("Quotation WhatsApp submission failed", { quoteId, phoneSuffix: lead.phone.slice(-4), senderIdSuffix: sender.phoneNumberId.slice(-4), error });
+    return { ok: false as const, status: 502, reason };
+  }
 }
 
 async function sendReviewRequest(leadId: string) {
@@ -112,7 +154,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ...payment, ...(await trySendReceipt(lead, payment)) });
     }
     if (input.action === "send_receipt") {
-      const snapshot = await getBusinessSnapshot();
+      const snapshot = await getFastBusinessSnapshot();
       const payment = snapshot.payments.find((item: any) => item.id === input.paymentId);
       if (!payment) throw new Error("Payment record not found.");
       if (payment.status !== "VERIFIED") throw new Error("Only verified payments can be sent as receipts.");
@@ -123,50 +165,20 @@ export async function POST(request: Request) {
     if (input.action === "quote") {
       const lead = await leadById(input.leadId);
       if (!lead) return NextResponse.json({ error: "The client linked to this quotation could not be found." }, { status: 404 });
-
       const quote = await createQuote({ ...input, status: "QUOTATION" }) as any;
-      const quoteId = String(quote.id || "");
-      const amount = input.amountZmw == null ? "Tailored quotation" : `K${input.amountZmw.toLocaleString()}`;
-      const within24h = await hasOpenWhatsAppWindow(lead.phone);
-
-      if (!within24h) {
-        const reason = "The quotation was saved, but the client’s 24-hour WhatsApp reply window is closed. Ask the client to send a new WhatsApp message, then resend the quotation.";
-        return NextResponse.json({ ...quote, delivery: { sent: false, reason }, error: reason }, { status: 409 });
-      }
-
-      const sender = await getWhatsAppSender(lead.phone);
-      if (!sender?.phoneNumberId) {
-        const reason = "The quotation was saved, but this client does not yet have a verified WhatsApp sender context. Ask the client to send one new WhatsApp message so MedMinds can capture the correct business number, then resend the quotation.";
-        console.warn("Quotation delivery blocked because sender context is missing", { quoteId, phoneSuffix: lead.phone.slice(-4) });
-        return NextResponse.json({ ...quote, delivery: { sent: false, reason }, error: reason }, { status: 409 });
-      }
-
-      try {
-        const delivery = await sendCommercialPdf({ lead, record: quote, phoneNumberIdOverride: sender.phoneNumberId });
-        await addMessage(lead.phone, "assistant", `[Human: MedMinds Sales] [Quotation sent: ${delivery.filename}]`);
-        void notifyBusinessEvent({
-          type: "quote_created",
-          eventKey: `quote_created:${quoteId}`,
-          title: "New MedMinds quotation submitted to client",
-          body: `Service: ${input.service}\nAmount: ${amount}\nDetails: ${input.details}\nDocument: ${delivery.documentNumber}\nClient sender: ${sender.displayPhoneNumber || `ID …${sender.phoneNumberId.slice(-4)}`}`,
-          lead
-        }).catch(() => undefined);
-        return NextResponse.json({
-          ...quote,
-          delivery: {
-            sent: true,
-            mode: "document",
-            messageId: delivery.messageId,
-            documentNumber: delivery.documentNumber,
-            filename: delivery.filename,
-            senderPhone: sender.displayPhoneNumber
-          }
-        });
-      } catch (error) {
-        const messageText = error instanceof Error ? error.message : "WhatsApp delivery failed.";
-        console.error("Quotation WhatsApp delivery failed", { quoteId, phoneSuffix: lead.phone.slice(-4), senderIdSuffix: sender.phoneNumberId.slice(-4), error });
-        return NextResponse.json({ ...quote, delivery: { sent: false, reason: messageText }, error: `Quotation saved, but client delivery failed: ${messageText}` }, { status: 502 });
-      }
+      const result = await submitQuotation(lead, quote);
+      if (!result.ok) return NextResponse.json({ ...quote, delivery: { status: "FAILED", reason: result.reason }, error: result.reason }, { status: result.status });
+      return NextResponse.json({ ...quote, delivery: result.delivery });
+    }
+    if (input.action === "resend_quote") {
+      const snapshot = await getFastBusinessSnapshot();
+      const quote = snapshot.quotes.find((item: any) => item.id === input.quoteId);
+      if (!quote) return NextResponse.json({ error: "Quotation not found." }, { status: 404 });
+      const lead = await leadById(quote.lead_id);
+      if (!lead) return NextResponse.json({ error: "The client linked to this quotation could not be found." }, { status: 404 });
+      const result = await submitQuotation(lead, quote);
+      if (!result.ok) return NextResponse.json({ ...quote, delivery: { status: "FAILED", reason: result.reason }, error: result.reason }, { status: result.status });
+      return NextResponse.json({ ...quote, delivery: result.delivery });
     }
     if (input.action === "review_request") return NextResponse.json(await sendReviewRequest(input.leadId));
     return NextResponse.json(await recordFeedback(input));
