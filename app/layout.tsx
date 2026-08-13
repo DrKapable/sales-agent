@@ -8,6 +8,7 @@ import "./admin-mobile-v4.css";
 import "./admin-mobile-v5.css";
 import "./admin-mobile-v6.css";
 import "./admin-mobile-v7.css";
+import "./admin-mobile-v8.css";
 import "./brand-v2.css";
 import "./brand-v2-fix.css";
 import "./public-chat-v2.css";
