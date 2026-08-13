@@ -6,6 +6,7 @@ import { parseIncomingMessages, sendWhatsAppText, verifyWhatsAppSignature } from
 import { notifyDirectorOfNewClient } from "@/lib/new-client-alert";
 import { sendCommercialPdf } from "@/lib/commercial-document";
 import { getLatestPreparedQuotation, isPreparedQuotationRequest, preparedQuotationFallbackText } from "@/lib/prepared-quotation";
+import { rememberWhatsAppSender } from "@/lib/whatsapp-sender-context";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 
@@ -37,6 +38,9 @@ export async function POST(request: NextRequest) {
             configuredPhoneNumberIdSuffix: configuredPhoneNumberId.slice(-4)
           });
         }
+
+        await rememberWhatsAppSender({ phone: message.phone, phoneNumberId: message.phoneNumberId, displayPhoneNumber: message.displayPhoneNumber })
+          .catch((error) => console.error("Unable to remember WhatsApp sender context", { phoneSuffix: message.phone.slice(-4), error }));
 
         const previousHistory = await getConversation(message.phone, 1);
         const firstEverClientMessage = previousHistory.length === 0;
@@ -73,11 +77,7 @@ export async function POST(request: NextRequest) {
           if (prepared) {
             let reply: string;
             try {
-              const delivered = await sendCommercialPdf({
-                lead,
-                record: prepared,
-                phoneNumberIdOverride: message.phoneNumberId ?? undefined
-              });
+              const delivered = await sendCommercialPdf({ lead, record: prepared, phoneNumberIdOverride: message.phoneNumberId ?? undefined });
               reply = `I've sent your prepared MedMinds quotation ${delivered.documentNumber} above. Please review it and let me know if you would like us to proceed or if you need any clarification.`;
               console.info("Prepared quotation sent to WhatsApp client", { messageId: message.id, quoteId: prepared.id, documentNumber: delivered.documentNumber });
             } catch (error) {
