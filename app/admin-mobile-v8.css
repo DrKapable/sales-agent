@@ -1,0 +1,66 @@
+/* Final mobile chat corrections: admin-only, loaded after earlier mobile layers. */
+body:has(.dashboard)>iframe[title="Chat with MedMinds"]{display:none!important}
+
+@media (max-width:820px){
+  .dashboard.mobileChatOpen .messageTimeline{
+    box-sizing:border-box!important;
+    padding-bottom:calc(104px + env(safe-area-inset-bottom))!important;
+    scroll-padding-bottom:calc(104px + env(safe-area-inset-bottom))!important;
+  }
+
+  /* Restore the contextual action that v6 hides with the controlStrip. */
+  .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen)>.controlStrip{display:contents!important}
+  .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen)>.controlStrip>label,
+  .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen)>.controlStrip>.resumeButton,
+  .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen)>.controlStrip>div{display:none!important}
+  .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen)>.controlStrip>.takeoverButton{
+    position:fixed!important;
+    left:12px!important;
+    right:12px!important;
+    bottom:calc(10px + env(safe-area-inset-bottom))!important;
+    z-index:84!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    width:auto!important;
+    min-height:48px!important;
+    margin:0!important;
+    padding:0 18px!important;
+    border:0!important;
+    border-radius:24px!important;
+    background:#1d9c8e!important;
+    color:#fff!important;
+    box-shadow:0 5px 18px rgba(16,43,40,.18)!important;
+    font-size:14px!important;
+    font-weight:800!important;
+  }
+  .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen)>.controlStrip>.takeoverButton::after{content:" chat"!important}
+
+  /* Human mode keeps only the WhatsApp-like composer at the bottom. */
+  .dashboard.mobileChatOpen .conversationPanel:has(.resumeButton) .messageTimeline{
+    padding-bottom:calc(96px + env(safe-area-inset-bottom))!important;
+    scroll-padding-bottom:calc(96px + env(safe-area-inset-bottom))!important;
+  }
+
+  /* Compact controls sheet; it overlays rather than pushing the conversation. */
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen>.controlStrip{
+    bottom:116px!important;
+    max-height:228px!important;
+    gap:7px!important;
+    padding:11px!important;
+  }
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen>.followUpTools{
+    min-height:106px!important;
+    max-height:106px!important;
+    padding:8px 11px!important;
+    gap:5px!important;
+  }
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen>.followUpTools input{min-height:30px!important}
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen>.followUpTools button{min-height:28px!important;padding:3px 9px!important}
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen>.followUpTools>span{display:none!important}
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen>.controlStrip>.takeoverButton{display:flex!important;position:static!important;width:100%!important;min-height:36px!important;box-shadow:none!important}
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen>.controlStrip>.takeoverButton::after{content:" chat"!important}
+
+  /* Hide bottom chat actions while the management sheet is open. */
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen .replyComposer{display:none!important}
+}
