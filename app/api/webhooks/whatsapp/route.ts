@@ -4,6 +4,8 @@ import { humanReplyDelayMs, wait } from "@/lib/timing";
 import { generateWhatsAppReplyWithRecovery, sendWhatsAppTextWithRetry } from "@/lib/whatsapp-recovery";
 import { parseIncomingMessages, sendWhatsAppText, verifyWhatsAppSignature } from "@/lib/whatsapp";
 import { notifyDirectorOfNewClient } from "@/lib/new-client-alert";
+import { sendCommercialPdf } from "@/lib/commercial-document";
+import { getLatestPreparedQuotation, isPreparedQuotationRequest, preparedQuotationFallbackText } from "@/lib/prepared-quotation";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 
@@ -64,6 +66,37 @@ export async function POST(request: NextRequest) {
 
           lead = await updateLead(message.phone, { aiPaused: false });
           console.info("Legacy AI referral resumed without waiting for human takeover", { messageId: message.id, assignedTo: lead.assignedTo });
+        }
+
+        if (isPreparedQuotationRequest(message.text)) {
+          const prepared = await getLatestPreparedQuotation(lead.id);
+          if (prepared) {
+            let reply: string;
+            try {
+              const delivered = await sendCommercialPdf({
+                lead,
+                record: prepared,
+                phoneNumberIdOverride: message.phoneNumberId ?? undefined
+              });
+              reply = `I've sent your prepared MedMinds quotation ${delivered.documentNumber} above. Please review it and let me know if you would like us to proceed or if you need any clarification.`;
+              console.info("Prepared quotation sent to WhatsApp client", { messageId: message.id, quoteId: prepared.id, documentNumber: delivered.documentNumber });
+            } catch (error) {
+              reply = preparedQuotationFallbackText(prepared);
+              console.error("Prepared quotation PDF delivery failed; using text fallback", { messageId: message.id, quoteId: prepared.id, error });
+            }
+
+            await addMessage(message.phone, "assistant", reply);
+            await sendWhatsAppTextWithRetry(message.phone, reply, message.phoneNumberId);
+            console.info("Prepared quotation client response sent", { messageId: message.id, quoteId: prepared.id });
+
+            if (firstEverClientMessage) {
+              const currentLead = await getOrCreateLead(message.phone, "whatsapp");
+              const alerted = await notifyDirectorOfNewClient({ lead: currentLead, firstMessage: message.text, source: "whatsapp", phoneNumberIdOverride: message.phoneNumberId ?? undefined });
+              console.info("New client director alert processed", { messageId: message.id, alerted });
+            }
+            continue;
+          }
+          console.info("Prepared quotation requested but none is stored for this client", { messageId: message.id, leadId: lead.id });
         }
 
         const result = await generateWhatsAppReplyWithRecovery(message.phone, message.text);
