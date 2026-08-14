@@ -23,6 +23,9 @@
       }
     ],
     "paths": {
+      "@/lib/ai/prompt": [
+        "./lib/ai/prompt-kaunda.ts"
+      ],
       "@/*": [
         "./*"
       ]
