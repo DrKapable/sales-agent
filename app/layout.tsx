@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import { AgentIdentityEnhancer } from "@/components/agent-identity-enhancer";
 import { ChatDeliveryTicksEnhancer } from "@/components/chat-delivery-ticks-enhancer";
 import { ChatRichTextEnhancer } from "@/components/chat-rich-text-enhancer";
 import { ClientRecordManagementEnhancer } from "@/components/client-record-management-enhancer";
@@ -35,5 +36,5 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
-  return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><MobileAdminEnhancer /><ClientRecordManagementEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer />{children}</body></html>;
+  return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><MobileAdminEnhancer /><ClientRecordManagementEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
 }
