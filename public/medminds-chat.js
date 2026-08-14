@@ -7,8 +7,8 @@
   const origin = new URL(script.src, window.location.href).origin;
   const iframe = document.createElement("iframe");
   iframe.src = `${origin}/widget`;
-  iframe.title = "Chat with MedMinds";
-  iframe.setAttribute("aria-label", "Chat with MedMinds");
+  iframe.title = "Chat with Mary Kainda";
+  iframe.setAttribute("aria-label", "Chat with Mary Kainda, MedMinds AI assistant");
   iframe.setAttribute("allow", "clipboard-write");
   iframe.style.position = "fixed";
   iframe.style.right = "16px";

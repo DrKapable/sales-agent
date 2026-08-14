@@ -8,7 +8,7 @@ type WidgetMessage = { id: string; role: "user" | "assistant"; content: string; 
 const welcome: WidgetMessage = {
   id: "welcome",
   role: "assistant",
-  content: "Hi 👋 Welcome to MedMinds. What can I help you with today?",
+  content: "Hi 👋 I'm Mary Kainda from MedMinds. What can I help you with today?",
   time: "Now"
 };
 
@@ -156,15 +156,15 @@ export function FloatingSalesChat() {
   }
 
   if (!open) {
-    return <button type="button" className="widgetLauncher" aria-label="Chat with MedMinds" onClick={() => setOpen(true)}>
+    return <button type="button" className="widgetLauncher" aria-label="Chat with Mary Kainda" onClick={() => setOpen(true)}>
       <span className="widgetLauncherLogo"><BrandLogo compact /></span><span className="widgetPulse" />
     </button>;
   }
 
-  return <section className="salesChatWidget" aria-label="MedMinds chat assistant" aria-busy={busy}>
+  return <section className="salesChatWidget" aria-label="Mary Kainda, MedMinds AI assistant" aria-busy={busy}>
     <header className="widgetHeader">
       <span className="widgetBrand"><BrandLogo compact /></span>
-      <div><strong>MedMinds Assistant</strong><small><span className="liveDot" /> Online</small></div>
+      <div><strong>Mary Kainda</strong><small><span className="liveDot" /> MedMinds AI · Online</small></div>
       <button type="button" className="widgetNewChat" onClick={newChat} disabled={busy}>New</button>
       <button type="button" className="widgetClose" aria-label="Close chat" onClick={() => setOpen(false)}>×</button>
     </header>
@@ -191,12 +191,12 @@ export function FloatingSalesChat() {
         {messages.map((message) => <div key={message.id} className={`widgetMessageRow ${message.role}`}>
           <div className="widgetMessage"><p>{message.content}</p><time>{message.time}</time></div>
         </div>)}
-        {busy && <div className="widgetMessageRow assistant"><div className="widgetMessage widgetTyping" aria-label="MedMinds Assistant is typing"><span /><span /><span /></div></div>}
+        {busy && <div className="widgetMessageRow assistant"><div className="widgetMessage widgetTyping" aria-label="Mary Kainda is typing"><span /><span /><span /></div></div>}
         <div ref={endRef} />
       </div>
       {messages.length === 1 && <div className="widgetSuggestions">{suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => void sendMessage(suggestion)} disabled={busy}>{suggestion}</button>)}</div>}
       <form className="widgetComposer" onSubmit={submit}>
-        <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleKeyDown} maxLength={4000} rows={1} placeholder="Type a message" aria-label="Message MedMinds" disabled={busy} />
+        <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleKeyDown} maxLength={4000} rows={1} placeholder="Type a message" aria-label="Message Mary Kainda" disabled={busy} />
         <button type="submit" aria-label="Send message" disabled={busy || !input.trim()}>➤</button>
       </form>
       <div className="widgetFooter">
