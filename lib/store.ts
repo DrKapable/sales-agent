@@ -9,6 +9,7 @@ type MemoryStore = {
 };
 
 const CATALOGUE_VERSION = 2;
+const AI_PROPOSAL_COURSE_VERSION = 3;
 
 declare global {
   var __medmindsMemoryStore: MemoryStore | undefined;
@@ -71,13 +72,14 @@ async function ensureDatabase() {
     await db.query(`ALTER TABLE offers ADD COLUMN IF NOT EXISTS rush_price_zmw NUMERIC`);
     await db.query(`ALTER TABLE offers ADD COLUMN IF NOT EXISTS catalogue_version INTEGER NOT NULL DEFAULT 0`);
     for (const offer of offerSeeds) {
+      const catalogueVersion = offer.slug === "course-ai-research-writing" ? AI_PROPOSAL_COURSE_VERSION : CATALOGUE_VERSION;
       await db.query(
         `INSERT INTO offers (id, slug, name, category, description, features, price_zmw, rush_price_zmw, payment_instructions, active, catalogue_version)
          VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11)
          ON CONFLICT (slug) DO UPDATE SET name=$3,category=$4,description=$5,features=$6::jsonb,
          price_zmw=$7,rush_price_zmw=$8,payment_instructions=$9,active=$10,catalogue_version=$11,updated_at=NOW()
          WHERE offers.catalogue_version < $11`,
-        [crypto.randomUUID(), offer.slug, offer.name, offer.category, offer.description, JSON.stringify(offer.features), offer.priceZmw, offer.rushPriceZmw, offer.paymentInstructions, offer.active, CATALOGUE_VERSION]
+        [crypto.randomUUID(), offer.slug, offer.name, offer.category, offer.description, JSON.stringify(offer.features), offer.priceZmw, offer.rushPriceZmw, offer.paymentInstructions, offer.active, catalogueVersion]
       );
     }
   })();
