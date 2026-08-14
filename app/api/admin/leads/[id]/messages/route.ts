@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { humanMessageContent, replyWindow } from "@/lib/conversation";
+import { decorateMessagesForAdmin, recordOutgoingMessageAccepted } from "@/lib/message-delivery";
 import { staffNames } from "@/lib/team-directory";
 import { addMessage, getConversation, listLeads, updateLead } from "@/lib/store";
 import { sendWhatsAppText } from "@/lib/whatsapp";
@@ -19,7 +20,8 @@ async function leadAndMessages(id: string) {
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const state = await leadAndMessages((await params).id);
   if (!state) return NextResponse.json({ error: "Lead not found." }, { status: 404 });
-  return NextResponse.json({ ...state, replyWindow: replyWindow(state.messages) });
+  const messages = await decorateMessagesForAdmin(state.messages);
+  return NextResponse.json({ ...state, messages, replyWindow: replyWindow(state.messages) });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -47,7 +49,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
   await addMessage(state.lead.phone, "assistant", humanMessageContent(parsed.data.sender, parsed.data.text), externalId);
+  if (externalId) await recordOutgoingMessageAccepted({ messageId: externalId, phone: state.lead.phone }).catch((error) => console.warn("Unable to record admin WhatsApp acceptance", { leadId: state.lead.id, error }));
   const lead = await updateLead(state.lead.phone, { aiPaused: true, assignedTo: parsed.data.sender, status: "HUMAN ASSISTANCE REQUIRED" });
-  const messages = await getConversation(state.lead.phone, 100);
-  return NextResponse.json({ lead, messages, replyWindow: replyWindow(messages), delivery });
+  const storedMessages = await getConversation(state.lead.phone, 100);
+  const messages = await decorateMessagesForAdmin(storedMessages);
+  return NextResponse.json({ lead, messages, replyWindow: replyWindow(storedMessages), delivery });
 }
