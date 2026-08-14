@@ -44,8 +44,8 @@
       "icons": [{ "src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "name": "MedMinds Assistant",
-      "short_name": "Assistant",
+      "name": "Mary Kainda",
+      "short_name": "Mary",
       "url": "/",
       "icons": [{ "src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
