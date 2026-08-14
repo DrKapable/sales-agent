@@ -8,6 +8,8 @@ import { sendCommercialPdf } from "@/lib/commercial-document";
 import { getLatestPreparedQuotation, isPreparedQuotationRequest, preparedQuotationFallbackText } from "@/lib/prepared-quotation";
 import { rememberWhatsAppSender } from "@/lib/whatsapp-sender-context";
 import { applyQuoteDeliveryReceipt } from "@/lib/quotation-delivery";
+import { applyMessageDeliveryReceipt, recordOutgoingMessageAccepted } from "@/lib/message-delivery";
+import { attachOutgoingMessageId } from "@/lib/outgoing-message-link";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 
@@ -30,15 +32,24 @@ export async function POST(request: NextRequest) {
   after(async () => {
     for (const receipt of deliveryReceipts) {
       try {
-        const matched = await applyQuoteDeliveryReceipt({
-          messageId: receipt.id,
-          status: receipt.status,
-          timestamp: receipt.timestamp,
-          error: receipt.error
-        });
-        if (matched) console.info("Quotation delivery receipt recorded", { messageId: receipt.id, status: receipt.status });
+        const [quoteMatched, messageMatched] = await Promise.all([
+          applyQuoteDeliveryReceipt({
+            messageId: receipt.id,
+            status: receipt.status,
+            timestamp: receipt.timestamp,
+            error: receipt.error
+          }),
+          applyMessageDeliveryReceipt({
+            messageId: receipt.id,
+            status: receipt.status,
+            recipientId: receipt.recipientId,
+            error: receipt.error
+          })
+        ]);
+        if (quoteMatched) console.info("Quotation delivery receipt recorded", { messageId: receipt.id, status: receipt.status });
+        if (messageMatched) console.info("WhatsApp chat delivery receipt recorded", { messageId: receipt.id, status: receipt.status });
       } catch (error) {
-        console.error("Unable to record quotation delivery receipt", { messageId: receipt.id, status: receipt.status, error });
+        console.error("Unable to record WhatsApp delivery receipt", { messageId: receipt.id, status: receipt.status, error });
       }
     }
 
@@ -106,8 +117,12 @@ export async function POST(request: NextRequest) {
             }
 
             await addMessage(message.phone, "assistant", reply);
-            await sendWhatsAppTextWithRetry(message.phone, reply, message.phoneNumberId);
-            console.info("Prepared quotation client response sent", { messageId: message.id, quoteId: prepared.id });
+            const sent = await sendWhatsAppTextWithRetry(message.phone, reply, message.phoneNumberId);
+            await Promise.all([
+              attachOutgoingMessageId({ phone: message.phone, content: reply, messageId: sent.messageId }),
+              recordOutgoingMessageAccepted({ messageId: sent.messageId, phone: message.phone })
+            ]).catch((error) => console.warn("Unable to link prepared-quotation reply delivery status", { messageId: message.id, error }));
+            console.info("Prepared quotation client response sent", { messageId: message.id, quoteId: prepared.id, outboundMessageId: sent.messageId });
 
             if (firstEverClientMessage) {
               const currentLead = await getOrCreateLead(message.phone, "whatsapp");
@@ -125,8 +140,12 @@ export async function POST(request: NextRequest) {
         const replyDelayMs = humanReplyDelayMs(Date.now() - processingStartedAt);
         console.info("WhatsApp client reply scheduled", { messageId: message.id, delayMs: replyDelayMs });
         await wait(replyDelayMs);
-        await sendWhatsAppTextWithRetry(message.phone, result.reply, message.phoneNumberId);
-        console.info("WhatsApp client reply sent", { messageId: message.id });
+        const sent = await sendWhatsAppTextWithRetry(message.phone, result.reply, message.phoneNumberId);
+        await Promise.all([
+          attachOutgoingMessageId({ phone: message.phone, content: result.reply, messageId: sent.messageId }),
+          recordOutgoingMessageAccepted({ messageId: sent.messageId, phone: message.phone })
+        ]).catch((error) => console.warn("Unable to link AI reply delivery status", { messageId: message.id, error }));
+        console.info("WhatsApp client reply sent", { messageId: message.id, outboundMessageId: sent.messageId });
 
         if (firstEverClientMessage) {
           const currentLead = await getOrCreateLead(message.phone, "whatsapp");
