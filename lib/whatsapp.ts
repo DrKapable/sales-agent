@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { normalizeWhatsAppReply } from "@/lib/whatsapp-format";
 
 export function verifyWhatsAppSignature(rawBody: string, signature: string | null, secret = process.env.WHATSAPP_APP_SECRET) {
   if (!secret || !signature?.startsWith("sha256=")) return false;
@@ -141,13 +142,36 @@ function whatsappConfig(phoneNumberIdOverride?: string) {
   return { token, phoneNumberId, version };
 }
 
+export async function sendWhatsAppTypingIndicator(messageId: string, phoneNumberIdOverride?: string) {
+  if (process.env.WHATSAPP_TYPING_INDICATOR === "false") return { success: false, skipped: true } as const;
+  const { token, phoneNumberId, version } = whatsappConfig(phoneNumberIdOverride);
+  const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
+    method: "POST",
+    signal: AbortSignal.timeout(8000),
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      status: "read",
+      message_id: messageId,
+      typing_indicator: { type: "text" }
+    })
+  });
+  const rawBody = await response.text();
+  if (!response.ok) {
+    throw new Error(`WhatsApp typing indicator returned ${response.status}: ${JSON.stringify(sanitizeWhatsAppApiError(rawBody))}`);
+  }
+  const parsed = rawBody ? JSON.parse(rawBody) as { success?: boolean } : { success: true };
+  return { success: parsed.success !== false, skipped: false } as const;
+}
+
 export async function sendWhatsAppText(phone: string, body: string, phoneNumberIdOverride?: string) {
   const { token, phoneNumberId, version } = whatsappConfig(phoneNumberIdOverride);
+  const formattedBody = normalizeWhatsAppReply(body);
   const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
     method: "POST",
     signal: AbortSignal.timeout(12000),
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: phone, type: "text", text: { preview_url: false, body } })
+    body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: phone, type: "text", text: { preview_url: false, body: formattedBody } })
   });
   const rawBody = await response.text();
   if (!response.ok) {
@@ -197,7 +221,7 @@ export async function sendWhatsAppPdfDocument(input: {
       document: {
         id: mediaId,
         filename: input.filename,
-        ...(input.caption ? { caption: input.caption.slice(0, 1024) } : {})
+        ...(input.caption ? { caption: normalizeWhatsAppReply(input.caption).slice(0, 1024) } : {})
       }
     })
   });
