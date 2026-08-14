@@ -2,7 +2,7 @@ import { after, NextRequest, NextResponse } from "next/server";
 import { addMessage, getConversation, getOrCreateLead, updateLead } from "@/lib/store";
 import { humanReplyDelayMs, wait } from "@/lib/timing";
 import { generateWhatsAppReplyWithRecovery, sendWhatsAppTextWithRetry } from "@/lib/whatsapp-recovery";
-import { parseDeliveryReceipts, parseIncomingMessages, sendWhatsAppText, verifyWhatsAppSignature } from "@/lib/whatsapp";
+import { parseDeliveryReceipts, parseIncomingMessages, sendWhatsAppText, sendWhatsAppTypingIndicator, verifyWhatsAppSignature } from "@/lib/whatsapp";
 import { notifyDirectorOfNewClient } from "@/lib/new-client-alert";
 import { sendCommercialPdf } from "@/lib/commercial-document";
 import { getLatestPreparedQuotation, isPreparedQuotationRequest, preparedQuotationFallbackText } from "@/lib/prepared-quotation";
@@ -87,6 +87,10 @@ export async function POST(request: NextRequest) {
           lead = await updateLead(message.phone, { aiPaused: false });
           console.info("Legacy AI referral resumed without waiting for human takeover", { messageId: message.id, assignedTo: lead.assignedTo });
         }
+
+        await sendWhatsAppTypingIndicator(message.id, message.phoneNumberId ?? undefined)
+          .then((typing) => console.info("WhatsApp typing indicator processed", { messageId: message.id, skipped: typing.skipped }))
+          .catch((error) => console.warn("WhatsApp typing indicator failed; continuing with reply", { messageId: message.id, error }));
 
         if (isPreparedQuotationRequest(message.text)) {
           const prepared = await getLatestPreparedQuotation(lead.id);
