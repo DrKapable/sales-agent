@@ -8,6 +8,7 @@ const PAYMENT_AFTER_QUOTE = "Once the amount is approved, submit payment to 0977
 const GENERAL_CONTACT = "Dr Kanyembo Ng'andwe on 0974634555";
 const RESEARCH_PAYMENT = `Review research pricing at ${RESEARCH_PRICING_URL}. ${PAYMENT_DETAILS}. For other enquiries, contact ${GENERAL_CONTACT}.`;
 const PA_GYM_ACCOUNT = "https://medmindslc.site/pa-gym-start.html?ref=jumamustafap";
+const AI_PROPOSAL_COURSE_PAYMENT = "AI-Assisted Research Proposal Writing course payment: Airtel Money 0977259132 (Juma Phiri) or MTN Money 0969152364 (Musonda Mupeta). After payment, send proof of payment and your email address for account activation. Create your account at https://medmindslc.online/user-account/.";
 
 type ResearchPrice = {
   slug: string;
@@ -73,7 +74,28 @@ function researchOffer(price: ResearchPrice): OfferSeed {
 }
 
 const courseOffers: OfferSeed[] = [
-  { slug: "course-ai-research-writing", name: "AI-Enhanced Academic Research Writing", category: "Courses", description: "A self-paced course on ethical AI use, literature review, structure, citations and publication-ready academic writing.", features: ["Intermediate level", "Certificate included", "Self-paced online learning"], priceZmw: 2500, rushPriceZmw: 2500, paymentInstructions: `${PAYMENT_DETAILS}.`, active: true },
+  {
+    slug: "course-ai-research-writing",
+    name: "AI-Assisted Research Proposal Writing",
+    category: "Courses",
+    description: "A 2-hour, 10-module, fully self-paced online course that guides learners from defining a research problem through literature searching, ethical AI use, reference management, sample-size calculation, proposal drafting and professional Word formatting.",
+    features: [
+      "2 hours total across 10 short self-paced modules",
+      "Lifetime access with immediate access after enrolment",
+      "Research problem and topic definition",
+      "Academic literature searching with Google Scholar, PubMed and AJOL",
+      "Zotero reference management and automatic citations/bibliographies",
+      "Ethical use of ChatGPT/LLMs for academic research",
+      "Research Rabbit and KoboToolbox",
+      "Sample-size calculation with OpenEpi",
+      "Evidence-based proposal drafting and Microsoft Word formatting",
+      "Course videos stream on the platform and are not downloadable"
+    ],
+    priceZmw: 350,
+    rushPriceZmw: 350,
+    paymentInstructions: AI_PROPOSAL_COURSE_PAYMENT,
+    active: true
+  },
   { slug: "course-digital-surveys", name: "Create Digital Surveys with ChatGPT and KoboToolbox", category: "Courses", description: "A beginner course on generating survey questions, building digital forms and managing responses.", features: ["Beginner level", "Self-paced online learning"], priceZmw: 0, rushPriceZmw: 0, paymentInstructions: `Contact ${GENERAL_CONTACT} for the current enrolment link.`, active: true },
   { slug: "course-ecg", name: "Master ECG Interpretation", category: "Courses", description: "Step-by-step ECG interpretation for medical students and junior doctors preparing for clinical examinations.", features: ["Intermediate level", "Certificate included", "Clinical and OSCE focused"], priceZmw: 1500, rushPriceZmw: 1500, paymentInstructions: `${PAYMENT_DETAILS}.`, active: true },
   { slug: "course-chest-xray", name: "Mastering Chest X-Ray Interpretation for MBChB OSCEs", category: "Courses", description: "A structured, examination-focused approach to common chest radiograph findings.", features: ["Intermediate level", "Certificate included", "OSCE focused"], priceZmw: 1200, rushPriceZmw: 1200, paymentInstructions: `${PAYMENT_DETAILS}.`, active: true },
