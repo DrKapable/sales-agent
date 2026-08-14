@@ -2,6 +2,7 @@ export const AI_ASSISTED_PROPOSAL_COURSE_KNOWLEDGE = `APPROVED AI-ASSISTED RESEA
 - Canonical course name: AI-Assisted Research Proposal Writing.
 - Treat "AI Enhanced Research Proposal Writing", "AI-Enhanced Academic Research Writing", "AI research writing course", "AI-assisted proposal course" and similar wording as this same course unless the client clearly names another course.
 - Current price: K350. The previous/original price was K2,500. Do not quote K2,500 as the current fee.
+- The supplied FAQ states that K350 is the current promotional price until the 100th enrolment. Do not invent or claim a current enrolment count.
 - Duration: 2 hours total, split into 10 short modules.
 - Format: fully self-paced online learning.
 - Access: lifetime access after enrolment. The learner can start immediately after enrolment/account activation.
