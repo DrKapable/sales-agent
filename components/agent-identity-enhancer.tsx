@@ -20,7 +20,7 @@ function applyIdentity(root: ParentNode = document) {
   });
 
   root.querySelectorAll<HTMLElement>(".widgetHeader small").forEach((label) => {
-    if (label.textContent?.includes("Online")) label.innerHTML = '<span class="liveDot"></span> MedMinds AI · Online';
+    if (label.textContent?.includes("Online")) label.innerHTML = '<span class="liveDot"></span> Sales assistant · Online';
   });
 
   root.querySelectorAll<HTMLElement>(".widgetMessageRow.assistant .widgetMessage p, .chatMessageRow.assistant .message p").forEach((message, index) => {
@@ -31,7 +31,7 @@ function applyIdentity(root: ParentNode = document) {
   });
 
   root.querySelectorAll<HTMLElement>(".widgetTyping, .typing").forEach((typing) => typing.setAttribute("aria-label", `${AGENT_NAME} is typing`));
-  root.querySelectorAll<HTMLElement>(".salesChatWidget").forEach((chat) => chat.setAttribute("aria-label", `${AGENT_NAME}, MedMinds AI assistant`));
+  root.querySelectorAll<HTMLElement>(".salesChatWidget").forEach((chat) => chat.setAttribute("aria-label", `${AGENT_NAME}, MedMinds sales assistant`));
   root.querySelectorAll<HTMLElement>(".widgetLauncher").forEach((launcher) => launcher.setAttribute("aria-label", `Chat with ${AGENT_NAME}`));
   root.querySelectorAll<HTMLTextAreaElement>(".widgetComposer textarea").forEach((input) => input.setAttribute("aria-label", `Message ${AGENT_NAME}`));
 
