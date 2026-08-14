@@ -14,7 +14,7 @@ const starterPrompts = [
 const welcomeMessage: ChatMessage = {
   id: "welcome",
   role: "assistant",
-  content: "Hi 👋 Welcome to MedMinds. What would you like help with today?",
+  content: "Hi 👋 I'm Mary Kainda from MedMinds. What would you like help with today?",
   time: "Now"
 };
 
@@ -86,21 +86,22 @@ export function TestChat({ enabled }: { enabled: boolean }) {
     <div className="chatPanel" aria-busy={busy}>
       <div className="chatTop">
         <span className="avatar logoAvatar"><BrandLogo compact /></span>
-        <div><strong>MedMinds Assistant</strong><small><span className="liveDot" />{enabled ? "Online and ready to help" : "Configuration pending"}</small></div>
+        <div><strong>Mary Kainda</strong><small><span className="liveDot" />{enabled ? "MedMinds AI · Online" : "Configuration pending"}</small></div>
         <button className="newChatButton" type="button" onClick={resetChat} disabled={busy}>New chat</button>
       </div>
-      <div className="chatPrivacy">Secure sales assistant · One question at a time</div>
+      <div className="chatPrivacy">Secure MedMinds AI sales assistant · One question at a time</div>
       <div className="chatMessages" aria-live="polite">
         {messages.map((message) => <div key={message.id} className={`chatMessageRow ${message.role}`}>
           <div className={`message ${message.role === "user" ? "out" : "in"}`}>
             <p>{message.content}</p><time>{message.time}</time>
           </div>
         </div>)}
-        {busy && <div className="chatMessageRow assistant"><div className="message in typing" aria-label="MedMinds Assistant is typing"><span /><span /><span /></div></div>}
+        {busy && <div className="chatMessageRow assistant"><div className="message in typing" aria-label="Mary Kainda is typing"><span /><span /><span /></div></div>}
         <div ref={endRef} />
       </div>
       {messages.length === 1 && <div className="starterPrompts" aria-label="Suggested questions">
-        {starterPrompts.map((prompt) => <button key={prompt} type="button" disabled={!enabled || busy} onClick={() => void sendMessage(prompt)}>{prompt}</button>)}
+        {starterPrompts.map((prompt) => <button key={prompt} type="button" disabled={!enabled || busy} onClick={() => void sendMessage(prompt)}>{prompt}</button>)
+        }
       </div>}
       <form className="chatForm" onSubmit={submit}>
         <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleKeyDown} rows={1} maxLength={4000} placeholder={enabled ? "Write your message" : "Configure AI Gateway to begin"} disabled={!enabled || busy} aria-label="Test message" />
