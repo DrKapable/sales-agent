@@ -12,6 +12,7 @@ import { rememberWhatsAppSender } from "@/lib/whatsapp-sender-context";
 import { applyQuoteDeliveryReceipt } from "@/lib/quotation-delivery";
 import { applyMessageDeliveryReceipt, recordOutgoingMessageAccepted } from "@/lib/message-delivery";
 import { attachOutgoingMessageId } from "@/lib/outgoing-message-link";
+import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewrite";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 
@@ -139,9 +140,12 @@ export async function POST(request: NextRequest) {
         const result = await generateWhatsAppReplyWithRecovery(message.phone, message.text);
         console.info("WhatsApp client reply prepared", { messageId: message.id, hasReferral: Boolean(result.referralNotification), queuedDocuments: result.documentIds.length });
 
+        let deliveredDocuments = 0;
+        let failedDocuments = 0;
         for (const documentId of result.documentIds) {
           const document = await getClientDocumentForLead(documentId, lead.id);
           if (!document) {
+            failedDocuments += 1;
             console.warn("Queued client document was no longer assigned", { messageId: message.id, documentId, leadId: lead.id });
             continue;
           }
@@ -157,20 +161,34 @@ export async function POST(request: NextRequest) {
             await addMessage(message.phone, "assistant", documentContent, sentDocument.messageId);
             await Promise.all([
               recordOutgoingMessageAccepted({ messageId: sentDocument.messageId, phone: message.phone }),
-              markClientDocumentSent(document.id, lead.id)
+              markClientDocumentSent(document.id, lead.id, "Mary Kaunda")
             ]);
+            deliveredDocuments += 1;
             console.info("Mary sent assigned client document", { messageId: message.id, documentId: document.id, outboundMessageId: sentDocument.messageId });
           } catch (error) {
+            failedDocuments += 1;
             console.error("Mary assigned-document delivery failed", { messageId: message.id, documentId: document.id, error });
           }
         }
 
+        let reply = result.reply;
+        if (result.documentIds.length > 0 && deliveredDocuments === 0) {
+          reply = "I couldn't attach the assigned document just now. I have kept your request here so it can be retried. You can also ask me to try sending it again.";
+          const rewritten = await rewriteLatestUnsentAssistantMessage({ phone: message.phone, from: result.reply, to: reply }).catch(() => false);
+          if (!rewritten) await addMessage(message.phone, "assistant", reply).catch(() => undefined);
+          await updateLead(message.phone, { status: "FOLLOW-UP REQUIRED", handoffReason: "Assigned client document failed to send through WhatsApp." }).catch(() => undefined);
+        } else if (failedDocuments > 0) {
+          reply = "I've sent the available document. One additional attachment could not be sent just now. You can ask me to try that attachment again.";
+          const rewritten = await rewriteLatestUnsentAssistantMessage({ phone: message.phone, from: result.reply, to: reply }).catch(() => false);
+          if (!rewritten) await addMessage(message.phone, "assistant", reply).catch(() => undefined);
+        }
+
         const replyDelayMs = humanReplyDelayMs(Date.now() - processingStartedAt);
-        console.info("WhatsApp client reply scheduled", { messageId: message.id, delayMs: replyDelayMs });
+        console.info("WhatsApp client reply scheduled", { messageId: message.id, delayMs: replyDelayMs, deliveredDocuments, failedDocuments });
         await wait(replyDelayMs);
-        const sent = await sendWhatsAppTextWithRetry(message.phone, result.reply, message.phoneNumberId);
+        const sent = await sendWhatsAppTextWithRetry(message.phone, reply, message.phoneNumberId);
         await Promise.all([
-          attachOutgoingMessageId({ phone: message.phone, content: result.reply, messageId: sent.messageId }),
+          attachOutgoingMessageId({ phone: message.phone, content: reply, messageId: sent.messageId }),
           recordOutgoingMessageAccepted({ messageId: sent.messageId, phone: message.phone })
         ]).catch((error) => console.warn("Unable to link AI reply delivery status", { messageId: message.id, error }));
         console.info("WhatsApp client reply sent", { messageId: message.id, outboundMessageId: sent.messageId });
