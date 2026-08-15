@@ -1,4 +1,6 @@
 import { after, NextRequest, NextResponse } from "next/server";
+import { clientDocumentChatContent, getClientDocumentForLead, markClientDocumentSent } from "@/lib/client-documents";
+import { sendClientWhatsAppDocument } from "@/lib/client-document-whatsapp";
 import { addMessage, getConversation, getOrCreateLead, updateLead } from "@/lib/store";
 import { humanReplyDelayMs, wait } from "@/lib/timing";
 import { generateWhatsAppReplyWithRecovery, sendWhatsAppTextWithRetry } from "@/lib/whatsapp-recovery";
@@ -135,7 +137,33 @@ export async function POST(request: NextRequest) {
         }
 
         const result = await generateWhatsAppReplyWithRecovery(message.phone, message.text);
-        console.info("WhatsApp client reply prepared", { messageId: message.id, hasReferral: Boolean(result.referralNotification) });
+        console.info("WhatsApp client reply prepared", { messageId: message.id, hasReferral: Boolean(result.referralNotification), queuedDocuments: result.documentIds.length });
+
+        for (const documentId of result.documentIds) {
+          const document = await getClientDocumentForLead(documentId, lead.id);
+          if (!document) {
+            console.warn("Queued client document was no longer assigned", { messageId: message.id, documentId, leadId: lead.id });
+            continue;
+          }
+          try {
+            const sentDocument = await sendClientWhatsAppDocument({
+              phone: message.phone,
+              bytes: document.bytes,
+              filename: document.fileName,
+              mimeType: document.mimeType,
+              phoneNumberIdOverride: message.phoneNumberId ?? undefined
+            });
+            const documentContent = clientDocumentChatContent({ title: document.title, fileName: document.fileName });
+            await addMessage(message.phone, "assistant", documentContent, sentDocument.messageId);
+            await Promise.all([
+              recordOutgoingMessageAccepted({ messageId: sentDocument.messageId, phone: message.phone }),
+              markClientDocumentSent(document.id, lead.id)
+            ]);
+            console.info("Mary sent assigned client document", { messageId: message.id, documentId: document.id, outboundMessageId: sentDocument.messageId });
+          } catch (error) {
+            console.error("Mary assigned-document delivery failed", { messageId: message.id, documentId: document.id, error });
+          }
+        }
 
         const replyDelayMs = humanReplyDelayMs(Date.now() - processingStartedAt);
         console.info("WhatsApp client reply scheduled", { messageId: message.id, delayMs: replyDelayMs });
