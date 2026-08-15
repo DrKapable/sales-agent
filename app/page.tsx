@@ -16,33 +16,20 @@ export default function Home() {
         </div>
       </nav>
 
-      <section className="hero shell homeHero">
-        <span className="floatingOrb orbOne" aria-hidden="true" />
-        <span className="floatingOrb orbTwo" aria-hidden="true" />
-
+      <section className="hero shell homeHero homeHeroWithImage">
+        <div className="homeHeroBackdrop" aria-hidden="true" />
         <div className="heroCopy">
           <div className="eyebrow">MedMinds Learning Centre</div>
           <h1>Medical learning, research support and digital solutions.</h1>
           <p className="heroText">Tell us what you need. We can help you understand the available service, pricing and next steps, then connect you with the right MedMinds team member when necessary.</p>
           <div className="heroActions">
-            <button type="button" className="button buttonPrimary" data-medminds-open-chat>Chat with MedMinds</button>
+            <button type="button" className="button buttonPrimary" data-medminds-open-chat>Chat with Mary Kaunda</button>
             <a href={whatsappUrl} target="_blank" rel="noreferrer" className="button buttonSecondary">WhatsApp us</a>
           </div>
           <div className="trustRow">
             <span>Clear service information</span><span>Human support available</span><span>Secure client follow-up</span>
           </div>
         </div>
-
-        <aside className="heroCard homeServiceChooser" aria-label="MedMinds services">
-          <div className="homeServiceChooserHeader"><span className="avatar logoAvatar"><BrandLogo compact /></span><div><strong>How can we help?</strong><small>Choose an area or simply open the chat.</small></div></div>
-          <div className="homeServiceList">
-            <button type="button" data-medminds-open-chat><strong>Pa Gym</strong><span>Medical theory, question practice and OSCE preparation</span></button>
-            <button type="button" data-medminds-open-chat><strong>Research support</strong><span>Proposals, dissertations, data analysis and academic support</span></button>
-            <button type="button" data-medminds-open-chat><strong>Tutorials & courses</strong><span>Learning support for students and health professionals</span></button>
-            <button type="button" data-medminds-open-chat><strong>Digital solutions</strong><span>Software, websites and business automation</span></button>
-          </div>
-          <a href={reviewsUrl} target="_blank" rel="noreferrer" className="homeReviewLink">Not sure yet? Read our Google reviews →</a>
-        </aside>
       </section>
 
       <section id="services" className="featureSection shell homeServices">
@@ -56,7 +43,7 @@ export default function Home() {
 
       <section className="homeTrust shell">
         <div><span className="kicker">A real team behind the chat</span><h2>Start online. Speak to a person whenever the case needs one.</h2></div>
-        <p>The MedMinds assistant handles routine enquiries and helps organise the next step. Research, sales, customer-support, legal and technical matters can be referred to the appropriate team member.</p>
+        <p>Mary Kaunda handles routine enquiries and helps organise the next step. Research, sales, customer-support, legal and technical matters can be referred to the appropriate team member.</p>
       </section>
 
       <section className="homeCta shell">
