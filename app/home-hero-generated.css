@@ -1,4 +1,4 @@
-/* Mary Kaunda hero visual. Keep this isolated from admin/chat styles. */
+/* Mary Kaunda homepage hero. Keep this isolated from admin/chat styles. */
 .homeHeroWithImage {
   display: block !important;
   position: relative;
@@ -9,28 +9,34 @@
   overflow: hidden;
   border: 1px solid #d8e5ea;
   border-radius: 30px;
-  background: #f7fbfc;
+  background: #fff;
   box-shadow: 0 28px 72px rgba(32, 58, 90, .12);
   isolation: isolate;
 }
 
 /*
- * The source artwork is 16:9. It must never be stretched with a tall
- * cover crop: that enlarged the raster and cut off the service cards.
+ * Render the generated artwork as a dedicated media panel rather than
+ * stretching it across the whole card. The source is 16:9: sizing by
+ * height and anchoring to the right keeps Mary and every service card
+ * visible while cropping only the intentionally empty left-side space.
  */
 .homeHeroWithImage .homeHeroBackdrop {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 42%;
   z-index: 0;
-  background-color: #f7fbfc;
-  background-image: url('/medminds-hero-mary-kaunda.webp?v=2');
+  background-color: #eef7f9;
+  background-image: url('/medminds-hero-mary-kaunda.webp?v=3');
   background-repeat: no-repeat;
-  background-size: contain;
-  background-position: center center;
-  filter: saturate(1.02) contrast(1.015);
+  background-size: auto 100%;
+  background-position: right center;
+  filter: saturate(1.02) contrast(1.02);
   transform: translateZ(0);
 }
 
+/* A short transition at the text/image seam only. Do not wash out Mary. */
 .homeHeroWithImage::after {
   content: "";
   position: absolute;
@@ -38,12 +44,12 @@
   z-index: 1;
   pointer-events: none;
   background: linear-gradient(90deg,
-    rgba(255,255,255,.995) 0%,
-    rgba(255,255,255,.975) 24%,
-    rgba(255,255,255,.86) 34%,
-    rgba(255,255,255,.50) 43%,
-    rgba(255,255,255,.12) 52%,
-    rgba(255,255,255,0) 60%);
+    rgba(255,255,255,1) 0%,
+    rgba(255,255,255,1) 35%,
+    rgba(255,255,255,.94) 39%,
+    rgba(255,255,255,.52) 44%,
+    rgba(255,255,255,.10) 49%,
+    rgba(255,255,255,0) 54%);
 }
 
 .homeHeroWithImage .heroCopy {
@@ -52,7 +58,7 @@
   width: min(46%, 520px);
   max-width: none;
   margin: 0;
-  padding: 48px 0 46px 48px;
+  padding: 48px 0 44px 48px;
 }
 
 .homeHeroWithImage .eyebrow {
@@ -69,7 +75,7 @@
 }
 
 .homeHeroWithImage .heroText {
-  max-width: 480px;
+  max-width: 470px;
   margin-top: 20px;
   font-size: 16px;
   line-height: 1.55;
@@ -87,11 +93,13 @@
   font-size: 12px;
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 1280px) {
   .homeHeroWithImage {
-    /* At normal desktop widths this is close to the source aspect ratio,
-       so the image remains near its intended rendered size. */
-    min-height: min(640px, calc((100vw - 80px) * .56));
+    min-height: 620px;
+  }
+
+  .homeHeroWithImage .homeHeroBackdrop {
+    left: 41%;
   }
 }
 
@@ -100,18 +108,28 @@
     min-height: 570px;
   }
 
+  .homeHeroWithImage .homeHeroBackdrop {
+    left: 44%;
+  }
+
+  .homeHeroWithImage::after {
+    background: linear-gradient(90deg,
+      #fff 0%, #fff 38%, rgba(255,255,255,.92) 42%,
+      rgba(255,255,255,.42) 47%, rgba(255,255,255,0) 54%);
+  }
+
   .homeHeroWithImage .heroCopy {
     width: 48%;
     padding: 40px 0 38px 36px;
   }
 
   .homeHeroWithImage h1 {
-    max-width: 450px;
-    font-size: clamp(39px, 4.8vw, 52px);
+    max-width: 440px;
+    font-size: clamp(38px, 4.8vw, 51px);
   }
 
   .homeHeroWithImage .heroText {
-    max-width: 430px;
+    max-width: 420px;
     font-size: 15px;
   }
 }
@@ -157,19 +175,18 @@
     gap: 8px;
   }
 
-  /* Show the complete generated artwork on phones. The old cover crop
-     enlarged Mary and removed the right-side service cards. */
+  /* On phones, preserve the full right edge (including all service cards)
+     and crop only the artwork's large empty left margin. */
   .homeHeroWithImage .homeHeroBackdrop {
     position: relative;
     inset: auto;
     order: 2;
     width: 100%;
-    height: auto;
-    aspect-ratio: 1672 / 941;
+    height: clamp(330px, 82vw, 480px);
     border-top: 1px solid #e0eaee;
-    background-size: contain;
-    background-position: center center;
-    filter: saturate(1.02) contrast(1.015);
+    background-size: auto 100%;
+    background-position: right center;
+    filter: saturate(1.02) contrast(1.02);
   }
 
   .homeHeroWithImage .trustRow {
@@ -196,5 +213,9 @@
   .homeHeroWithImage .heroActions .button {
     width: 100%;
     justify-content: center;
+  }
+
+  .homeHeroWithImage .homeHeroBackdrop {
+    height: clamp(320px, 90vw, 390px);
   }
 }
