@@ -24,9 +24,16 @@ type DocumentPayload = {
   existingDocumentId?: string | null;
 };
 
+type PendingDocument = {
+  key: string;
+  file: File;
+  title: string;
+};
+
 const ACCEPTED = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv";
 const DEFAULT_MAX = 4 * 1024 * 1024;
 const EMPTY_USAGE: ClientDocumentUsage = { count: 0, maxCount: 20, totalBytes: 0, maxTotalBytes: 24 * 1024 * 1024 };
+const ALLOWED_EXTENSIONS = new Set(["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv"]);
 
 function activePanel() {
   return document.querySelector<HTMLElement>(".conversationPanel");
@@ -69,6 +76,14 @@ function friendlyDate(value: string) {
   return new Date(value).toLocaleString([], { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+function fileSignature(file: File) {
+  return `${file.name}::${file.size}::${file.lastModified}`;
+}
+
+function pendingKey(file: File) {
+  return `${fileSignature(file)}::${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`;
+}
+
 export function AdminDocumentsEnhancer() {
   const [phone, setPhone] = useState<string | null>(null);
   const [clientName, setClientName] = useState("Client");
@@ -84,8 +99,7 @@ export function AdminDocumentsEnhancer() {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [titleDraft, setTitleDraft] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<PendingDocument[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [sendTarget, setSendTarget] = useState<ClientDocumentSummary | null>(null);
   const [caption, setCaption] = useState("");
@@ -107,9 +121,10 @@ export function AdminDocumentsEnhancer() {
       setPhone(nextClient.phone);
       setClientName(nextClient.name);
       setOpen(false);
-      setSelectedFile(null);
+      setPendingFiles([]);
       setSendTarget(null);
       setRenameTarget(null);
+      if (inputRef.current) inputRef.current.value = "";
     } else if (nextClient.name !== clientName) {
       setClientName(nextClient.name);
     }
@@ -176,6 +191,7 @@ export function AdminDocumentsEnhancer() {
       setLead(null);
       setDocuments([]);
       setUsage(EMPTY_USAGE);
+      setPendingFiles([]);
     }
   }, [phone, loadDocuments]);
 
@@ -199,6 +215,7 @@ export function AdminDocumentsEnhancer() {
   const canManualSend = Boolean(lead?.aiPaused && (lead.source !== "whatsapp" || replyWindow.open));
   const usagePercent = Math.min(100, Math.round((usage.totalBytes / Math.max(1, usage.maxTotalBytes)) * 100));
   const sortedDocuments = useMemo(() => [...documents].sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [documents]);
+  const availableSlots = Math.max(0, usage.maxCount - usage.count);
 
   function openManager() {
     if (!phone) return;
@@ -208,54 +225,108 @@ export function AdminDocumentsEnhancer() {
     void loadDocuments(phone);
   }
 
-  function chooseFile(file: File) {
-    setError("");
+  function openFilePicker() {
+    if (!inputRef.current || busy || availableSlots <= 0) return;
+    inputRef.current.value = "";
+    inputRef.current.click();
+  }
+
+  function addFiles(files: File[]) {
     setNotice("");
-    if (file.size <= 0) {
-      setError("The selected document is empty.");
-      return;
+    if (!files.length) return;
+
+    const existing = new Set(pendingFiles.map((item) => fileSignature(item.file)));
+    const accepted: PendingDocument[] = [];
+    const problems: string[] = [];
+    const remainingCapacity = Math.max(0, availableSlots - pendingFiles.length);
+
+    for (const file of files) {
+      if (accepted.length >= remainingCapacity) {
+        problems.push(`Only ${availableSlots} additional document${availableSlots === 1 ? "" : "s"} can be assigned to this client.`);
+        break;
+      }
+      if (file.size <= 0) {
+        problems.push(`${file.name}: the file is empty.`);
+        continue;
+      }
+      if (file.size > maxBytes) {
+        problems.push(`${file.name}: exceeds the ${formatSize(maxBytes)} per-file limit.`);
+        continue;
+      }
+      const extension = file.name.toLowerCase().split(".").pop() || "";
+      if (!ALLOWED_EXTENSIONS.has(extension)) {
+        problems.push(`${file.name}: unsupported file type.`);
+        continue;
+      }
+      const signature = fileSignature(file);
+      if (existing.has(signature)) {
+        problems.push(`${file.name}: already selected in this upload queue.`);
+        continue;
+      }
+      existing.add(signature);
+      accepted.push({ key: pendingKey(file), file, title: titleFromFile(file.name) });
     }
-    if (file.size > maxBytes) {
-      setError(`This file is too large. The per-file limit is ${formatSize(maxBytes)}.`);
-      return;
+
+    if (accepted.length) {
+      setPendingFiles((current) => [...current, ...accepted]);
+      setOpen(true);
+      setError(problems.length ? problems.join(" ") : "");
+    } else if (problems.length) {
+      setError(problems.join(" "));
     }
-    const extension = file.name.toLowerCase().split(".").pop() || "";
-    if (!["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv"].includes(extension)) {
-      setError("Use PDF, Word, Excel, PowerPoint, TXT or CSV files.");
-      return;
-    }
-    setSelectedFile(file);
-    setTitleDraft(titleFromFile(file.name));
-    setOpen(true);
+  }
+
+  function updatePendingTitle(key: string, title: string) {
+    setPendingFiles((current) => current.map((item) => item.key === key ? { ...item, title } : item));
+  }
+
+  function removePending(key: string) {
+    setPendingFiles((current) => current.filter((item) => item.key !== key));
   }
 
   async function uploadSelected() {
-    if (!phone || !selectedFile || busy) return;
-    if (!titleDraft.trim()) {
-      setError("Add a clear title before assigning this document.");
+    if (!phone || !pendingFiles.length || busy) return;
+    if (pendingFiles.some((item) => !item.title.trim())) {
+      setError("Add a clear display title for every selected document.");
       return;
     }
+
     setBusy(true);
     setError("");
     setNotice("");
+    const batch = [...pendingFiles];
+    const failed: PendingDocument[] = [];
+    const failures: string[] = [];
+    let assigned = 0;
+
     try {
-      const form = new FormData();
-      form.set("phone", phone);
-      form.set("sender", activeSender(activePanel()));
-      form.set("title", titleDraft.trim());
-      form.set("file", selectedFile, selectedFile.name);
-      const response = await fetch("/api/admin/client-documents", { method: "POST", body: form });
-      const data = await response.json() as DocumentPayload;
-      if (!response.ok) {
-        if (data.documents) applyPayload(data);
-        throw new Error(data.error || "Unable to assign the document.");
+      for (const item of batch) {
+        try {
+          const form = new FormData();
+          form.set("phone", phone);
+          form.set("sender", activeSender(activePanel()));
+          form.set("title", item.title.trim());
+          form.set("file", item.file, item.file.name);
+          const response = await fetch("/api/admin/client-documents", { method: "POST", body: form });
+          const data = await response.json() as DocumentPayload;
+          if (!response.ok) {
+            if (data.documents) applyPayload(data);
+            throw new Error(data.error || "Unable to assign this document.");
+          }
+          applyPayload(data);
+          assigned += 1;
+        } catch (err) {
+          failed.push(item);
+          failures.push(`${item.file.name}: ${err instanceof Error ? err.message : "upload failed"}`);
+        }
       }
-      applyPayload(data);
-      setNotice(`${selectedFile.name} is now assigned only to ${clientName}.`);
-      setSelectedFile(null);
-      setTitleDraft("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to assign the document.");
+
+      setPendingFiles(failed);
+      if (assigned > 0) {
+        setNotice(`${assigned} document${assigned === 1 ? "" : "s"} assigned to ${clientName}. You can choose more files immediately.`);
+      }
+      if (failures.length) setError(failures.join(" "));
+      if (assigned > 0) await loadDocuments(phone, true);
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -332,8 +403,7 @@ export function AdminDocumentsEnhancer() {
   function onDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setDragActive(false);
-    const file = event.dataTransfer.files?.[0];
-    if (file) chooseFile(file);
+    addFiles(Array.from(event.dataTransfer.files || []));
   }
 
   const attachControl = attachHost ? createPortal(
@@ -370,13 +440,19 @@ export function AdminDocumentsEnhancer() {
           <section className="clientDocumentsUploadCard">
             <div className={`clientDocumentsDropZone ${dragActive ? "dragActive" : ""}`} onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragActive(false)} onDrop={onDrop}>
               <div className="clientDocumentsDropIcon" aria-hidden="true">＋</div>
-              <div><strong>Assign a document</strong><p>Drop a file here or choose one from your device.</p><small>PDF, Word, Excel, PowerPoint, TXT or CSV · up to {formatSize(maxBytes)}</small></div>
-              <button type="button" className="clientDocumentsChooseButton" disabled={busy || usage.count >= usage.maxCount} onClick={() => inputRef.current?.click()}>Choose file</button>
+              <div><strong>Assign documents</strong><p>Choose one or several files. You can repeat this as many times as needed.</p><small>PDF, Word, Excel, PowerPoint, TXT or CSV · up to {formatSize(maxBytes)} each</small></div>
+              <button type="button" className="clientDocumentsChooseButton" disabled={busy || availableSlots <= 0} onClick={openFilePicker}>{pendingFiles.length ? "Add more files" : "Choose files"}</button>
             </div>
-            {selectedFile ? <div className="clientDocumentsSelectedFile">
-              <span className={`clientDocumentType type-${fileKind(selectedFile.name).toLowerCase()}`}>{fileKind(selectedFile.name)}</span>
-              <div className="clientDocumentsSelectedMeta"><strong>{selectedFile.name}</strong><span>{formatSize(selectedFile.size)}</span><label>Display title<input value={titleDraft} maxLength={180} onChange={(event) => setTitleDraft(event.target.value)} placeholder="Clear title Mary can identify" /></label></div>
-              <div className="clientDocumentsSelectedActions"><button type="button" className="button buttonPrimary" disabled={busy || !titleDraft.trim()} onClick={() => void uploadSelected()}>{busy ? "Assigning..." : `Assign to ${clientName}`}</button><button type="button" className="button buttonGhost" disabled={busy} onClick={() => { setSelectedFile(null); setTitleDraft(""); if (inputRef.current) inputRef.current.value = ""; }}>Cancel</button></div>
+
+            {pendingFiles.map((item) => <div className="clientDocumentsSelectedFile" key={item.key}>
+              <span className={`clientDocumentType type-${fileKind(item.file.name).toLowerCase()}`}>{fileKind(item.file.name)}</span>
+              <div className="clientDocumentsSelectedMeta"><strong>{item.file.name}</strong><span>{formatSize(item.file.size)}</span><label>Display title<input value={item.title} maxLength={180} onChange={(event) => updatePendingTitle(item.key, event.target.value)} placeholder="Clear title Mary can identify" /></label></div>
+              <div className="clientDocumentsSelectedActions"><button type="button" className="button buttonGhost" disabled={busy} onClick={() => removePending(item.key)}>Remove from queue</button></div>
+            </div>)}
+
+            {pendingFiles.length ? <div className="clientDocumentsSelectedActions" style={{ marginTop: 10 }}>
+              <button type="button" className="button buttonPrimary" disabled={busy || pendingFiles.some((item) => !item.title.trim())} onClick={() => void uploadSelected()}>{busy ? `Assigning ${pendingFiles.length}...` : `Assign ${pendingFiles.length} document${pendingFiles.length === 1 ? "" : "s"} to ${clientName}`}</button>
+              <button type="button" className="button buttonGhost" disabled={busy} onClick={() => { setPendingFiles([]); if (inputRef.current) inputRef.current.value = ""; }}>Clear queue</button>
             </div> : null}
           </section>
 
@@ -407,7 +483,7 @@ export function AdminDocumentsEnhancer() {
   ) : null;
 
   return <>
-    <input ref={inputRef} className="clientDocumentFileInput" type="file" accept={ACCEPTED} onChange={(event) => { const file = event.target.files?.[0]; if (file) chooseFile(file); }} />
+    <input ref={inputRef} className="clientDocumentFileInput" type="file" accept={ACCEPTED} multiple onChange={(event) => { addFiles(Array.from(event.target.files || [])); event.currentTarget.value = ""; }} />
     {attachControl}{toolsControl}{manager}
   </>;
 }
