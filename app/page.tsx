@@ -35,7 +35,7 @@ export default function Home() {
           <Image
             src="/medminds-hero-mary-kaunda-hq.webp"
             alt="Mary Kaunda from MedMinds Learning Centre with research, learning and digital service highlights"
-            width={1022}
+            width={1672}
             height={941}
             priority
             sizes="(max-width: 760px) 100vw, (max-width: 1100px) 52vw, 56vw"
