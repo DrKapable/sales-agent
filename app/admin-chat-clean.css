@@ -1,0 +1,265 @@
+/* Desktop admin chat: keep the conversation as the primary workspace.
+   Mobile chat has its own WhatsApp-style layers and is intentionally untouched. */
+@media (min-width: 901px) {
+  .dashboard .conversationPanel {
+    min-height: 920px;
+    max-height: 920px;
+    overflow: hidden;
+  }
+
+  /* Keep management controls useful, but stop them dominating the chat. */
+  .dashboard .conversationHeader {
+    padding: 14px 18px;
+  }
+
+  .dashboard .controlStrip {
+    position: relative;
+    gap: 8px 10px;
+    padding: 10px 18px;
+  }
+
+  .dashboard .controlStrip label,
+  .dashboard .composerTop label,
+  .dashboard .followUpTools label {
+    font-size: 9px;
+  }
+
+  .dashboard .controlStrip select,
+  .dashboard .composerTop select {
+    min-height: 36px;
+    padding-block: 6px;
+    font-size: 12px;
+  }
+
+  /* Archive/delete actions and Documents share one compact secondary toolbar. */
+  .dashboard .controlStrip > div:not(.clientDocumentsToolsHost) {
+    grid-column: 1 / 4 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    min-width: 0;
+    padding-top: 0 !important;
+  }
+
+  .dashboard .controlStrip > div:not(.clientDocumentsToolsHost) > .button {
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 9px;
+    font-size: 10px;
+  }
+
+  .dashboard .controlStrip > .clientDocumentsToolsHost {
+    grid-column: 4 / 5 !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+
+  .dashboard .clientDocumentsToolsUpload {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: auto;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 9px;
+    white-space: nowrap;
+    font-size: 10px;
+  }
+
+  .dashboard .conversationMeta {
+    gap: 6px;
+    padding: 7px 18px;
+  }
+
+  .dashboard .conversationMeta span {
+    padding: 5px 8px;
+    font-size: 9px;
+  }
+
+  .dashboard .followUpTools {
+    grid-template-columns: minmax(240px,.8fr) auto 1fr;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 8px 18px;
+  }
+
+  .dashboard .followUpTools label {
+    gap: 3px;
+  }
+
+  .dashboard .followUpTools input {
+    min-height: 34px;
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+
+  .dashboard .followUpTools button {
+    padding: 6px 10px;
+    font-size: 9px;
+  }
+
+  .dashboard .followUpTools > span {
+    justify-self: end;
+    font-size: 9px;
+  }
+
+  /* The conversation must receive the remaining height, never the controls. */
+  .dashboard .messageTimeline {
+    flex: 1 1 auto !important;
+    min-height: 360px !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    gap: 12px;
+    padding: 22px 24px 26px;
+    scroll-padding-bottom: 26px;
+  }
+
+  .dashboard .timelineBubble {
+    max-width: min(76%, 700px);
+  }
+
+  /* In AI mode there is nothing the administrator can type, so do not reserve
+     a large disabled composer. The Take over action remains visible above. */
+  .dashboard .replyComposer:has(textarea:disabled) {
+    display: none !important;
+  }
+
+  /* Keep the internal note available as one quiet collapsed row. */
+  .dashboard .internalNoteDetails summary {
+    min-height: 42px;
+    padding: 8px 18px;
+  }
+
+  .dashboard .internalNoteDetails summary strong {
+    font-size: 11px;
+  }
+
+  .dashboard .internalNoteDetails summary small,
+  .dashboard .internalNoteDetails summary b {
+    font-size: 9px;
+  }
+
+  .dashboard .internalNoteDetails summary::after {
+    width: 22px;
+    height: 22px;
+    font-size: 15px;
+  }
+
+  .dashboard .internalNoteDetails .internalNote {
+    padding: 0 18px 11px;
+  }
+
+  .dashboard .internalNoteDetails .internalNote textarea {
+    min-height: 58px;
+  }
+
+  /* Human takeover gets a compact three-part composer:
+     attachment | message | send. The previous two-column grid was the reason
+     the paperclip, textarea and send button wrapped into a broken layout. */
+  .dashboard .replyComposer:has(textarea:not(:disabled)) {
+    padding: 10px 16px 11px;
+    box-shadow: 0 -8px 22px rgba(16,43,40,.07);
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .composerTop {
+    align-items: flex-end;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .quickReplies {
+    padding-top: 6px;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .quickReplies button {
+    padding: 6px 10px;
+    font-size: 9px;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .composerInputRow {
+    display: grid !important;
+    grid-template-columns: auto minmax(0,1fr) 124px !important;
+    align-items: end !important;
+    gap: 8px !important;
+    margin-top: 7px;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) [data-client-documents-attach-host] {
+    align-self: end;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .clientDocumentAttachButton {
+    width: 48px;
+    height: 48px;
+    border: 1px solid #d9e5e2;
+    background: #f7fbfa;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .composerInputRow textarea {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 64px !important;
+    max-height: 118px !important;
+    margin: 0 !important;
+    padding: 11px 13px;
+    resize: vertical;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .sendReplyButton {
+    width: 124px !important;
+    min-width: 124px !important;
+    min-height: 64px !important;
+    height: 64px !important;
+    padding: 0 14px !important;
+    align-self: end !important;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .composerFooter {
+    margin-top: 6px;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .composerFooter small,
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .composerFooter > span {
+    font-size: 9px;
+  }
+}
+
+/* Narrow desktop/tablet landscape keeps the same hierarchy without overflow. */
+@media (min-width: 901px) and (max-width: 1180px) {
+  .dashboard .controlStrip {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+  }
+
+  .dashboard .controlStrip > div:not(.clientDocumentsToolsHost) {
+    grid-column: 1 / 2 !important;
+    flex-wrap: wrap !important;
+  }
+
+  .dashboard .controlStrip > .clientDocumentsToolsHost {
+    grid-column: 2 / 3 !important;
+    justify-content: flex-start;
+  }
+
+  .dashboard .followUpTools {
+    grid-template-columns: minmax(210px,1fr) auto;
+  }
+
+  .dashboard .followUpTools > span {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .composerInputRow {
+    grid-template-columns: auto minmax(0,1fr) 108px !important;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) .sendReplyButton {
+    width: 108px !important;
+    min-width: 108px !important;
+  }
+}
