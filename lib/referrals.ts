@@ -29,7 +29,7 @@ export const referralRecipients: Record<string, ReferralRecipient> = {
   mustafa: {
     name: "Dr. Mustafa Juma Phiri",
     phone: "260977259132",
-    roles: ["Director", "Research specialist", "Research support", "Software development", "Business automation", "Web development", "Payments", "Discount approvals"]
+    roles: ["Director", "Research specialist", "Research support", "Software development", "Business automation", "Web development", "Cybersecurity and technical escalation", "Payments", "Discount approvals"]
   },
   kanyembo: {
     name: "Dr Kanyembo Ng'andwe",
@@ -51,11 +51,6 @@ export const referralRecipients: Record<string, ReferralRecipient> = {
     phone: "260979104893",
     roles: ["Operations team", "Research support expert"]
   },
-  kabosha: {
-    name: "Ms Kabosha Kayonga",
-    phone: "260776037567",
-    roles: ["Computer scientist", "Cybersecurity expert", "Technical support"]
-  },
   zabibu: {
     name: "Dr Zabibu Nandazi",
     phone: "260975352801",
@@ -70,7 +65,6 @@ function namedRecipient(context: string) {
   if (/\bchisha\b|\bchomba\b|\bcounsel chisha\b/.test(text)) return referralRecipients.chisha;
   if (/\bconrad\b|\bmununkha\b/.test(text)) return referralRecipients.conrad;
   if (/\bmadalitso\b|\bmasumbu\b/.test(text)) return referralRecipients.madalitso;
-  if (/\bkabosha\b|\bkayonga\b/.test(text)) return referralRecipients.kabosha;
   if (/\bzabibu\b|\bnandazi\b/.test(text)) return referralRecipients.zabibu;
   return null;
 }
@@ -86,6 +80,7 @@ export function recipientForReferral(type: ReferralType, context = "") {
     case "software":
     case "business_automation":
     case "web_development":
+    case "cybersecurity":
       return referralRecipients.mustafa;
     case "sales":
       return referralRecipients.kanyembo;
@@ -100,8 +95,6 @@ export function recipientForReferral(type: ReferralType, context = "") {
     case "marketing":
     case "administrative":
       return referralRecipients.conrad;
-    case "cybersecurity":
-      return referralRecipients.kabosha;
     default:
       return referralRecipients.kanyembo;
   }
