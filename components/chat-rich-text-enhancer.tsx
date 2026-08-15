@@ -2,8 +2,26 @@
 
 import { useEffect } from "react";
 
+function formatDocumentBubble(element: HTMLParagraphElement, raw: string) {
+  if (!raw.startsWith("[DOCUMENT] ")) return false;
+  const body = raw.slice("[DOCUMENT] ".length);
+  const [title, ...captionLines] = body.split("\n");
+  const titleNode = document.createElement("span");
+  titleNode.className = "documentMessageTitle";
+  titleNode.textContent = `📄 ${title || "Document"}`;
+  const fragment = document.createDocumentFragment();
+  fragment.appendChild(titleNode);
+  if (captionLines.length) {
+    fragment.appendChild(document.createElement("br"));
+    fragment.appendChild(document.createTextNode(captionLines.join("\n")));
+  }
+  element.replaceChildren(fragment);
+  return true;
+}
+
 function formatBubble(element: HTMLParagraphElement) {
   const raw = element.textContent || "";
+  if (formatDocumentBubble(element, raw)) return;
   if (!raw.includes("*")) return;
   const normalized = raw.replace(/\*\*([^*\n]+)\*\*/g, "*$1*");
   const parts = normalized.split(/(\*[^*\n]+\*)/g);
