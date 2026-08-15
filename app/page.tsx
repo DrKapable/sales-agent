@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import Script from "next/script";
 import { BrandLogo } from "@/components/brand-logo";
@@ -17,7 +18,6 @@ export default function Home() {
       </nav>
 
       <section className="hero shell homeHero homeHeroWithImage">
-        <div className="homeHeroBackdrop" aria-hidden="true" />
         <div className="heroCopy">
           <div className="eyebrow">MedMinds Learning Centre</div>
           <h1>Medical learning, research support and digital solutions.</h1>
@@ -29,6 +29,17 @@ export default function Home() {
           <div className="trustRow">
             <span>Clear service information</span><span>Human support available</span><span>Secure client follow-up</span>
           </div>
+        </div>
+
+        <div className="heroVisual" aria-label="Mary Kaunda, MedMinds sales assistant">
+          <Image
+            src="/medminds-hero-mary-kaunda-hq.webp"
+            alt="Mary Kaunda from MedMinds Learning Centre with research, learning and digital service highlights"
+            width={1672}
+            height={941}
+            priority
+            sizes="(max-width: 760px) 100vw, (max-width: 1100px) 52vw, 56vw"
+          />
         </div>
       </section>
 

@@ -4,7 +4,6 @@ export const staffNames = [
   "Counsel Chisha Chomba",
   "Mr Conrad Mununkha Phiri",
   "Mr. Madalitso Masumbu",
-  "Ms Kabosha Kayonga",
   "Dr Zabibu Nandazi"
 ] as const;
 
@@ -20,6 +19,7 @@ export const teamDirectory: ReadonlyArray<{ name: StaffName; roles: readonly str
       "Software development",
       "Business automation",
       "Web development",
+      "Cybersecurity and technical escalation",
       "Payments and discount approvals"
     ]
   },
@@ -38,10 +38,6 @@ export const teamDirectory: ReadonlyArray<{ name: StaffName; roles: readonly str
   {
     name: "Mr. Madalitso Masumbu",
     roles: ["Operations team", "Research support expert"]
-  },
-  {
-    name: "Ms Kabosha Kayonga",
-    roles: ["Computer scientist", "Cybersecurity expert", "Technical support"]
   },
   {
     name: "Dr Zabibu Nandazi",
