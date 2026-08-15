@@ -48,6 +48,7 @@ export function AdminDocumentsEnhancer() {
   const [maxBytes, setMaxBytes] = useState(DEFAULT_MAX);
   const [drawerHost, setDrawerHost] = useState<HTMLElement | null>(null);
   const [attachHost, setAttachHost] = useState<HTMLElement | null>(null);
+  const [toolsHost, setToolsHost] = useState<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -60,6 +61,7 @@ export function AdminDocumentsEnhancer() {
       setPhone(null);
       setDrawerHost(null);
       setAttachHost(null);
+      setToolsHost(null);
       return;
     }
     const nextPhone = activePhone(panel);
@@ -82,7 +84,17 @@ export function AdminDocumentsEnhancer() {
       composerRow.prepend(attach);
     }
     if (attach && attach !== attachHost) setAttachHost(attach);
-  }, [attachHost, drawerHost, phone]);
+
+    const controlStrip = panel.querySelector<HTMLElement>(".controlStrip");
+    let tools = controlStrip?.querySelector<HTMLElement>("[data-client-documents-tools-host]") || null;
+    if (controlStrip && !tools) {
+      tools = document.createElement("div");
+      tools.dataset.clientDocumentsToolsHost = "true";
+      tools.className = "clientDocumentsToolsHost";
+      controlStrip.appendChild(tools);
+    }
+    if (tools && tools !== toolsHost) setToolsHost(tools);
+  }, [attachHost, drawerHost, phone, toolsHost]);
 
   useEffect(() => {
     syncHosts();
@@ -193,12 +205,17 @@ export function AdminDocumentsEnhancer() {
     }
   }
 
-  const attachControl = attachHost ? createPortal(
+  const fileInput = attachHost ? createPortal(
     <>
       <button type="button" className="clientDocumentAttachButton" aria-label="Upload and assign a document to this client" title="Upload document" disabled={!phone || busy} onClick={() => inputRef.current?.click()}>📎</button>
       <input ref={inputRef} className="clientDocumentFileInput" type="file" accept={ACCEPTED} onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); }} />
     </>,
     attachHost
+  ) : null;
+
+  const toolsUpload = toolsHost ? createPortal(
+    <button type="button" className="clientDocumentsToolsUpload" disabled={!phone || busy} onClick={() => inputRef.current?.click()}>📎 Upload document</button>,
+    toolsHost
   ) : null;
 
   const drawer = drawerHost && phone ? createPortal(
@@ -207,7 +224,7 @@ export function AdminDocumentsEnhancer() {
       <div className="clientDocumentsBody">
         {notice && <div className="clientDocumentNotice">{notice}</div>}
         {error && <div className="clientDocumentError">{error}</div>}
-        {!documents.length && <p className="clientDocumentsEmpty">No documents assigned yet. Use the paperclip beside the reply box to upload one.</p>}
+        {!documents.length && <p className="clientDocumentsEmpty">No documents assigned yet. Use Upload document or the paperclip beside the reply box.</p>}
         {documents.map((document) => <article className="clientDocumentItem" key={document.id}>
           <div><strong>{document.title}</strong><span>{document.fileName} · {formatSize(document.sizeBytes)}</span><small>{document.lastSentAt ? `Last sent ${new Date(document.lastSentAt).toLocaleString()}` : `Assigned${document.uploadedBy ? ` by ${document.uploadedBy}` : ""}`}</small></div>
           <div className="clientDocumentActions"><button type="button" disabled={busy || !lead?.aiPaused} title={!lead?.aiPaused ? "Take over the chat to send manually. Mary can send it while AI mode is active." : "Send this document now"} onClick={() => void sendDocument(document.id)}>Send now</button><button type="button" className="danger" disabled={busy} onClick={() => void removeDocument(document.id)}>Remove</button></div>
@@ -218,5 +235,5 @@ export function AdminDocumentsEnhancer() {
     drawerHost
   ) : null;
 
-  return <>{attachControl}{drawer}</>;
+  return <>{fileInput}{toolsUpload}{drawer}</>;
 }
