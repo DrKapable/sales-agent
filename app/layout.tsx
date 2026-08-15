@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
+import { AdminDocumentsEnhancer } from "@/components/admin-documents-enhancer";
 import { AgentIdentityEnhancer } from "@/components/agent-identity-enhancer";
 import { ChatDeliveryTicksEnhancer } from "@/components/chat-delivery-ticks-enhancer";
 import { ChatRichTextEnhancer } from "@/components/chat-rich-text-enhancer";
@@ -12,6 +13,7 @@ import "./admin-mobile-v5.css";
 import "./admin-mobile-v6.css";
 import "./admin-mobile-v7.css";
 import "./admin-mobile-v8.css";
+import "./admin-documents.css";
 import "./brand-v2.css";
 import "./brand-v2-fix.css";
 import "./home-hero-generated.css";
@@ -37,5 +39,5 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
-  return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><MobileAdminEnhancer /><ClientRecordManagementEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
+  return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><MobileAdminEnhancer /><ClientRecordManagementEnhancer /><AdminDocumentsEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
 }

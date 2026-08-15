@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { listClientDocuments } from "@/lib/client-documents";
 import { humanMessageContent, replyWindow } from "@/lib/conversation";
 import { decorateMessagesForAdmin, recordOutgoingMessageAccepted } from "@/lib/message-delivery";
 import { staffNames } from "@/lib/team-directory";
@@ -14,7 +15,8 @@ const sendSchema = z.object({
 async function leadAndMessages(id: string) {
   const lead = (await listLeads()).find((item) => item.id === id);
   if (!lead) return null;
-  return { lead, messages: await getConversation(lead.phone, 100) };
+  const [messages, documents] = await Promise.all([getConversation(lead.phone, 100), listClientDocuments(lead.id)]);
+  return { lead, messages, documents };
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -53,5 +55,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const lead = await updateLead(state.lead.phone, { aiPaused: true, assignedTo: parsed.data.sender, status: "HUMAN ASSISTANCE REQUIRED" });
   const storedMessages = await getConversation(state.lead.phone, 100);
   const messages = await decorateMessagesForAdmin(storedMessages);
-  return NextResponse.json({ lead, messages, replyWindow: replyWindow(storedMessages), delivery });
+  return NextResponse.json({ lead, messages, documents: await listClientDocuments(state.lead.id), replyWindow: replyWindow(storedMessages), delivery });
 }
