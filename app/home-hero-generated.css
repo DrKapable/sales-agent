@@ -98,19 +98,26 @@
     width: 100%;
     max-width: none !important;
     margin: 0 !important;
-    padding: 30px 22px 24px;
+    padding: 24px 18px 18px;
     background: linear-gradient(180deg, #fff 0%, #f8fcfd 100%);
   }
 
   .homeHeroWithImage h1 {
     max-width: none;
-    font-size: clamp(38px, 11vw, 54px);
-    line-height: 1;
+    margin-top: 14px;
+    font-size: clamp(36px, 10.2vw, 47px);
+    line-height: 1.01;
   }
 
   .homeHeroWithImage .heroText {
     max-width: none;
-    font-size: 16px;
+    font-size: 15px;
+    line-height: 1.52;
+  }
+
+  .homeHeroWithImage .heroActions {
+    margin-top: 19px;
+    gap: 8px;
   }
 
   .homeHeroWithImage .homeHeroBackdrop {
@@ -118,28 +125,30 @@
     inset: auto;
     order: 2;
     width: 100%;
-    height: clamp(300px, 69vw, 430px);
+    height: clamp(292px, 67vw, 410px);
     border-top: 1px solid #e0eaee;
     background-size: cover;
-    background-position: 72% center;
+    background-position: 70% center;
   }
 
   .homeHeroWithImage .trustRow {
     max-width: none;
+    margin-top: 18px;
+    gap: 7px 12px;
+    font-size: 12px;
   }
 }
 
-@media (max-width: 430px) {
-  .homeHeroWithImage .heroCopy {
-    padding: 26px 18px 21px;
+@media (max-width: 360px) {
+  .homeHeroWithImage .heroActions {
+    flex-direction: column;
+  }
+
+  .homeHeroWithImage .heroActions .button {
+    width: 100%;
   }
 
   .homeHeroWithImage .homeHeroBackdrop {
-    height: 320px;
-    background-position: 70% center;
-  }
-
-  .homeHeroWithImage .heroActions {
-    flex-direction: column;
+    height: 285px;
   }
 }
