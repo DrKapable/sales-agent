@@ -21,7 +21,7 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
   await addMessage(phone, "assistant", reply).catch((error) => {
     console.error("WhatsApp fallback could not be saved", { phoneSuffix: phone.slice(-4), error });
   });
-  return { reply, referralNotification: null };
+  return { reply, referralNotification: null, documentIds: [] };
 }
 
 export async function sendWhatsAppTextWithRetry(phone: string, body: string, phoneNumberId?: string | null) {
