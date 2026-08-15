@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import {
+  ClientDocumentStoreError,
   deleteClientDocument,
+  getClientDocumentUsage,
   listClientDocuments,
   MAX_CLIENT_DOCUMENT_BYTES,
   resolveClientDocumentMime,
   sanitizeDocumentFilename,
-  saveClientDocument
+  saveClientDocument,
+  validateClientDocumentBytes
 } from "@/lib/client-documents";
-import { listLeads } from "@/lib/store";
+import { replyWindow } from "@/lib/conversation";
+import { getConversation, listLeads } from "@/lib/store";
 import { staffNames } from "@/lib/team-directory";
 
 async function leadByPhone(value: string | null) {
@@ -17,10 +21,26 @@ async function leadByPhone(value: string | null) {
   return (await listLeads()).find((item) => item.phone.replace(/\D/g, "") === digits) || null;
 }
 
+async function payloadForLead(lead: Awaited<ReturnType<typeof leadByPhone>>) {
+  if (!lead) return null;
+  const [documents, usage, messages] = await Promise.all([
+    listClientDocuments(lead.id),
+    getClientDocumentUsage(lead.id),
+    getConversation(lead.phone, 100)
+  ]);
+  return {
+    lead,
+    documents,
+    usage,
+    replyWindow: replyWindow(messages),
+    maxBytes: MAX_CLIENT_DOCUMENT_BYTES
+  };
+}
+
 export async function GET(request: Request) {
   const lead = await leadByPhone(new URL(request.url).searchParams.get("phone"));
   if (!lead) return NextResponse.json({ error: "Client not found." }, { status: 404 });
-  return NextResponse.json({ lead, documents: await listClientDocuments(lead.id), maxBytes: MAX_CLIENT_DOCUMENT_BYTES });
+  return NextResponse.json(await payloadForLead(lead));
 }
 
 export async function POST(request: Request) {
@@ -38,19 +58,33 @@ export async function POST(request: Request) {
   const fileName = sanitizeDocumentFilename(value.name);
   const mimeType = resolveClientDocumentMime(fileName, value.type);
   if (!mimeType) return NextResponse.json({ error: "Unsupported document type. Use PDF, Word, Excel, PowerPoint, TXT or CSV." }, { status: 415 });
+  const bytes = new Uint8Array(await value.arrayBuffer());
+  const validation = validateClientDocumentBytes(fileName, mimeType, bytes);
+  if (!validation.valid) return NextResponse.json({ error: validation.reason }, { status: 415 });
+
   const senderValue = String(form.get("sender") || "").trim();
   const uploadedBy = staffNames.some((name) => name === senderValue) ? senderValue : null;
-  const title = String(form.get("title") || "").trim().slice(0, 180) || fileName;
-  const document = await saveClientDocument({
-    leadId: lead.id,
-    phone: lead.phone,
-    fileName,
-    title,
-    mimeType,
-    bytes: new Uint8Array(await value.arrayBuffer()),
-    uploadedBy
-  });
-  return NextResponse.json({ lead, document, documents: await listClientDocuments(lead.id), assigned: true, maxBytes: MAX_CLIENT_DOCUMENT_BYTES });
+  const title = String(form.get("title") || "").trim().replace(/\s+/g, " ").slice(0, 180) || fileName;
+
+  try {
+    const document = await saveClientDocument({
+      leadId: lead.id,
+      phone: lead.phone,
+      fileName,
+      title,
+      mimeType,
+      bytes,
+      uploadedBy
+    });
+    return NextResponse.json({ ...(await payloadForLead(lead)), document, assigned: true });
+  } catch (error) {
+    if (error instanceof ClientDocumentStoreError) {
+      const status = error.code === "duplicate" ? 409 : 413;
+      return NextResponse.json({ error: error.message, code: error.code, existingDocumentId: error.existingDocumentId, ...(await payloadForLead(lead)) }, { status });
+    }
+    console.error("Client document upload failed", { leadId: lead.id, fileName, error });
+    return NextResponse.json({ error: "The document could not be assigned. Please try again." }, { status: 500 });
+  }
 }
 
 export async function DELETE(request: Request) {
@@ -61,5 +95,5 @@ export async function DELETE(request: Request) {
   if (!documentId) return NextResponse.json({ error: "Document ID is required." }, { status: 400 });
   const deleted = await deleteClientDocument(documentId, lead.id);
   if (!deleted) return NextResponse.json({ error: "Assigned document not found." }, { status: 404 });
-  return NextResponse.json({ deleted: true, documents: await listClientDocuments(lead.id) });
+  return NextResponse.json({ deleted: true, ...(await payloadForLead(lead)) });
 }
