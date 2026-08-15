@@ -12,6 +12,12 @@ describe("mobile document upload compatibility", () => {
     expect(resolveClientDocumentMime("results.xlsx", "application/octet-stream")).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   });
 
+  it("can resolve CSV files from their extension when a phone does not provide text/csv", () => {
+    expect(resolveClientDocumentMime("clients.csv", null)).toBe("text/csv");
+    const bytes = new TextEncoder().encode("name,phone\nMary,260977000000\n");
+    expect(validateClientDocumentBytes("clients.csv", "text/csv", bytes).valid).toBe(true);
+  });
+
   it("still rejects a fake PDF after extension fallback because byte validation remains authoritative", () => {
     const mime = resolveClientDocumentMime("fake.pdf", null);
     const fakeBytes = new Uint8Array([0x4d, 0x5a, 0x90, 0x00]);
