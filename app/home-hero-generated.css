@@ -1,73 +1,28 @@
 /* Mary Kaunda homepage hero. Keep this isolated from admin/chat styles. */
 .homeHeroWithImage {
-  display: block !important;
-  position: relative;
-  min-height: 610px;
+  display: grid !important;
+  grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr);
+  align-items: center;
+  gap: 0;
   margin-top: 18px;
   margin-bottom: 72px;
   padding: 0 !important;
   overflow: hidden;
   border: 1px solid #d8e5ea;
   border-radius: 30px;
-  background: #fff;
+  background: linear-gradient(135deg, #ffffff 0%, #fbfdfe 48%, #eef8f9 100%);
   box-shadow: 0 28px 72px rgba(32, 58, 90, .12);
-  isolation: isolate;
-}
-
-/*
- * Render the generated artwork as a dedicated media panel rather than
- * stretching it across the whole card. The source is 16:9: sizing by
- * height and anchoring to the right keeps Mary and every service card
- * visible while cropping only the intentionally empty left-side space.
- */
-.homeHeroWithImage .homeHeroBackdrop {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 42%;
-  z-index: 0;
-  background-color: #eef7f9;
-  background-image: url('/medminds-hero-mary-kaunda.webp?v=3');
-  background-repeat: no-repeat;
-  background-size: auto 100%;
-  background-position: right center;
-  filter: saturate(1.02) contrast(1.02);
-  transform: translateZ(0);
-}
-
-/* A short transition at the text/image seam only. Do not wash out Mary. */
-.homeHeroWithImage::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: linear-gradient(90deg,
-    rgba(255,255,255,1) 0%,
-    rgba(255,255,255,1) 35%,
-    rgba(255,255,255,.94) 39%,
-    rgba(255,255,255,.52) 44%,
-    rgba(255,255,255,.10) 49%,
-    rgba(255,255,255,0) 54%);
 }
 
 .homeHeroWithImage .heroCopy {
-  position: relative !important;
-  z-index: 2 !important;
-  width: min(46%, 520px);
-  max-width: none;
+  width: 100%;
+  max-width: 560px;
   margin: 0;
-  padding: 48px 0 44px 48px;
-}
-
-.homeHeroWithImage .eyebrow {
-  position: relative;
-  z-index: 3;
+  padding: 52px 34px 50px 48px;
 }
 
 .homeHeroWithImage h1 {
-  max-width: 500px;
+  max-width: 520px;
   margin-top: 16px;
   font-size: clamp(42px, 4.25vw, 58px);
   line-height: 1.01;
@@ -75,7 +30,7 @@
 }
 
 .homeHeroWithImage .heroText {
-  max-width: 470px;
+  max-width: 490px;
   margin-top: 20px;
   font-size: 16px;
   line-height: 1.55;
@@ -87,50 +42,57 @@
 }
 
 .homeHeroWithImage .trustRow {
-  max-width: 470px;
+  max-width: 490px;
   margin-top: 20px;
   gap: 8px 16px;
   font-size: 12px;
 }
 
-@media (min-width: 1280px) {
-  .homeHeroWithImage {
-    min-height: 620px;
-  }
+/*
+ * This is a normal responsive image element, not an absolutely positioned
+ * background panel. Its intrinsic dimensions control the aspect ratio, so
+ * the artwork remains sharp and none of the service cards are clipped.
+ */
+.homeHeroWithImage .heroVisual {
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 18px 18px 0;
+}
 
-  .homeHeroWithImage .homeHeroBackdrop {
-    left: 41%;
-  }
+.homeHeroWithImage .heroVisual img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 620px;
+  object-fit: contain;
+  border-radius: 22px;
+  filter: saturate(1.02) contrast(1.015);
 }
 
 @media (max-width: 1080px) and (min-width: 761px) {
   .homeHeroWithImage {
-    min-height: 570px;
-  }
-
-  .homeHeroWithImage .homeHeroBackdrop {
-    left: 44%;
-  }
-
-  .homeHeroWithImage::after {
-    background: linear-gradient(90deg,
-      #fff 0%, #fff 38%, rgba(255,255,255,.92) 42%,
-      rgba(255,255,255,.42) 47%, rgba(255,255,255,0) 54%);
+    grid-template-columns: minmax(0, .96fr) minmax(0, 1.04fr);
   }
 
   .homeHeroWithImage .heroCopy {
-    width: 48%;
-    padding: 40px 0 38px 36px;
+    padding: 42px 24px 40px 36px;
   }
 
   .homeHeroWithImage h1 {
-    max-width: 440px;
+    max-width: 450px;
     font-size: clamp(38px, 4.8vw, 51px);
   }
 
   .homeHeroWithImage .heroText {
-    max-width: 420px;
+    max-width: 430px;
     font-size: 15px;
+  }
+
+  .homeHeroWithImage .heroVisual {
+    padding: 14px 14px 14px 0;
   }
 }
 
@@ -138,21 +100,16 @@
   .homeHeroWithImage {
     display: flex !important;
     flex-direction: column;
-    min-height: 0 !important;
     margin-top: 8px;
     margin-bottom: 50px;
     border-radius: 24px;
   }
 
-  .homeHeroWithImage::after {
-    display: none;
-  }
-
   .homeHeroWithImage .heroCopy {
     order: 1;
     width: 100%;
-    max-width: none !important;
-    margin: 0 !important;
+    max-width: none;
+    margin: 0;
     padding: 24px 18px 20px;
     background: linear-gradient(180deg, #fff 0%, #f8fcfd 100%);
   }
@@ -175,25 +132,25 @@
     gap: 8px;
   }
 
-  /* On phones, preserve the full right edge (including all service cards)
-     and crop only the artwork's large empty left margin. */
-  .homeHeroWithImage .homeHeroBackdrop {
-    position: relative;
-    inset: auto;
-    order: 2;
-    width: 100%;
-    height: clamp(330px, 82vw, 480px);
-    border-top: 1px solid #e0eaee;
-    background-size: auto 100%;
-    background-position: right center;
-    filter: saturate(1.02) contrast(1.02);
-  }
-
   .homeHeroWithImage .trustRow {
     max-width: none;
     margin-top: 17px;
     gap: 7px 12px;
     font-size: 12px;
+  }
+
+  .homeHeroWithImage .heroVisual {
+    order: 2;
+    width: 100%;
+    padding: 0;
+    border-top: 1px solid #e0eaee;
+    background: #edf7f8;
+  }
+
+  .homeHeroWithImage .heroVisual img {
+    width: 100%;
+    max-height: none;
+    border-radius: 0;
   }
 }
 
@@ -213,9 +170,5 @@
   .homeHeroWithImage .heroActions .button {
     width: 100%;
     justify-content: center;
-  }
-
-  .homeHeroWithImage .homeHeroBackdrop {
-    height: clamp(320px, 90vw, 390px);
   }
 }
