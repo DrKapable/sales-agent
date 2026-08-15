@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { clientDocumentChatContent, getClientDocumentForLead, listClientDocuments, markClientDocumentSent } from "@/lib/client-documents";
+import { clientDocumentChatContent, getClientDocumentForLead, getClientDocumentUsage, listClientDocuments, markClientDocumentSent } from "@/lib/client-documents";
 import { sendClientWhatsAppDocument } from "@/lib/client-document-whatsapp";
 import { humanMessageContent, replyWindow } from "@/lib/conversation";
 import { decorateMessagesForAdmin, recordOutgoingMessageAccepted } from "@/lib/message-delivery";
@@ -46,19 +46,21 @@ export async function POST(request: Request) {
       delivery = { status: "accepted", messageId: sent.messageId };
     } catch (error) {
       console.error("Admin WhatsApp document resend failed", { leadId: lead.id, documentId: document.id, error });
-      return NextResponse.json({ error: "Meta did not accept this WhatsApp document. Check the production log for the specific reason." }, { status: 502 });
+      return NextResponse.json({ error: "Meta did not accept this WhatsApp document. Nothing was marked as sent. Check the production log for the specific reason." }, { status: 502 });
     }
   }
 
   await addMessage(lead.phone, "assistant", humanMessageContent(parsed.data.sender, clientDocumentChatContent({ title: document.title, fileName: document.fileName, caption: parsed.data.caption })), externalId);
   if (externalId) await recordOutgoingMessageAccepted({ messageId: externalId, phone: lead.phone }).catch(() => undefined);
-  await markClientDocumentSent(document.id, lead.id);
+  await markClientDocumentSent(document.id, lead.id, parsed.data.sender);
   const updatedLead = await updateLead(lead.phone, { aiPaused: true, assignedTo: parsed.data.sender, status: "HUMAN ASSISTANCE REQUIRED" });
   const messages = await getConversation(lead.phone, 100);
+  const [documents, usage] = await Promise.all([listClientDocuments(lead.id), getClientDocumentUsage(lead.id)]);
   return NextResponse.json({
     lead: updatedLead,
     messages: await decorateMessagesForAdmin(messages),
-    documents: await listClientDocuments(lead.id),
+    documents,
+    usage,
     replyWindow: replyWindow(messages),
     delivery
   });
