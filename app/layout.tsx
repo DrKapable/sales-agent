@@ -14,6 +14,7 @@ import "./admin-mobile-v7.css";
 import "./admin-mobile-v8.css";
 import "./brand-v2.css";
 import "./brand-v2-fix.css";
+import "./home-hero-generated.css";
 import "./public-chat-v2.css";
 
 export const metadata: Metadata = {
