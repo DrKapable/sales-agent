@@ -21,26 +21,22 @@ async function leadByPhone(value: string | null) {
   return (await listLeads()).find((item) => item.phone.replace(/\D/g, "") === digits) || null;
 }
 
-async function payloadForLead(lead: Awaited<ReturnType<typeof leadByPhone>>) {
+async function payloadForLead(lead: Awaited<ReturnType<typeof leadByPhone>>, includeReplyWindow = true) {
   if (!lead) return null;
-  const [documents, usage, messages] = await Promise.all([
+  const [documents, usage] = await Promise.all([
     listClientDocuments(lead.id),
-    getClientDocumentUsage(lead.id),
-    getConversation(lead.phone, 100)
+    getClientDocumentUsage(lead.id)
   ]);
-  return {
-    lead,
-    documents,
-    usage,
-    replyWindow: replyWindow(messages),
-    maxBytes: MAX_CLIENT_DOCUMENT_BYTES
-  };
+  const base = { lead, documents, usage, maxBytes: MAX_CLIENT_DOCUMENT_BYTES };
+  if (!includeReplyWindow) return base;
+  const messages = await getConversation(lead.phone, 100);
+  return { ...base, replyWindow: replyWindow(messages) };
 }
 
 export async function GET(request: Request) {
   const lead = await leadByPhone(new URL(request.url).searchParams.get("phone"));
   if (!lead) return NextResponse.json({ error: "Client not found." }, { status: 404 });
-  return NextResponse.json(await payloadForLead(lead));
+  return NextResponse.json(await payloadForLead(lead, true));
 }
 
 export async function POST(request: Request) {
@@ -56,7 +52,9 @@ export async function POST(request: Request) {
   }
 
   const fileName = sanitizeDocumentFilename(value.name);
-  const mimeType = resolveClientDocumentMime(fileName, value.type);
+  // Android/Samsung file pickers sometimes report a generic or incorrect MIME type.
+  // Extension + byte-signature validation below remains authoritative.
+  const mimeType = resolveClientDocumentMime(fileName, value.type) || resolveClientDocumentMime(fileName, null);
   if (!mimeType) return NextResponse.json({ error: "Unsupported document type. Use PDF, Word, Excel, PowerPoint, TXT or CSV." }, { status: 415 });
   const bytes = new Uint8Array(await value.arrayBuffer());
   const validation = validateClientDocumentBytes(fileName, mimeType, bytes);
@@ -76,11 +74,11 @@ export async function POST(request: Request) {
       bytes,
       uploadedBy
     });
-    return NextResponse.json({ ...(await payloadForLead(lead)), document, assigned: true });
+    return NextResponse.json({ ...(await payloadForLead(lead, false)), document, assigned: true });
   } catch (error) {
     if (error instanceof ClientDocumentStoreError) {
       const status = error.code === "duplicate" ? 409 : 413;
-      return NextResponse.json({ error: error.message, code: error.code, existingDocumentId: error.existingDocumentId, ...(await payloadForLead(lead)) }, { status });
+      return NextResponse.json({ error: error.message, code: error.code, existingDocumentId: error.existingDocumentId, ...(await payloadForLead(lead, false)) }, { status });
     }
     console.error("Client document upload failed", { leadId: lead.id, fileName, error });
     return NextResponse.json({ error: "The document could not be assigned. Please try again." }, { status: 500 });
@@ -95,5 +93,5 @@ export async function DELETE(request: Request) {
   if (!documentId) return NextResponse.json({ error: "Document ID is required." }, { status: 400 });
   const deleted = await deleteClientDocument(documentId, lead.id);
   if (!deleted) return NextResponse.json({ error: "Assigned document not found." }, { status: 404 });
-  return NextResponse.json({ deleted: true, ...(await payloadForLead(lead)) });
+  return NextResponse.json({ deleted: true, ...(await payloadForLead(lead, false)) });
 }
