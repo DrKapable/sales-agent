@@ -1,155 +1,177 @@
-/* Client-assigned documents: compact controls that preserve the WhatsApp-style composer. */
-[data-client-documents-attach-host] {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
+/* Client document manager: isolated attachment workflow for the admin inbox. */
+.clientDocumentFileInput{position:fixed!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;left:-9999px!important}
+body.clientDocumentsModalOpen{overflow:hidden!important}
+
+[data-client-documents-attach-host]{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center}
+.clientDocumentAttachButton{position:relative;display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;color:#315266;font-size:20px;line-height:1;cursor:pointer;transition:background .16s ease,transform .16s ease}
+.clientDocumentAttachButton:hover{background:#e7f4f1;transform:translateY(-1px)}
+.clientDocumentAttachButton:disabled{opacity:.42;cursor:not-allowed;transform:none}
+.clientDocumentAttachButton>b{position:absolute;top:-3px;right:-2px;display:grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border:2px solid #fff;border-radius:999px;background:#1d9c8e;color:#fff;font-size:9px;font-weight:900;line-height:1}
+
+.clientDocumentsToolsHost{grid-column:1/-1!important}
+.clientDocumentsToolsUpload{display:none;width:100%;min-height:38px;padding:7px 10px;border:1px solid #c8dfdb;border-radius:11px;background:#eff8f6;color:#1f6f67;font-size:11px;font-weight:800;cursor:pointer}
+.clientDocumentsToolsUpload:disabled{opacity:.45;cursor:not-allowed}
+
+.clientDocumentsModal{position:fixed;inset:0;z-index:2147483200;display:grid;place-items:center;padding:24px;background:rgba(10,32,44,.58);backdrop-filter:blur(7px)}
+.clientDocumentsDialog{position:relative;display:flex;flex-direction:column;width:min(980px,calc(100vw - 40px));max-height:min(88vh,860px);overflow:hidden;border:1px solid rgba(255,255,255,.64);border-radius:24px;background:#f7faf9;box-shadow:0 32px 90px rgba(12,35,44,.28)}
+.clientDocumentsHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:22px 24px 16px;border-bottom:1px solid #e2ebe8;background:linear-gradient(180deg,#fff 0%,#f8fbfa 100%)}
+.clientDocumentsHeader>div{min-width:0}
+.clientDocumentsEyebrow{display:block;margin-bottom:5px;color:#1d8a7f;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+.clientDocumentsHeader h2{margin:0;color:#183e48;font-size:22px;line-height:1.2}
+.clientDocumentsHeader p{margin:6px 0 0;color:#6b8085;font-size:12px;line-height:1.45}
+.clientDocumentsClose{flex:0 0 auto;display:grid;place-items:center;width:38px;height:38px;padding:0;border:1px solid #dbe7e4;border-radius:50%;background:#fff;color:#557076;font-size:25px;font-weight:400;cursor:pointer}
+.clientDocumentsClose:hover{background:#edf6f4;color:#225f59}
+.clientDocumentsClose:disabled{opacity:.45;cursor:not-allowed}
+
+.clientDocumentsStatusBar{display:grid;grid-template-columns:130px 170px 1fr;gap:10px;padding:12px 24px 8px;background:#fff}
+.clientDocumentsStatusBar>div{display:flex;align-items:baseline;gap:6px;min-width:0;padding:8px 10px;border:1px solid #e0e9e7;border-radius:12px;background:#fbfdfc}
+.clientDocumentsStatusBar strong{color:#1e4650;font-size:13px}
+.clientDocumentsStatusBar span{color:#819397;font-size:10px}
+.clientDocumentsMode{justify-content:flex-start!important;align-items:center!important}
+.clientDocumentsMode strong{display:inline-flex;align-items:center;gap:6px}
+.clientDocumentsMode strong::before{content:"";width:7px;height:7px;border-radius:50%;background:#91a6a2}
+.clientDocumentsMode.ready strong::before{background:#24a38e;box-shadow:0 0 0 3px rgba(36,163,142,.12)}
+.clientDocumentsMode.guarded strong::before{background:#d5a037;box-shadow:0 0 0 3px rgba(213,160,55,.12)}
+.clientDocumentsUsageTrack{height:4px;margin:0 24px 2px;border-radius:999px;background:#eaf0ee;overflow:hidden}
+.clientDocumentsUsageTrack>span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#59b8ab,#238e82);transition:width .25s ease}
+
+.clientDocumentNotice,.clientDocumentError{margin:10px 24px 0;padding:9px 12px;border-radius:11px;font-size:11px;font-weight:750;line-height:1.4}
+.clientDocumentNotice{border:1px solid #c9e9df;background:#edf9f5;color:#256b5f}
+.clientDocumentError{border:1px solid #efd1d1;background:#fff4f4;color:#9b3d3d}
+
+.clientDocumentsContent{display:grid;grid-template-columns:minmax(270px,.82fr) minmax(0,1.45fr);gap:16px;min-height:0;padding:16px 24px 20px;overflow:auto}
+.clientDocumentsUploadCard,.clientDocumentsLibrary{min-width:0}
+.clientDocumentsDropZone{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:12px;min-height:150px;padding:18px;border:1.5px dashed #b7d6d0;border-radius:18px;background:linear-gradient(145deg,#f6fbfa,#eef7f5);transition:border-color .15s ease,background .15s ease,transform .15s ease}
+.clientDocumentsDropZone.dragActive{border-color:#248f84;background:#e9f7f3;transform:scale(1.006)}
+.clientDocumentsDropIcon{display:grid;place-items:center;width:46px;height:46px;border-radius:15px;background:#fff;color:#21897e;box-shadow:0 6px 18px rgba(32,109,101,.10);font-size:25px}
+.clientDocumentsDropZone strong{display:block;color:#244c53;font-size:14px}
+.clientDocumentsDropZone p{margin:4px 0;color:#70858a;font-size:11px;line-height:1.4}
+.clientDocumentsDropZone small{display:block;color:#8b9b9f;font-size:9px}
+.clientDocumentsChooseButton{grid-column:1/-1;min-height:38px;border:0;border-radius:11px;background:#1d9c8e;color:#fff;font-size:11px;font-weight:850;cursor:pointer;box-shadow:0 5px 14px rgba(29,156,142,.16)}
+.clientDocumentsChooseButton:hover{filter:brightness(.98)}
+.clientDocumentsChooseButton:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+
+.clientDocumentsSelectedFile{display:grid;grid-template-columns:auto 1fr;gap:11px;margin-top:10px;padding:12px;border:1px solid #d9e7e4;border-radius:16px;background:#fff}
+.clientDocumentsSelectedMeta{display:grid;gap:4px;min-width:0}
+.clientDocumentsSelectedMeta>strong{overflow:hidden;color:#234850;font-size:12px;text-overflow:ellipsis;white-space:nowrap}
+.clientDocumentsSelectedMeta>span{color:#839497;font-size:9px}
+.clientDocumentsSelectedMeta label{display:grid;gap:4px;margin-top:3px;color:#657b80;font-size:9px;font-weight:750}
+.clientDocumentsSelectedMeta input{width:100%;min-height:36px;padding:8px 10px;border:1px solid #d5e1df;border-radius:10px;background:#fbfdfd;color:#203d44;font:inherit;font-size:11px;outline:none}
+.clientDocumentsSelectedMeta input:focus{border-color:#74bcb4;box-shadow:0 0 0 3px rgba(116,188,180,.12)}
+.clientDocumentsSelectedActions{grid-column:1/-1;display:flex;gap:7px}
+.clientDocumentsSelectedActions .button{flex:1;min-height:36px;font-size:10px}
+
+.clientDocumentType{display:grid;place-items:center;flex:0 0 auto;width:44px;height:50px;border-radius:12px;background:#e8f0f2;color:#355d67;font-size:9px;font-weight:950;letter-spacing:.04em}
+.clientDocumentType.large{width:58px;height:66px;border-radius:15px;font-size:11px}
+.clientDocumentType.type-pdf{background:#fff0ee;color:#a44338}
+.clientDocumentType.type-doc{background:#eef3ff;color:#3b5d9a}
+.clientDocumentType.type-xls{background:#ecf7ef;color:#387751}
+.clientDocumentType.type-ppt{background:#fff2eb;color:#a55b34}
+.clientDocumentType.type-txt,.clientDocumentType.type-csv{background:#f1f3f4;color:#59686b}
+
+.clientDocumentsLibrary{display:flex;flex-direction:column;min-height:260px;border:1px solid #dce7e5;border-radius:18px;background:#fff;overflow:hidden}
+.clientDocumentsLibraryHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 15px;border-bottom:1px solid #edf1f0}
+.clientDocumentsLibraryHeader h3{margin:0;color:#24464d;font-size:14px}
+.clientDocumentsLibraryHeader p{margin:4px 0 0;color:#7b8e92;font-size:10px;line-height:1.4}
+.clientDocumentsRefresh{flex:0 0 auto;padding:6px 9px;border:1px solid #d6e3e0;border-radius:9px;background:#f8fbfa;color:#52716f;font-size:9px;font-weight:800;cursor:pointer}
+.clientDocumentsRefresh:disabled{opacity:.5;cursor:not-allowed}
+.clientDocumentsList{display:grid;gap:0;min-height:0;overflow:auto}
+.clientDocumentItem{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:11px;padding:13px 14px;border-bottom:1px solid #edf2f1;background:#fff;transition:background .14s ease}
+.clientDocumentItem:last-child{border-bottom:0}
+.clientDocumentItem:hover{background:#fbfdfc}
+.clientDocumentMeta{display:grid;gap:3px;min-width:0}
+.clientDocumentTitleRow{display:flex;align-items:center;gap:7px;min-width:0}
+.clientDocumentTitleRow>strong{overflow:hidden;color:#1e414a;font-size:12px;text-overflow:ellipsis;white-space:nowrap}
+.clientDocumentMeta>span{overflow:hidden;color:#6f858a;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
+.clientDocumentMeta>small{overflow:hidden;color:#98a5a8;font-size:8px;text-overflow:ellipsis;white-space:nowrap}
+.clientDocumentMeta>.clientDocumentLastSent{color:#5e7f7a}
+.clientDocumentSentPill,.clientDocumentUnsentPill{flex:0 0 auto;padding:3px 6px;border-radius:999px;font-size:8px!important;font-weight:850;white-space:nowrap}
+.clientDocumentSentPill{background:#e5f6f1;color:#26766a}
+.clientDocumentUnsentPill{background:#f1f3f4;color:#718084}
+.clientDocumentActions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px;max-width:190px}
+.clientDocumentActions a,.clientDocumentActions button{display:inline-flex;align-items:center;justify-content:center;min-height:30px;padding:5px 8px;border:1px solid #d7e3e0;border-radius:9px;background:#fff;color:#496b70;font:inherit;font-size:8px;font-weight:850;text-decoration:none;cursor:pointer}
+.clientDocumentActions a:hover,.clientDocumentActions button:hover{background:#f2f8f6}
+.clientDocumentActions .send{border-color:#b9ddd6;background:#ebf8f5;color:#24796e}
+.clientDocumentActions .danger{border-color:#efd6d6;color:#a04747}
+.clientDocumentActions button:disabled{opacity:.38;cursor:not-allowed}
+
+.clientDocumentsEmpty{display:grid;place-items:center;gap:5px;min-height:190px;padding:24px;text-align:center;color:#7a8c90}
+.clientDocumentsEmpty>span{font-size:26px}
+.clientDocumentsEmpty>strong{color:#45636a;font-size:12px}
+.clientDocumentsEmpty>p{max-width:420px;margin:0;color:#87979a;font-size:9px;line-height:1.5}
+
+.clientDocumentsFooter{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 24px calc(11px + env(safe-area-inset-bottom));border-top:1px solid #e1e9e7;background:#fff}
+.clientDocumentsFooter>span{color:#859699;font-size:9px;line-height:1.4}
+.clientDocumentsFooter .button{flex:0 0 auto;min-height:34px;padding-inline:14px;font-size:9px}
+
+.clientDocumentsConfirmLayer{position:absolute;inset:0;z-index:15;display:grid;place-items:center;padding:20px;background:rgba(12,37,45,.48);backdrop-filter:blur(4px)}
+.clientDocumentsConfirmCard,.clientDocumentsRenameCard{width:min(520px,100%);border:1px solid #dce7e4;border-radius:20px;background:#fff;box-shadow:0 22px 60px rgba(10,36,45,.24)}
+.clientDocumentsConfirmCard{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:20px}
+.clientDocumentsConfirmCopy{min-width:0}
+.clientDocumentsConfirmCopy>span,.clientDocumentsRenameCard>div:first-child>span{display:block;color:#1b8b7f;font-size:9px;font-weight:900;letter-spacing:.09em;text-transform:uppercase}
+.clientDocumentsConfirmCopy h3,.clientDocumentsRenameCard h3{margin:4px 0 5px;color:#24464e;font-size:17px;line-height:1.25}
+.clientDocumentsConfirmCopy p,.clientDocumentsRenameCard p{margin:0;color:#74878b;font-size:10px;line-height:1.5}
+.clientDocumentsConfirmCopy label{display:grid;gap:5px;margin-top:13px;color:#5d7478;font-size:9px;font-weight:800}
+.clientDocumentsConfirmCopy textarea{width:100%;min-height:84px;padding:9px 10px;border:1px solid #d6e2e0;border-radius:11px;background:#fbfdfc;color:#213e45;font:inherit;font-size:11px;line-height:1.45;resize:vertical;outline:none}
+.clientDocumentsConfirmCopy textarea:focus{border-color:#75bbb3;box-shadow:0 0 0 3px rgba(117,187,179,.12)}
+.clientDocumentsConfirmCopy>small{display:block;margin-top:7px;color:#8c999c;font-size:8px;line-height:1.4}
+.clientDocumentsConfirmActions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:7px;margin-top:2px}
+.clientDocumentsConfirmActions .button{min-height:36px;font-size:10px}
+.clientDocumentsRenameCard{display:grid;gap:13px;padding:20px}
+.clientDocumentsRenameCard>input{width:100%;min-height:40px;padding:9px 11px;border:1px solid #d4e1de;border-radius:11px;background:#fbfdfc;color:#203d44;font:inherit;font-size:12px;outline:none}
+.clientDocumentsRenameCard>input:focus{border-color:#75bbb3;box-shadow:0 0 0 3px rgba(117,187,179,.12)}
+.clientDocumentsRenameCard>div:last-child{display:flex;justify-content:flex-end;gap:7px}
+.clientDocumentsRenameCard .button{min-height:36px;font-size:10px}
+
+.timelineBubble p:has(> .documentMessageTitle){margin-top:5px}
+.documentMessageTitle{display:block;font-weight:800}
+
+@media(max-width:820px){
+  .clientDocumentsToolsUpload{display:flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;width:100%!important;min-height:36px!important;margin:0!important;padding:5px 8px!important;border-radius:10px!important;font-size:9px!important}
+  .dashboard.mobileChatOpen .controlStrip>.clientDocumentsToolsHost{display:none!important}
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen>.controlStrip>.clientDocumentsToolsHost{display:block!important;grid-column:1/-1!important}
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen>.controlStrip>.clientDocumentsToolsHost .clientDocumentsToolsUpload{display:flex!important}
+
+  .clientDocumentsModal{place-items:end center;padding:0;background:rgba(8,30,39,.55);backdrop-filter:blur(4px)}
+  .clientDocumentsDialog{width:100%;max-height:92dvh;border:0;border-radius:22px 22px 0 0;box-shadow:0 -18px 55px rgba(8,30,39,.22)}
+  .clientDocumentsHeader{padding:15px 15px 12px}
+  .clientDocumentsHeader h2{font-size:18px}
+  .clientDocumentsHeader p{max-width:86%;font-size:10px}
+  .clientDocumentsClose{width:34px;height:34px;font-size:22px}
+  .clientDocumentsStatusBar{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:9px 12px 6px}
+  .clientDocumentsStatusBar>div{padding:7px 8px;border-radius:10px}
+  .clientDocumentsStatusBar>.clientDocumentsMode{grid-column:1/-1}
+  .clientDocumentsUsageTrack{margin-inline:12px}
+  .clientDocumentNotice,.clientDocumentError{margin:8px 12px 0;padding:8px 10px;font-size:10px}
+  .clientDocumentsContent{grid-template-columns:1fr;gap:10px;padding:10px 12px 14px}
+  .clientDocumentsDropZone{min-height:112px;padding:13px;border-radius:15px}
+  .clientDocumentsDropIcon{width:40px;height:40px;border-radius:12px;font-size:21px}
+  .clientDocumentsChooseButton{min-height:36px}
+  .clientDocumentsSelectedFile{grid-template-columns:auto 1fr;padding:10px;border-radius:14px}
+  .clientDocumentsLibrary{min-height:250px;border-radius:15px}
+  .clientDocumentsLibraryHeader{padding:11px 12px}
+  .clientDocumentsLibraryHeader p{font-size:9px}
+  .clientDocumentItem{grid-template-columns:auto minmax(0,1fr);gap:9px;padding:11px}
+  .clientDocumentType{width:40px;height:46px;border-radius:11px}
+  .clientDocumentActions{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));max-width:none;width:100%}
+  .clientDocumentActions a,.clientDocumentActions button{min-height:32px;padding:5px 4px;font-size:8px}
+  .clientDocumentsFooter{padding:9px 12px calc(9px + env(safe-area-inset-bottom))}
+  .clientDocumentsFooter>span{display:none}
+  .clientDocumentsFooter .button{width:100%}
+  .clientDocumentsConfirmLayer{place-items:end center;padding:0;background:rgba(8,30,39,.42)}
+  .clientDocumentsConfirmCard,.clientDocumentsRenameCard{width:100%;border:0;border-radius:20px 20px 0 0;padding:17px 15px calc(17px + env(safe-area-inset-bottom));box-shadow:0 -18px 55px rgba(8,30,39,.22)}
+  .clientDocumentsConfirmCard{grid-template-columns:auto 1fr}
+  .clientDocumentsConfirmActions{display:grid;grid-template-columns:1fr 1fr}
+  .clientDocumentsRenameCard>div:last-child{display:grid;grid-template-columns:1fr 1fr}
 }
 
-.clientDocumentAttachButton {
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: #315266;
-  font-size: 21px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.clientDocumentAttachButton:hover { background: #e9f5f3; }
-.clientDocumentAttachButton:disabled { opacity: .45; cursor: not-allowed; }
-.clientDocumentFileInput { display: none !important; }
-
-.clientDocumentsToolsHost { display: flex; align-items: center; }
-.clientDocumentsToolsUpload {
-  min-height: 38px;
-  border: 1px solid #c8e4df;
-  border-radius: 11px;
-  background: #edf9f7;
-  color: #267d73;
-  padding: 7px 12px;
-  font-size: 11px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.clientDocumentsToolsUpload:hover { background: #e2f5f1; }
-.clientDocumentsToolsUpload:disabled { opacity: .45; cursor: not-allowed; }
-
-.clientDocumentsDrawer {
-  margin: 8px 16px 4px;
-  border: 1px solid #dce8e9;
-  border-radius: 16px;
-  background: rgba(255,255,255,.94);
-  overflow: hidden;
-}
-
-.clientDocumentsDrawer > summary {
-  list-style: none;
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 13px;
-  cursor: pointer;
-  color: #244b4d;
-  font-size: 13px;
-}
-
-.clientDocumentsDrawer > summary::-webkit-details-marker { display: none; }
-.clientDocumentsDrawer > summary span { font-weight: 800; }
-.clientDocumentsDrawer > summary b {
-  min-width: 24px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: #dff4f0;
-  color: #217c73;
-  text-align: center;
-  font-size: 12px;
-}
-.clientDocumentsDrawer > summary small { justify-self: end; color: #789096; font-size: 11px; }
-
-.clientDocumentsBody {
-  border-top: 1px solid #e7eeee;
-  padding: 10px;
-  display: grid;
-  gap: 8px;
-  max-height: 280px;
-  overflow: auto;
-}
-
-.clientDocumentItem {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid #e1e9eb;
-  border-radius: 13px;
-  background: #fbfdfd;
-}
-.clientDocumentItem > div:first-child { min-width: 0; display: grid; gap: 2px; }
-.clientDocumentItem strong,
-.clientDocumentItem span,
-.clientDocumentItem small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.clientDocumentItem strong { color: #173d49; font-size: 13px; }
-.clientDocumentItem span { color: #627b84; font-size: 11px; }
-.clientDocumentItem small { color: #8a9ba0; font-size: 10px; }
-
-.clientDocumentActions { display: flex; gap: 6px; flex: 0 0 auto; }
-.clientDocumentActions button {
-  border: 1px solid #badfd9;
-  border-radius: 999px;
-  background: #edf9f7;
-  color: #257e75;
-  padding: 7px 10px;
-  font-size: 11px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.clientDocumentActions button.danger { border-color: #efd2d2; background: #fff7f7; color: #a54444; }
-.clientDocumentActions button:disabled { opacity: .42; cursor: not-allowed; }
-
-.clientDocumentsEmpty,
-.clientDocumentsHint { margin: 0; color: #6f848b; font-size: 11px; line-height: 1.45; }
-.clientDocumentsHint { padding: 2px 4px; }
-.clientDocumentNotice,
-.clientDocumentError { padding: 8px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; }
-.clientDocumentNotice { background: #e9f7f2; color: #246d5e; }
-.clientDocumentError { background: #fff0f0; color: #9e3c3c; }
-
-.timelineBubble p:has(> .documentMessageTitle) { margin-top: 5px; }
-.documentMessageTitle { display: block; font-weight: 800; }
-
-@media (max-width: 820px) {
-  .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen) .clientDocumentsToolsHost { display: none !important; }
-  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen .clientDocumentsToolsHost {
-    grid-column: 1 / -1 !important;
-    display: block !important;
-    width: 100% !important;
-  }
-  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen .clientDocumentsToolsUpload {
-    width: 100% !important;
-    min-height: 36px !important;
-    border-radius: 10px !important;
-    font-size: 10px !important;
-  }
-}
-
-@media (max-width: 760px) {
-  .clientDocumentsDrawer {
-    margin: 5px 10px 3px;
-    border-radius: 14px;
-  }
-  .clientDocumentsDrawer > summary {
-    grid-template-columns: auto auto 1fr;
-    padding: 9px 11px;
-  }
-  .clientDocumentsDrawer > summary small { display: none; }
-  .clientDocumentsBody { max-height: 42vh; padding: 8px; }
-  .clientDocumentItem { align-items: flex-start; padding: 9px; }
-  .clientDocumentActions { flex-direction: column; }
-  .clientDocumentActions button { padding: 6px 9px; }
-  .clientDocumentAttachButton { width: 42px; height: 42px; }
+@media(max-width:430px){
+  .clientDocumentAttachButton{width:40px;height:40px;font-size:18px}
+  .clientDocumentsHeader p{max-width:92%}
+  .clientDocumentsStatusBar strong{font-size:11px}
+  .clientDocumentsStatusBar span{font-size:8px}
+  .clientDocumentsDropZone p{font-size:10px}
+  .clientDocumentsDropZone small{font-size:8px}
+  .clientDocumentTitleRow{align-items:flex-start;flex-direction:column;gap:4px}
+  .clientDocumentMeta>span,.clientDocumentMeta>small{font-size:8px}
 }
