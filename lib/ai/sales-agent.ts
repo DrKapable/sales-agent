@@ -3,6 +3,7 @@ import { z } from "zod";
 import { SALES_AGENT_PROMPT } from "@/lib/ai/prompt";
 import { getAiModel } from "@/lib/env";
 import { restoreChat } from "@/lib/chat-lifecycle";
+import { getClientDocumentForLead, listClientDocuments } from "@/lib/client-documents";
 import { addMessage, getConversation, getOrCreateLead, listOffers, updateLead } from "@/lib/store";
 import { buildReferralMessage, recipientForReferral } from "@/lib/referrals";
 import { createResearchPortalTask } from "@/lib/research-portal";
@@ -14,6 +15,7 @@ import { leadStatuses, type LeadPatch } from "@/lib/types";
 export type SalesAgentResult = {
   reply: string;
   referralNotification: { phone: string; recipientName: string; body: string } | null;
+  documentIds: string[];
 };
 
 export async function replyToClient(phone: string, text: string, source: "whatsapp" | "simulator", modelOverride?: string): Promise<SalesAgentResult> {
@@ -21,6 +23,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const lead = await getOrCreateLead(phone, source);
   const history = await getConversation(phone);
   let referralNotification: SalesAgentResult["referralNotification"] = null;
+  const queuedDocumentIds = new Set<string>();
 
   const updateLeadTool = tool({
     description: "Save new client details or update the sales status. Never mark a lead converted without verified payment confirmation.",
@@ -93,6 +96,31 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
     }
   });
 
+  const listAssignedDocumentsTool = tool({
+    description: "List documents that a MedMinds administrator has explicitly assigned to this client. Use this when the client asks for a file, document, form, report, letter, proposal, quotation copy or other attachment that may already be assigned to them.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      const documents = await listClientDocuments(lead.id);
+      if (!documents.length) return { available: false, documents: [], instruction: "No administrator-assigned documents are available for this client." };
+      return {
+        available: true,
+        documents: documents.map((item) => ({ id: item.id, title: item.title, fileName: item.fileName, mimeType: item.mimeType, lastSentAt: item.lastSentAt }))
+      };
+    }
+  });
+
+  const sendAssignedDocumentTool = tool({
+    description: "Queue one administrator-assigned document for WhatsApp delivery to this client. Use only a document ID returned by listAssignedClientDocuments and only when the client has asked for or clearly needs that document.",
+    inputSchema: z.object({ documentId: z.string().uuid() }),
+    execute: async ({ documentId }) => {
+      if (source !== "whatsapp") return { queued: false, reason: "Assigned-document delivery is available only in the WhatsApp conversation." };
+      const document = await getClientDocumentForLead(documentId, lead.id);
+      if (!document) return { queued: false, reason: "That document is not assigned to this client." };
+      queuedDocumentIds.add(document.id);
+      return { queued: true, documentId: document.id, title: document.title, fileName: document.fileName, instruction: "The attachment is queued for this WhatsApp response." };
+    }
+  });
+
   const handoffTool = tool({
     description: "Assign genuine human escalations to the most appropriate MedMinds team member. Preserve any explicitly requested staff member in the reason or summary.",
     inputSchema: z.object({
@@ -128,8 +156,16 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const model = modelOverride || getAiModel();
   const agent = new ToolLoopAgent({
     model: gateway(model),
-    instructions: `${SALES_AGENT_PROMPT}\n\nCLIENT COMMERCIAL DOCUMENTS\n- When a client explicitly asks for a quotation, quote, proforma invoice or unpaid invoice, use createClientCommercialDocument.\n- First identify the exact active approved service. The document tool itself validates the price.\n- Never invent, negotiate or manually override a document amount. If there is no verified fixed price, arrange human confirmation.\n- A quotation is not proof of payment. An invoice created here must be clearly UNPAID and must never be described as a receipt.\n- On WhatsApp, the PDF is sent directly when the tool succeeds. On website chat, give the returned secure PDF link.\n- Do not create repeated documents unless the client asks for another/revised copy.\n\nRESEARCH PORTAL ASSISTANT-ADMIN CAPABILITY\n- You have one restricted research-portal action: create an unassigned research task using createResearchPortalTask.\n- Create a portal task only when there is a concrete research deliverable or operational action that should enter the work queue, not for ordinary enquiries or price questions.\n- The task MUST remain unlinked to a client and unassigned to operations/marketing. Humans will review, link and assign it later.\n- Never tell a client that a writer, operations member or client account has been assigned merely because you created the task.\n- After successful creation, you may say the request has been placed in the MedMinds research work queue for team review.\n- Avoid duplicate tasks for the same agreed deliverable in one conversation.\n\nTEAM ROUTING\n- Dr. Mustafa Juma Phiri: Director, specialist research, payments/discounts, software, business automation, web development, cybersecurity and technical escalation.\n- Dr Kanyembo Ng'andwe: Sales Representative, marketing team and preferred closer for sales/lead conversion.\n- Mr. Madalitso Masumbu: Operations and routine research support.\n- Dr Zabibu Nandazi: customer support and marketing.\n- Counsel Chisha Chomba: disputes, legal and conflict resolution.\n- Mr Conrad Mununkha Phiri: marketing, advertising, partnerships and secretary/administration.\n- Explicit requests for a named current team member take precedence.\n\nHANDOVER CONTINUITY\n- A referral does not end your role. Keep answering new client messages where possible.\n- Do not repeatedly tell a referred client to wait.\n- Resolve short follow-ups from recent context.\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers, commercial documents, portal-task creation and prices.`,
-    tools: { getApprovedOffers: approvedOffersTool, updateLead: updateLeadTool, createClientCommercialDocument: clientDocumentTool, requestHumanAssistance: handoffTool, createResearchPortalTask: researchTaskTool }
+    instructions: `${SALES_AGENT_PROMPT}\n\nCLIENT COMMERCIAL DOCUMENTS\n- When a client explicitly asks for a quotation, quote, proforma invoice or unpaid invoice, use createClientCommercialDocument.\n- First identify the exact active approved service. The document tool itself validates the price.\n- Never invent, negotiate or manually override a document amount. If there is no verified fixed price, arrange human confirmation.\n- A quotation is not proof of payment. An invoice created here must be clearly UNPAID and must never be described as a receipt.\n- On WhatsApp, the PDF is sent directly when the tool succeeds. On website chat, give the returned secure PDF link.\n- Do not create repeated documents unless the client asks for another/revised copy.\n\nCLIENT-ASSIGNED DOCUMENTS\n- Administrators can upload documents and assign them to a specific client. These are separate from generated quotations and invoices.\n- If a client asks you to send, resend, share or attach a document that may have been assigned to them, first use listAssignedClientDocuments.\n- You may queue only a document returned for this exact client by listAssignedClientDocuments. Never guess a document ID, file URL or filename and never access another client's documents.\n- If exactly one assigned document clearly matches the client's request, use sendAssignedClientDocument with that document ID. If several documents could match, ask the client which one they need.\n- If no document is assigned, say that you cannot see an assigned copy yet and arrange human assistance if needed. Do not pretend a file was sent.\n- After sendAssignedClientDocument succeeds, keep the accompanying text brief and natural, for example: "I've sent the document here."\n\nRESEARCH PORTAL ASSISTANT-ADMIN CAPABILITY\n- You have one restricted research-portal action: create an unassigned research task using createResearchPortalTask.\n- Create a portal task only when there is a concrete research deliverable or operational action that should enter the work queue, not for ordinary enquiries or price questions.\n- The task MUST remain unlinked to a client and unassigned to operations/marketing. Humans will review, link and assign it later.\n- Never tell a client that a writer, operations member or client account has been assigned merely because you created the task.\n- After successful creation, you may say the request has been placed in the MedMinds research work queue for team review.\n- Avoid duplicate tasks for the same agreed deliverable in one conversation.\n\nTEAM ROUTING\n- Dr. Mustafa Juma Phiri: Director, specialist research, payments/discounts, software, business automation, web development, cybersecurity and technical escalation.\n- Dr Kanyembo Ng'andwe: Sales Representative, marketing team and preferred closer for sales/lead conversion.\n- Mr. Madalitso Masumbu: Operations and routine research support.\n- Dr Zabibu Nandazi: customer support and marketing.\n- Counsel Chisha Chomba: disputes, legal and conflict resolution.\n- Mr Conrad Mununkha Phiri: marketing, advertising, partnerships and secretary/administration.\n- Explicit requests for a named current team member take precedence.\n\nHANDOVER CONTINUITY\n- A referral does not end your role. Keep answering new client messages where possible.\n- Do not repeatedly tell a referred client to wait.\n- Resolve short follow-ups from recent context.\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for offers, commercial documents, assigned client documents, portal-task creation and prices.`,
+    tools: {
+      getApprovedOffers: approvedOffersTool,
+      updateLead: updateLeadTool,
+      createClientCommercialDocument: clientDocumentTool,
+      listAssignedClientDocuments: listAssignedDocumentsTool,
+      sendAssignedClientDocument: sendAssignedDocumentTool,
+      requestHumanAssistance: handoffTool,
+      createResearchPortalTask: researchTaskTool
+    }
   });
 
   const latestStored = history.at(-1)?.role === "user" && history.at(-1)?.content === text;
@@ -138,5 +174,5 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const reply = (result.text.trim() || "I’ll make sure a MedMinds team member helps with that.").replaceAll("—", ",");
   await addMessage(phone, "assistant", reply);
   void maybeNotifyHotLead(phone).catch((error) => console.error("Hot-lead notification check failed", { phoneSuffix: phone.slice(-4), error }));
-  return { reply, referralNotification: referralNotification as SalesAgentResult["referralNotification"] };
+  return { reply, referralNotification: referralNotification as SalesAgentResult["referralNotification"], documentIds: [...queuedDocumentIds] };
 }
