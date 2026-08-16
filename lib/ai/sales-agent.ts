@@ -169,7 +169,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
     }
   });
 
-  const latestStored = history.at(-1)?.role === "user" && history.at(-1]?.content === text;
+  const latestStored = history.at(-1)?.role === "user" && history.at(-1)?.content === text;
   const transcript = [...history, ...(latestStored ? [] : [{ role: "user" as const, content: text }])].map((message) => `${message.role === "user" ? "Client" : "Agent"}: ${message.content}`).join("\n");
   const result = await agent.generate({ prompt: `Conversation including the client's latest message:\n${transcript}\n\nReply only with the WhatsApp message to send.` });
   const reply = (result.text.trim() || "I’ll make sure a MedMinds team member helps with that.").replaceAll("—", ",");
