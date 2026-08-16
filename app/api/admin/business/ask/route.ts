@@ -53,11 +53,13 @@ async function sendFollowUp(lead: SnapshotLead, message?: string) {
   if (await inside24HourWindow(lead.phone)) {
     const body = message?.trim() || `Hi ${lead.name?.split(/\s+/)[0] || "there"}, just checking in on your recent MedMinds enquiry. Would you still like us to help you with ${lead.serviceInterest || lead.packageName || "this"}?`;
     await sendWhatsAppText(lead.phone, body);
-    await addMessage(lead.phone, "assistant", `[Ask Intelligence follow-up] ${body}`);
+    // Store exactly the client-visible message. Ask Intelligence is workflow metadata,
+    // not part of the WhatsApp conversation and must never appear in the chat bubble.
+    await addMessage(lead.phone, "assistant", body);
     return { sent: true, mode: "freeform", message: body };
   }
   await sendWhatsAppFollowUpTemplate(lead.phone);
-  await addMessage(lead.phone, "assistant", `[Ask Intelligence follow-up sent using approved WhatsApp template: ${process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME || "configured template"}]`);
+  await addMessage(lead.phone, "assistant", "Follow-up sent using the approved WhatsApp template.");
   return { sent: true, mode: "template" };
 }
 
