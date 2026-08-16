@@ -1,10 +1,10 @@
 import { gateway, tool, ToolLoopAgent } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getBusinessSnapshot, createBusinessTask, createQuote } from "@/lib/business-ops";
+import { getBusinessSnapshot, createQuote } from "@/lib/business-ops";
+import { createMirroredBusinessTask } from "@/lib/business-task-bridge";
 import { getConversation, addMessage } from "@/lib/store";
 import { getAiModelCandidates } from "@/lib/env";
-import { createResearchPortalTask } from "@/lib/research-portal";
 import { notifyBusinessEvent } from "@/lib/business-notifications";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 import { sendWhatsAppFollowUpTemplate } from "@/lib/whatsapp-template";
@@ -53,8 +53,6 @@ async function sendFollowUp(lead: SnapshotLead, message?: string) {
   if (await inside24HourWindow(lead.phone)) {
     const body = message?.trim() || `Hi ${lead.name?.split(/\s+/)[0] || "there"}, just checking in on your recent MedMinds enquiry. Would you still like us to help you with ${lead.serviceInterest || lead.packageName || "this"}?`;
     await sendWhatsAppText(lead.phone, body);
-    // Store exactly the client-visible message. Ask Intelligence is workflow metadata,
-    // not part of the WhatsApp conversation and must never appear in the chat bubble.
     await addMessage(lead.phone, "assistant", body);
     return { sent: true, mode: "freeform", message: body };
   }
@@ -109,22 +107,27 @@ export async function POST(request: Request) {
   });
 
   const createTaskTool = tool({
-    description: "Create an internal MedMinds business task. Client linkage and staff assignment are optional. Use when the administrator clearly instructs you to create a task/reminder/action item.",
+    description: "Create one synchronized MedMinds task in BOTH Business Intelligence and the Research Portal. Client linkage and internal staff assignment are optional. Use this for every administrator request to create a task, reminder, action item or Research Portal task. Never create a task in only one of the two systems.",
     inputSchema: z.object({ client: z.string().max(160).optional(), title: z.string().min(3).max(240), assignedTo: z.string().max(160).optional(), dueAt: z.string().datetime().optional(), notes: z.string().max(1200).optional() }),
     execute: async ({ client, ...task }) => {
       const lead = client ? resolveLead(snapshot, client) : null;
-      const created = await createBusinessTask({ ...task, leadId: lead?.id });
-      void notifyBusinessEvent({ type: "operations_task", eventKey: `operations_task:${String((created as any).id)}`, title: "New MedMinds operations task", body: `Task: ${task.title}\nAssigned to: ${task.assignedTo || "Unassigned"}${task.dueAt ? `\nDue: ${task.dueAt}` : ""}`, lead }).catch(() => undefined);
-      return { created: true, taskId: (created as any).id, title: task.title, client: lead ? displayLead(lead) : "No client linked", assignedTo: task.assignedTo || "Unassigned" };
-    }
-  });
-
-  const researchTaskTool = tool({
-    description: "Create an UNASSIGNED task in the MedMinds Research Portal. Use only when the administrator explicitly asks for a research-portal/research task. It must remain unlinked to a client and unassigned to operations in the portal.",
-    inputSchema: z.object({ client: z.string().max(160).optional(), title: z.string().min(3).max(240), brief: z.string().min(10).max(2500), priority: z.enum(["low", "standard", "high", "urgent"]).default("standard"), dueDate: z.string().max(80).optional(), program: z.string().max(180).optional(), academicLevel: z.string().max(180).optional() }),
-    execute: async ({ client, ...task }) => {
-      const lead = client ? resolveLead(snapshot, client) : null;
-      return createResearchPortalTask({ ...task, lead });
+      const created = await createMirroredBusinessTask({ ...task, leadId: lead?.id }, lead);
+      void notifyBusinessEvent({
+        type: "operations_task",
+        eventKey: `operations_task:${String((created as any).id)}`,
+        title: "New MedMinds operations task",
+        body: `Task: ${task.title}\nAssigned to: ${task.assignedTo || "Unassigned"}${task.dueAt ? `\nDue: ${task.dueAt}` : ""}\nResearch Portal: synced`,
+        lead
+      }).catch(() => undefined);
+      return {
+        created: true,
+        mirrored: true,
+        taskId: (created as any).id,
+        researchPortalTaskId: (created as any).researchPortalTaskId,
+        title: task.title,
+        client: lead ? displayLead(lead) : "No client linked",
+        assignedTo: task.assignedTo || "Unassigned"
+      };
     }
   });
 
@@ -155,13 +158,13 @@ export async function POST(request: Request) {
     priorityLeads: snapshot.leads.slice(0, 20).map((lead) => ({ name: lead.name, phone: lead.phone, status: lead.status, score: lead.leadScore, band: lead.scoreBand, service: lead.serviceInterest || lead.packageName, followUpAt: lead.followUpAt }))
   };
 
-  const instructions = `You are the MedMinds Admin Intelligence assistant. You work for an authenticated administrator and may answer business questions or execute approved operational commands using tools.\n\nRULES\n- Distinguish questions from commands. Never execute an action unless the administrator's wording clearly asks you to do it.\n- Resolve the intended client from CRM data; if the tool reports multiple matches, ask the administrator to specify which one. Never guess.\n- Follow-ups: keep the message concise, warm and specific to the known service. Do not pressure the client.\n- Receipts: only use sendVerifiedReceipt. Receipts are official branded PDF documents and require a verified payment record. Never claim one was sent unless the tool succeeds.\n- Research Portal tasks must remain unassigned and unlinked inside the portal.\n- Do not verify payments, delete chats, mark leads converted, or change financial records through this interface. Those remain explicit dashboard controls.\n- Do not invent prices, payments, clients, tasks or outcomes.\n- After an action, state exactly what happened in one or two concise sentences.\n- If required information is missing, ask one direct question.\n\nCURRENT BUSINESS SNAPSHOT\n${JSON.stringify(summary)}`;
+  const instructions = `You are the MedMinds Admin Intelligence assistant. You work for an authenticated administrator and may answer business questions or execute approved operational commands using tools.\n\nRULES\n- Distinguish questions from commands. Never execute an action unless the administrator's wording clearly asks you to do it.\n- Resolve the intended client from CRM data; if the tool reports multiple matches, ask the administrator to specify which one. Never guess.\n- Follow-ups: keep the message concise, warm and specific to the known service. Do not pressure the client.\n- Receipts: only use sendVerifiedReceipt. Receipts are official branded PDF documents and require a verified payment record. Never claim one was sent unless the tool succeeds.\n- ALL task creation requests use createSynchronizedTask. A task created from Business Intelligence must exist in both Business Intelligence and the Research Portal with the same title, notes/brief and due date.\n- The Research Portal copy remains unassigned and unlinked inside the portal; the Business Intelligence copy may retain the administrator's internal assignee and CRM client linkage.\n- Do not create duplicate portal-only tasks.\n- Do not verify payments, delete chats, mark leads converted, or change financial records through this interface. Those remain explicit dashboard controls.\n- Do not invent prices, payments, clients, tasks or outcomes.\n- After an action, state exactly what happened in one or two concise sentences.\n- If required information is missing, ask one direct question.\n\nCURRENT BUSINESS SNAPSHOT\n${JSON.stringify(summary)}`;
 
   const models = getAiModelCandidates();
   let lastError: unknown = null;
   for (const model of models) {
     try {
-      const agent = new ToolLoopAgent({ model: gateway(model), instructions, tools: { findClient: findClientTool, followUpClient: followUpTool, createInternalTask: createTaskTool, createResearchPortalTask: researchTaskTool, sendVerifiedReceipt: sendReceiptTool, createQuotation: createQuoteTool } });
+      const agent = new ToolLoopAgent({ model: gateway(model), instructions, tools: { findClient: findClientTool, followUpClient: followUpTool, createSynchronizedTask: createTaskTool, sendVerifiedReceipt: sendReceiptTool, createQuotation: createQuoteTool } });
       const result = await agent.generate({ prompt: parsed.data.question });
       return NextResponse.json({ answer: result.text.trim() || "Done.", mode: "agent", model });
     } catch (error) {
