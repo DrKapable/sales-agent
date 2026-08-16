@@ -1,8 +1,13 @@
 import { sanitizeWhatsAppApiError } from "@/lib/whatsapp";
 
-export async function sendNamedWhatsAppTemplate(phone: string, templateName: string, languageCode = "en_US") {
+export async function sendNamedWhatsAppTemplate(
+  phone: string,
+  templateName: string,
+  languageCode = "en_US",
+  phoneNumberIdOverride?: string | null
+) {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const phoneNumberId = phoneNumberIdOverride || process.env.WHATSAPP_PHONE_NUMBER_ID;
   const version = process.env.WHATSAPP_GRAPH_VERSION;
 
   if (!token || !phoneNumberId || !version || !templateName) throw new Error("WhatsApp template is not configured.");
@@ -29,9 +34,13 @@ export async function sendNamedWhatsAppTemplate(phone: string, templateName: str
   return { messageId };
 }
 
-export async function sendWhatsAppFollowUpTemplate(phone: string) {
-  const templateName = process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME;
-  const languageCode = process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE || "en_US";
+export async function sendWhatsAppFollowUpTemplate(phone: string, options?: {
+  templateName?: string;
+  languageCode?: string;
+  phoneNumberIdOverride?: string | null;
+}) {
+  const templateName = options?.templateName || process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME;
+  const languageCode = options?.languageCode || process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE || "en_US";
   if (!templateName) throw new Error("WhatsApp follow-up template is not configured.");
-  return sendNamedWhatsAppTemplate(phone, templateName, languageCode);
+  return sendNamedWhatsAppTemplate(phone, templateName, languageCode, options?.phoneNumberIdOverride);
 }

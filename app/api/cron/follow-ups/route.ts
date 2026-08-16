@@ -1,25 +1,15 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { runAutomatedFollowUps } from "@/lib/follow-up";
-import { runDailyManagementBrief } from "@/lib/daily-brief";
 
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
-  const auth = request.headers.get("authorization");
-  const userAgent = request.headers.get("user-agent") || "";
-  const secret = process.env.CRON_SECRET;
-  const authorized = (secret && auth === `Bearer ${secret}`) || userAgent.includes("vercel-cron/1.0");
-  if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAuthorizedCronRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const [followUps, managementBrief] = await Promise.all([
-      runAutomatedFollowUps(),
-      runDailyManagementBrief().catch((error) => {
-        console.error("Daily management brief failed", { error });
-        return { sent: false, reason: "failed" };
-      })
-    ]);
-    return NextResponse.json({ ok: true, followUps, managementBrief });
+    const followUps = await runAutomatedFollowUps();
+    return NextResponse.json({ ok: true, followUps });
   } catch (error) {
     console.error("Automated follow-up cron failed", { error });
     return NextResponse.json({ error: "Follow-up run failed." }, { status: 500 });
