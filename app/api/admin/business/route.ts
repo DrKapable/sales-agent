@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createBusinessTask, createQuote, recordFeedback, recordPayment, updateBusinessTask, verifyPayment } from "@/lib/business-ops";
+import { createQuote, recordFeedback, recordPayment, updateBusinessTask, verifyPayment } from "@/lib/business-ops";
+import { createMirroredBusinessTask } from "@/lib/business-task-bridge";
 import { getFastBusinessSnapshot } from "@/lib/business-snapshot-fast";
 import { addMessage, getConversation, listLeads } from "@/lib/store";
 import { MEDMINDS_REVIEW_COLLECTION_URL } from "@/lib/reputation";
@@ -133,9 +134,15 @@ export async function POST(request: Request) {
   try {
     const input = parsed.data;
     if (input.action === "task") {
-      const task = await createBusinessTask(input);
       const lead = await leadById(input.leadId);
-      void notifyBusinessEvent({ type: "operations_task", eventKey: `operations_task:${String((task as { id?: string }).id)}`, title: "New MedMinds operations task", body: `Task: ${input.title}\nAssigned to: ${input.assignedTo || "Unassigned"}${input.dueAt ? `\nDue: ${input.dueAt}` : ""}`, lead }).catch(() => undefined);
+      const task = await createMirroredBusinessTask(input, lead);
+      void notifyBusinessEvent({
+        type: "operations_task",
+        eventKey: `operations_task:${String((task as { id?: string }).id)}`,
+        title: "New MedMinds operations task",
+        body: `Task: ${input.title}\nAssigned to: ${input.assignedTo || "Unassigned"}${input.dueAt ? `\nDue: ${input.dueAt}` : ""}\nResearch Portal: synced`,
+        lead
+      }).catch(() => undefined);
       return NextResponse.json(task);
     }
     if (input.action === "task_status") return NextResponse.json(await updateBusinessTask(input));
