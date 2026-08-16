@@ -46,9 +46,9 @@ export const referralRecipients: Record<string, ReferralRecipient> = {
     phone: "260979235018",
     roles: ["Digital marketing", "Marketing team", "Secretary"]
   },
-  madalitso: {
-    name: "Mr. Madalitso Masumbu",
-    phone: "260979104893",
+  monica: {
+    name: "Dr. Monica",
+    phone: "260968441133",
     roles: ["Operations team", "Research support expert"]
   },
   zabibu: {
@@ -64,7 +64,7 @@ function namedRecipient(context: string) {
   if (/\bkanyembo\b|\bng['’]?andwe\b/.test(text)) return referralRecipients.kanyembo;
   if (/\bchisha\b|\bchomba\b|\bcounsel chisha\b/.test(text)) return referralRecipients.chisha;
   if (/\bconrad\b|\bmununkha\b/.test(text)) return referralRecipients.conrad;
-  if (/\bmadalitso\b|\bmasumbu\b/.test(text)) return referralRecipients.madalitso;
+  if (/\bmonica\b/.test(text)) return referralRecipients.monica;
   if (/\bzabibu\b|\bnandazi\b/.test(text)) return referralRecipients.zabibu;
   return null;
 }
@@ -86,7 +86,7 @@ export function recipientForReferral(type: ReferralType, context = "") {
       return referralRecipients.kanyembo;
     case "research":
     case "operations":
-      return referralRecipients.madalitso;
+      return referralRecipients.monica;
     case "customer_support":
       return referralRecipients.zabibu;
     case "dispute":
