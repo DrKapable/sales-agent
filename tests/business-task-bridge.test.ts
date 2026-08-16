@@ -25,13 +25,14 @@ const lead: Lead = {
 };
 
 describe("Business Intelligence task Research Portal mirror", () => {
-  it("keeps the task title, notes and due date while adding available client context", () => {
+  it("keeps the task title, notes, priority and due date while adding available client context", () => {
     const payload = researchPortalTaskFromBusinessTask({
       leadId: lead.id,
       title: "Review client proposal",
       assignedTo: "Dr. Monica",
       dueAt: "2026-08-18T08:00:00.000Z",
-      notes: "Review the uploaded proposal and prepare the next operational step."
+      notes: "Review the uploaded proposal and prepare the next operational step.",
+      priority: "high"
     }, lead);
 
     expect(payload.title).toBe("Review client proposal");
@@ -41,11 +42,12 @@ describe("Business Intelligence task Research Portal mirror", () => {
     expect(payload.brief).toContain("Business Intelligence assignee: Dr. Monica.");
     expect(payload.dueDate).toBe("2026-08-18T08:00:00.000Z");
     expect(payload.program).toBe("MPH");
-    expect(payload.priority).toBe("standard");
+    expect(payload.priority).toBe("high");
   });
 
-  it("creates a valid brief even when notes are omitted", () => {
+  it("defaults priority to standard and creates a valid brief when notes are omitted", () => {
     const payload = researchPortalTaskFromBusinessTask({ title: "Call supplier" }, null);
     expect(payload.brief).toContain("Business Intelligence task: Call supplier.");
+    expect(payload.priority).toBe("standard");
   });
 });
