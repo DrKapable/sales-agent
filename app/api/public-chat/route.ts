@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
+import { maybeEscalateResearchService } from "@/lib/research-service-escalation";
 import { addMessage, getConversation, getOrCreateLead, updateLead } from "@/lib/store";
 import { getAiModelCandidates, getSetupState } from "@/lib/env";
 import { verifiedConversationFallback } from "@/lib/recovery-reply";
@@ -68,6 +69,14 @@ export async function POST(request: Request) {
       console.info("Website new client director alert processed", { phoneSuffix: phone.slice(-4), alerted });
     });
   };
+
+  const researchEscalation = await maybeEscalateResearchService({ phone, text: parsed.data.message, source: "simulator" });
+  if (researchEscalation) {
+    await addMessage(phone, "assistant", researchEscalation.reply).catch(() => undefined);
+    await sendReferralNotification(researchEscalation);
+    queueNewClientAlert();
+    return NextResponse.json({ reply: researchEscalation.reply });
+  }
 
   const result = await generateWithFailover(phone, parsed.data.message);
   if (result) {
