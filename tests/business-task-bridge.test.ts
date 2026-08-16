@@ -42,6 +42,7 @@ describe("Business Intelligence task Research Portal mirror", () => {
     expect(payload.brief).toContain("Business Intelligence assignee: Dr. Monica.");
     expect(payload.dueDate).toBe("2026-08-18T08:00:00.000Z");
     expect(payload.program).toBe("MPH");
+    expect(payload.academicLevel).toBeUndefined();
     expect(payload.priority).toBe("high");
   });
 
