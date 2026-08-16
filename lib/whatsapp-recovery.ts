@@ -1,6 +1,7 @@
 import { handleIncomingClientAttachment } from "@/lib/client-attachment-referral";
+import { researchCampaignOpening } from "@/lib/research-campaign-conversion";
 import { maybeEscalateResearchService } from "@/lib/research-service-escalation";
-import { addMessage } from "@/lib/store";
+import { addMessage, getConversation, updateLead } from "@/lib/store";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
 import { getAiModelCandidates } from "@/lib/env";
 import { verifiedConversationFallback } from "@/lib/recovery-reply";
@@ -10,6 +11,22 @@ import { sendWhatsAppText } from "@/lib/whatsapp";
 export async function generateWhatsAppReplyWithRecovery(phone: string, text: string): Promise<SalesAgentResult> {
   const attachmentResult = await handleIncomingClientAttachment(phone, text);
   if (attachmentResult) return attachmentResult;
+
+  // The current research ads generate many low-information openers such as
+  // "Can I get more info on this?". Keep that first reply short and useful
+  // instead of asking the model to guess which research product the ad meant.
+  const recentHistory = await getConversation(phone, 8).catch(() => []);
+  const firstClientTurn = recentHistory.filter((message) => message.role === "user").length <= 1;
+  const campaignOpening = researchCampaignOpening(text, firstClientTurn);
+  if (campaignOpening) {
+    await updateLead(phone, { serviceInterest: campaignOpening.serviceInterest, status: "NEW LEAD" }).catch((error) => {
+      console.warn("Unable to label research campaign lead", { phoneSuffix: phone.slice(-4), error });
+    });
+    await addMessage(phone, "assistant", campaignOpening.reply).catch((error) => {
+      console.error("Research campaign opening reply could not be saved", { phoneSuffix: phone.slice(-4), error });
+    });
+    return { reply: campaignOpening.reply, referralNotification: null, documentIds: [] };
+  }
 
   const researchEscalation = await maybeEscalateResearchService({ phone, text, source: "whatsapp" });
   if (researchEscalation) {
