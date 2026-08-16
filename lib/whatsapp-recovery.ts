@@ -1,3 +1,4 @@
+import { handleIncomingClientAttachment } from "@/lib/client-attachment-referral";
 import { addMessage } from "@/lib/store";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
 import { getAiModelCandidates } from "@/lib/env";
@@ -6,6 +7,9 @@ import { humanTextTypingDelayMs, wait } from "@/lib/timing";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 
 export async function generateWhatsAppReplyWithRecovery(phone: string, text: string): Promise<SalesAgentResult> {
+  const attachmentResult = await handleIncomingClientAttachment(phone, text);
+  if (attachmentResult) return attachmentResult;
+
   const models = getAiModelCandidates();
   for (let index = 0; index < models.length; index += 1) {
     const model = models[index];
