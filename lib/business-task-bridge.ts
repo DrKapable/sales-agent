@@ -1,4 +1,4 @@
-import { createBusinessTask } from "@/lib/business-ops";
+import { upsertExternalBusinessTask, type BusinessTaskPriority } from "@/lib/business-ops";
 import { createResearchPortalTask } from "@/lib/research-portal";
 import type { Lead } from "@/lib/types";
 
@@ -8,6 +8,7 @@ export type MirroredBusinessTaskInput = {
   assignedTo?: string;
   dueAt?: string;
   notes?: string;
+  priority?: BusinessTaskPriority;
 };
 
 export function researchPortalTaskFromBusinessTask(input: MirroredBusinessTaskInput, lead?: Lead | null) {
@@ -27,7 +28,7 @@ export function researchPortalTaskFromBusinessTask(input: MirroredBusinessTaskIn
   return {
     title: input.title,
     brief: brief.join("\n"),
-    priority: "standard" as const,
+    priority: input.priority || "standard" as const,
     dueDate: input.dueAt,
     program: lead?.programme || undefined,
     academicLevel: undefined
@@ -39,7 +40,8 @@ export async function createMirroredBusinessTask(input: MirroredBusinessTaskInpu
   const portalTask = await createResearchPortalTask({
     ...portalPayload,
     lead: lead || null,
-    notify: false
+    notify: false,
+    sourceReference: "business-intelligence"
   });
 
   if (!portalTask.created || !portalTask.taskId) {
@@ -47,7 +49,14 @@ export async function createMirroredBusinessTask(input: MirroredBusinessTaskInpu
   }
 
   try {
-    const businessTask = await createBusinessTask(input) as Record<string, unknown>;
+    const businessTask = await upsertExternalBusinessTask({
+      ...input,
+      priority: input.priority || "standard",
+      source: "research-portal",
+      externalId: portalTask.taskId,
+      program: lead?.programme || undefined,
+      sourceClient: lead ? (lead.name || lead.phone) : undefined
+    }) as Record<string, unknown>;
     return {
       ...businessTask,
       researchPortalTaskId: portalTask.taskId,
