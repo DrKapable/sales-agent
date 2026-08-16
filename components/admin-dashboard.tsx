@@ -10,6 +10,8 @@ type Setup = ReturnType<typeof getSetupState>;
 type ConversationState = { lead: Lead; messages: ConversationMessage[]; replyWindow: { open: boolean; expiresAt: string | null }; delivery?: { status: "accepted" | "simulated"; messageId: string | null } };
 type Tab = "leads" | "offers" | "setup";
 const staffMembers = ["Dr. Mustafa Juma Phiri", "Dr Kanyembo Ng'andwe"] as const;
+const CONVERSATION_REFRESH_MS = 5000;
+const INBOX_REFRESH_MS = 10000;
 const quickReplies = [
   { label: "Acknowledge", text: "Thank you for contacting MedMinds. I am reviewing your request and will assist you shortly." },
   { label: "Research pricing", text: "You can review our research service prices here: https://www.medmindslc.online/pricing" },
@@ -34,6 +36,8 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [offerQuery, setOfferQuery] = useState("");
   const [offerCategory, setOfferCategory] = useState("All categories");
+  const conversationRefreshInFlight = useRef(false);
+  const inboxRefreshInFlight = useRef(false);
 
   const converted = leads.filter((lead) => lead.status === "CONVERTED").length;
   const humanManaged = leads.filter((lead) => lead.aiPaused).length;
@@ -52,6 +56,8 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   }), [offers, offerCategory, offerQuery]);
 
   const loadConversation = useCallback(async (leadId: string, quiet = false) => {
+    if (conversationRefreshInFlight.current) return;
+    conversationRefreshInFlight.current = true;
     if (!quiet) setConversationLoading(true);
     try {
       const response = await fetch(`/api/admin/leads/${leadId}/messages`, { cache: "no-store" });
@@ -59,22 +65,73 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
       if (!response.ok) throw new Error(data.error || "Unable to load this conversation.");
       setConversation(data as ConversationState);
       setLeads((current) => current.map((lead) => lead.id === data.lead.id ? data.lead : lead));
-      setSender((data.lead.assignedTo as (typeof staffMembers)[number] | null) ?? staffMembers[0]);
-      setNote(data.lead.internalNote ?? "");
+      if (!quiet) {
+        setSender((data.lead.assignedTo as (typeof staffMembers)[number] | null) ?? staffMembers[0]);
+        setNote(data.lead.internalNote ?? "");
+      }
       setConversationError("");
     } catch (error) {
       if (!quiet) setConversationError(error instanceof Error ? error.message : "Unable to load this conversation.");
     } finally {
+      conversationRefreshInFlight.current = false;
       if (!quiet) setConversationLoading(false);
+    }
+  }, []);
+
+  const loadInbox = useCallback(async () => {
+    if (inboxRefreshInFlight.current) return;
+    inboxRefreshInFlight.current = true;
+    try {
+      const response = await fetch("/api/admin/leads", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !Array.isArray(data)) return;
+      const nextLeads = data as Lead[];
+      setLeads(nextLeads);
+      setSelectedLeadId((current) => current && nextLeads.some((lead) => lead.id === current) ? current : (nextLeads[0]?.id ?? null));
+    } catch {
+      // Keep the current inbox visible if a background refresh briefly fails.
+    } finally {
+      inboxRefreshInFlight.current = false;
     }
   }, []);
 
   useEffect(() => {
     if (!selectedLeadId || tab !== "leads") return;
     void loadConversation(selectedLeadId);
-    const timer = window.setInterval(() => void loadConversation(selectedLeadId, true), 15000);
-    return () => window.clearInterval(timer);
+    const refreshConversation = () => {
+      if (document.visibilityState === "visible") void loadConversation(selectedLeadId, true);
+    };
+    const timer = window.setInterval(refreshConversation, CONVERSATION_REFRESH_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshConversation();
+    };
+    window.addEventListener("focus", refreshConversation);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshConversation);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [selectedLeadId, tab, loadConversation]);
+
+  useEffect(() => {
+    if (tab !== "leads") return;
+    void loadInbox();
+    const refreshInbox = () => {
+      if (document.visibilityState === "visible") void loadInbox();
+    };
+    const timer = window.setInterval(refreshInbox, INBOX_REFRESH_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshInbox();
+    };
+    window.addEventListener("focus", refreshInbox);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshInbox);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [tab, loadInbox]);
 
   async function patchLead(id: string, patch: Partial<Pick<Lead, "status" | "aiPaused" | "assignedTo" | "internalNote" | "priority" | "followUpAt">>) {
     setSaving(true);
