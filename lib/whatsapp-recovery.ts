@@ -1,4 +1,5 @@
 import { handleIncomingClientAttachment } from "@/lib/client-attachment-referral";
+import { maybeEscalateResearchService } from "@/lib/research-service-escalation";
 import { addMessage } from "@/lib/store";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
 import { getAiModelCandidates } from "@/lib/env";
@@ -9,6 +10,14 @@ import { sendWhatsAppText } from "@/lib/whatsapp";
 export async function generateWhatsAppReplyWithRecovery(phone: string, text: string): Promise<SalesAgentResult> {
   const attachmentResult = await handleIncomingClientAttachment(phone, text);
   if (attachmentResult) return attachmentResult;
+
+  const researchEscalation = await maybeEscalateResearchService({ phone, text, source: "whatsapp" });
+  if (researchEscalation) {
+    await addMessage(phone, "assistant", researchEscalation.reply).catch((error) => {
+      console.error("Research escalation reply could not be saved", { phoneSuffix: phone.slice(-4), error });
+    });
+    return researchEscalation;
+  }
 
   const models = getAiModelCandidates();
   for (let index = 0; index < models.length; index += 1) {
