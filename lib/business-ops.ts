@@ -5,6 +5,23 @@ import type { Lead } from "@/lib/types";
 let sql: NeonQueryFunction<false, false> | null = null;
 let setup: Promise<void> | null = null;
 
+export type BusinessTaskPriority = "low" | "standard" | "high" | "urgent";
+
+export type BusinessTaskInput = {
+  leadId?: string;
+  title: string;
+  assignedTo?: string;
+  dueAt?: string;
+  notes?: string;
+  priority?: BusinessTaskPriority;
+  source?: string;
+  externalId?: string;
+  program?: string;
+  academicLevel?: string;
+  sourceClient?: string;
+  status?: "OPEN" | "COMPLETED";
+};
+
 function db() {
   if (!process.env.DATABASE_URL) return null;
   sql ??= neon(process.env.DATABASE_URL);
@@ -20,6 +37,13 @@ async function ensureTables() {
       due_at TIMESTAMPTZ, status TEXT NOT NULL DEFAULT 'OPEN', notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ
     )`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'standard'`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS source TEXT`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS external_id TEXT`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS program TEXT`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS academic_level TEXT`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS source_client TEXT`);
+    await database.query(`CREATE UNIQUE INDEX IF NOT EXISTS business_tasks_source_external_id_uidx ON business_tasks(source, external_id)`);
     await database.query(`CREATE TABLE IF NOT EXISTS client_payments (
       id UUID PRIMARY KEY, lead_id UUID, amount_zmw NUMERIC NOT NULL,
       reference TEXT, status TEXT NOT NULL DEFAULT 'PENDING', verified_by TEXT,
@@ -165,11 +189,47 @@ export async function getBusinessSnapshot() {
   };
 }
 
-export async function createBusinessTask(input: { leadId?: string; title: string; assignedTo?: string; dueAt?: string; notes?: string }) {
+export async function createBusinessTask(input: BusinessTaskInput) {
   await ensureTables();
   const database = db();
   if (!database) throw new Error("Persistent database storage is required.");
-  const rows = await database.query(`INSERT INTO business_tasks (id,lead_id,title,assigned_to,due_at,notes) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`, [crypto.randomUUID(), input.leadId || null, input.title, input.assignedTo || null, input.dueAt || null, input.notes || null]);
+  const rows = await database.query(
+    `INSERT INTO business_tasks (id,lead_id,title,assigned_to,due_at,status,notes,priority,source,external_id,program,academic_level,source_client)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    [
+      crypto.randomUUID(), input.leadId || null, input.title, input.assignedTo || null, input.dueAt || null,
+      input.status || "OPEN", input.notes || null, input.priority || "standard", input.source || null,
+      input.externalId || null, input.program || null, input.academicLevel || null, input.sourceClient || null
+    ]
+  );
+  return rows[0];
+}
+
+export async function upsertExternalBusinessTask(input: BusinessTaskInput & { source: string; externalId: string }) {
+  await ensureTables();
+  const database = db();
+  if (!database) throw new Error("Persistent database storage is required.");
+  const rows = await database.query(
+    `INSERT INTO business_tasks (id,lead_id,title,assigned_to,due_at,status,notes,priority,source,external_id,program,academic_level,source_client)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+     ON CONFLICT (source,external_id) DO UPDATE SET
+       lead_id=COALESCE(EXCLUDED.lead_id,business_tasks.lead_id),
+       title=EXCLUDED.title,
+       assigned_to=COALESCE(EXCLUDED.assigned_to,business_tasks.assigned_to),
+       due_at=EXCLUDED.due_at,
+       status=EXCLUDED.status,
+       notes=EXCLUDED.notes,
+       priority=EXCLUDED.priority,
+       program=COALESCE(EXCLUDED.program,business_tasks.program),
+       academic_level=COALESCE(EXCLUDED.academic_level,business_tasks.academic_level),
+       source_client=COALESCE(EXCLUDED.source_client,business_tasks.source_client)
+     RETURNING *`,
+    [
+      crypto.randomUUID(), input.leadId || null, input.title, input.assignedTo || null, input.dueAt || null,
+      input.status || "OPEN", input.notes || null, input.priority || "standard", input.source, input.externalId,
+      input.program || null, input.academicLevel || null, input.sourceClient || null
+    ]
+  );
   return rows[0];
 }
 
