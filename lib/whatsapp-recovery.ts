@@ -2,7 +2,7 @@ import { addMessage } from "@/lib/store";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
 import { getAiModelCandidates } from "@/lib/env";
 import { verifiedConversationFallback } from "@/lib/recovery-reply";
-import { wait } from "@/lib/timing";
+import { humanTextTypingDelayMs, wait } from "@/lib/timing";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 
 export async function generateWhatsAppReplyWithRecovery(phone: string, text: string): Promise<SalesAgentResult> {
@@ -25,6 +25,14 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
 }
 
 export async function sendWhatsAppTextWithRetry(phone: string, body: string, phoneNumberId?: string | null) {
+  const typingDelayMs = humanTextTypingDelayMs(body);
+  console.info("Mary human-like typing delay", {
+    phoneSuffix: phone.slice(-4),
+    characters: body.trim().length,
+    delayMs: typingDelayMs
+  });
+  await wait(typingDelayMs);
+
   try {
     return await sendWhatsAppText(phone, body, phoneNumberId ?? undefined);
   } catch (firstError) {
