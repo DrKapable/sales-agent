@@ -8,6 +8,7 @@ export async function createResearchPortalTask(input: {
   dueDate?: string;
   program?: string;
   academicLevel?: string;
+  sourceReference?: string;
   lead?: Lead | null;
   notify?: boolean;
 }) {
@@ -25,7 +26,8 @@ export async function createResearchPortalTask(input: {
       priority: input.priority || "standard",
       dueDate: input.dueDate,
       program: input.program,
-      academicLevel: input.academicLevel
+      academicLevel: input.academicLevel,
+      sourceReference: input.sourceReference
     })
   });
   const data = await response.json().catch(() => ({})) as { ok?: boolean; task?: { id?: string; title?: string; status?: string }; error?: string };
