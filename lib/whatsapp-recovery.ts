@@ -1,7 +1,9 @@
 import { handleIncomingClientAttachment } from "@/lib/client-attachment-referral";
+import { optimizeInboundLead, shapeMaryReply } from "@/lib/conversation-optimization";
 import { researchCampaignOpening } from "@/lib/research-campaign-conversion";
 import { maybeEscalateResearchService } from "@/lib/research-service-escalation";
-import { addMessage, getConversation, updateLead } from "@/lib/store";
+import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewrite";
+import { addMessage, updateLead } from "@/lib/store";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
 import { getAiModelCandidates } from "@/lib/env";
 import { verifiedConversationFallback } from "@/lib/recovery-reply";
@@ -12,11 +14,14 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
   const attachmentResult = await handleIncomingClientAttachment(phone, text);
   if (attachmentResult) return attachmentResult;
 
-  // The current research ads generate many low-information openers such as
-  // "Can I get more info on this?". Keep that first reply short and useful
-  // instead of asking the model to guess which research product the ad meant.
-  const recentHistory = await getConversation(phone, 8).catch(() => []);
-  const firstClientTurn = recentHistory.filter((message) => message.role === "user").length <= 1;
+  const optimization = await optimizeInboundLead(phone, text, "whatsapp").catch((error) => {
+    console.warn("Conversation optimization could not be applied; continuing safely", { phoneSuffix: phone.slice(-4), error });
+    return null;
+  });
+
+  // The two active research ads generate low-information openers such as
+  // "Can I get more info on this?". Keep the first reply short and easy to answer.
+  const firstClientTurn = (optimization?.clientMessageCount ?? 1) <= 1;
   const campaignOpening = researchCampaignOpening(text, firstClientTurn);
   if (campaignOpening) {
     await updateLead(phone, { serviceInterest: campaignOpening.serviceInterest, status: "NEW LEAD" }).catch((error) => {
@@ -40,14 +45,21 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
   for (let index = 0; index < models.length; index += 1) {
     const model = models[index];
     try {
-      return await replyToClient(phone, text, "whatsapp", model);
+      const result = await replyToClient(phone, text, "whatsapp", model);
+      if (!optimization) return result;
+      const shaped = shapeMaryReply(result.reply, text, optimization.analysis);
+      if (shaped === result.reply) return result;
+
+      const rewritten = await rewriteLatestUnsentAssistantMessage({ phone, from: result.reply, to: shaped }).catch(() => false);
+      return rewritten ? { ...result, reply: shaped } : result;
     } catch (error) {
       console.warn("WhatsApp AI generation failed", { phoneSuffix: phone.slice(-4), model, attempt: index + 1, error });
       if (index < models.length - 1) await wait(250);
     }
   }
 
-  const reply = await verifiedConversationFallback(phone, text).catch(() => "I’m here and I can help. Tell me a little more about what you need and I’ll continue from there.");
+  const fallback = await verifiedConversationFallback(phone, text).catch(() => "I’m here and I can help. Tell me a little more about what you need and I’ll continue from there.");
+  const reply = optimization ? shapeMaryReply(fallback, text, optimization.analysis) : fallback;
   await addMessage(phone, "assistant", reply).catch((error) => {
     console.error("WhatsApp fallback could not be saved", { phoneSuffix: phone.slice(-4), error });
   });
