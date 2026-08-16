@@ -29,18 +29,23 @@ export async function sendNamedWhatsAppTemplate(phone: string, templateName: str
   return { messageId };
 }
 
-/**
- * Supports a single currently-approved fallback template plus optional
- * step-specific approved templates. This does not assume those templates exist:
- * WHATSAPP_FOLLOWUP_TEMPLATE_NAME_1 ... _4 can be added after Meta approval.
- */
 export function followUpTemplateConfig(step: number) {
-  const number = Math.max(1, Math.min(4, step + 1));
-  const stepName = process.env[`WHATSAPP_FOLLOWUP_TEMPLATE_NAME_${number}`];
-  const stepLanguage = process.env[`WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE_${number}`];
+  const names = [
+    process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME_1,
+    process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME_2,
+    process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME_3,
+    process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME_4
+  ];
+  const languages = [
+    process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE_1,
+    process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE_2,
+    process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE_3,
+    process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE_4
+  ];
+  const index = Math.max(0, Math.min(3, step));
   return {
-    name: stepName || process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME || "",
-    language: stepLanguage || process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE || "en_US"
+    name: names[index] || process.env.WHATSAPP_FOLLOWUP_TEMPLATE_NAME || "",
+    language: languages[index] || process.env.WHATSAPP_FOLLOWUP_TEMPLATE_LANGUAGE || "en_US"
   };
 }
 
