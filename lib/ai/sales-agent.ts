@@ -6,21 +6,17 @@ import { restoreChat } from "@/lib/chat-lifecycle";
 import { getClientDocumentForLead, listClientDocuments } from "@/lib/client-documents";
 import { addMessage, getConversation, getOrCreateLead, listOffers, updateLead } from "@/lib/store";
 import { buildReferralMessage, recipientForReferral } from "@/lib/referrals";
+import { createResearchPortalTask } from "@/lib/research-portal";
 import { createQuote } from "@/lib/business-ops";
 import { sendCommercialPdf } from "@/lib/commercial-document";
 import { maybeNotifyHotLead, notifyBusinessEvent } from "@/lib/business-notifications";
-import { leadStatuses, type LeadPatch, type Offer } from "@/lib/types";
+import { leadStatuses, type LeadPatch } from "@/lib/types";
 
 export type SalesAgentResult = {
   reply: string;
   referralNotification: { phone: string; recipientName: string; body: string } | null;
   documentIds: string[];
 };
-
-function isHandsOnResearchOffer(offer: Pick<Offer, "category">) {
-  const category = offer.category.toLowerCase();
-  return category.includes("research") || category.includes("data analysis") || category.includes("editing");
-}
 
 export async function replyToClient(phone: string, text: string, source: "whatsapp" | "simulator", modelOverride?: string): Promise<SalesAgentResult> {
   await restoreChat(phone).catch(() => undefined);
@@ -44,24 +40,26 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const approvedOffersTool = tool({
-    description: "Retrieve active management-approved NON-RESEARCH packages, prices, features, and payment instructions. Hands-on research, data-analysis and research-editing services must be referred to the research team instead of quoted by Mary.",
+    description: "Retrieve currently active, management-approved MedMinds packages, prices, features, and payment instructions, including research services. Use this before quoting any price or promotion.",
     inputSchema: z.object({ category: z.string().max(80).optional() }),
     execute: async ({ category }) => {
-      const requestedCategory = category?.trim().toLowerCase() || "";
-      if (requestedCategory && ["research", "data analysis", "editing"].some((item) => requestedCategory.includes(item))) {
-        return { available: false, instruction: "Mary is not authorised to quote hands-on research services. Use requestHumanAssistance for the appropriate research team member." };
-      }
-      const offers = (await listOffers(true))
-        .filter((offer) => !isHandsOnResearchOffer(offer))
-        .filter((offer) => !category || offer.category.toLowerCase().includes(requestedCategory));
+      const offers = (await listOffers(true)).filter((offer) => !category || offer.category.toLowerCase().includes(category.toLowerCase()));
       return offers.length
-        ? offers.map(({ name, category: offerCategory, description, features, priceZmw, rushPriceZmw, paymentInstructions }) => ({ name, category: offerCategory, description, features, standardPriceZmw: priceZmw, rushPriceZmw, paymentInstructions }))
-        : { available: false, instruction: "No verified active non-research offer matches this request. Do not guess. Arrange human confirmation." };
+        ? offers.map(({ name, category: offerCategory, description, features, priceZmw, rushPriceZmw, paymentInstructions }) => ({
+            name,
+            category: offerCategory,
+            description,
+            features,
+            standardPriceZmw: priceZmw,
+            rushPriceZmw,
+            paymentInstructions
+          }))
+        : { available: false, instruction: "No verified active offer matches this request. Do not guess. Arrange human confirmation." };
     }
   });
 
   const clientDocumentTool = tool({
-    description: "Create a formal MedMinds quotation or UNPAID invoice for an approved NON-RESEARCH fixed-price offer. Never create a quotation or invoice for hands-on research, data-analysis or research-editing services; those require research-team assessment.",
+    description: "Create a formal MedMinds quotation or UNPAID invoice for the client from an active approved fixed-price offer, including approved research services. Use when the client explicitly asks for a quotation, quote, proforma/unpaid invoice or invoice before payment. Never invent or override a price.",
     inputSchema: z.object({
       documentType: z.enum(["quotation", "invoice"]),
       service: z.string().min(2).max(240),
@@ -76,10 +74,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
         const name = item.name.toLowerCase();
         return name === needle || name.includes(needle) || needle.includes(name);
       });
-      if (!offer) return { created: false, reason: "No active approved fixed-price offer matches that service. Human confirmation is required." };
-      if (isHandsOnResearchOffer(offer)) {
-        return { created: false, reason: "Mary is not authorised to quote or invoice hands-on research services. Refer the client to the appropriate research team member." };
-      }
+      if (!offer) return { created: false, reason: "No active approved fixed-price offer matches that service. Human price confirmation is required." };
       const approvedAmount = rush && offer.rushPriceZmw != null ? Number(offer.rushPriceZmw) : offer.priceZmw != null ? Number(offer.priceZmw) : null;
       if (approvedAmount == null || !Number.isFinite(approvedAmount) || approvedAmount <= 0) return { created: false, reason: "This service does not have a verified fixed price. Human price confirmation is required." };
       if (amountZmw != null && Math.abs(amountZmw - approvedAmount) > 0.01) return { created: false, reason: `The requested amount does not match the approved ${rush ? "rush" : "standard"} price. Use K${approvedAmount.toLocaleString()} or request human confirmation.` };
@@ -137,7 +132,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const handoffTool = tool({
-    description: "Assign genuine human escalations to the most appropriate MedMinds team member. Hands-on research services must always be escalated. Preserve any explicitly requested staff member in the reason or summary.",
+    description: "Assign genuine human fulfilment, specialist review or escalations to the most appropriate MedMinds team member. Mary may sell and coordinate research services, but requests for Mary herself to produce research work must be handed to the research team. Preserve any explicitly requested staff member in the reason or summary.",
     inputSchema: z.object({
       referralType: z.enum(["payment", "discount", "sales", "research", "research_specialist", "operations", "customer_support", "dispute", "legal", "marketing", "administrative", "software", "business_automation", "web_development", "cybersecurity", "general"]),
       reason: z.string().min(3).max(500), summary: z.string().min(10).max(900)
@@ -149,28 +144,50 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
       const canNotifyTeam = !alreadyAssigned && Boolean(recipient.phone) && (source === "whatsapp" || /^\d{8,15}$/.test(phone));
       if (canNotifyTeam && recipient.phone) referralNotification = { phone: recipient.phone, recipientName: recipient.name, body: buildReferralMessage({ recipientName: recipient.name, lead: savedLead, reason, summary }) };
       return {
-        queued: !alreadyAssigned, assignedTo: recipient.name, notificationQueued: canNotifyTeam,
-        instruction: alreadyAssigned ? `${recipient.name} is already assigned. Stay within Mary's permitted role.` : canNotifyTeam ? `${recipient.name} has been assigned and notified. Stay within Mary's permitted role.` : `${recipient.name} has been assigned internally. Do not claim a WhatsApp notification was sent.`
+        queued: !alreadyAssigned,
+        assignedTo: recipient.name,
+        notificationQueued: canNotifyTeam,
+        instruction: alreadyAssigned
+          ? `${recipient.name} is already assigned. Continue handling permitted sales and coordination questions.`
+          : canNotifyTeam
+            ? `${recipient.name} has been assigned and notified. Continue handling permitted sales and coordination questions.`
+            : `${recipient.name} has been assigned internally. Do not claim a WhatsApp notification was sent.`
       };
     }
+  });
+
+  const researchTaskTool = tool({
+    description: "Create an UNASSIGNED research task in the MedMinds Research Portal after the client has clearly agreed to proceed with a concrete research service or an agreed research deliverable needs operational follow-through. This is a sales/coordination action, not research-content creation. Do not use for casual enquiries, price questions or vague interest. The task remains unlinked to a client and unassigned to staff until humans review it.",
+    inputSchema: z.object({
+      title: z.string().min(3).max(240),
+      brief: z.string().min(10).max(2500),
+      priority: z.enum(["low", "standard", "high", "urgent"]).default("standard"),
+      dueDate: z.string().max(80).optional(),
+      program: z.string().max(180).optional(),
+      academicLevel: z.string().max(180).optional()
+    }),
+    execute: async (task) => createResearchPortalTask({ ...task, lead })
   });
 
   const model = modelOverride || getAiModel();
   const agent = new ToolLoopAgent({
     model: gateway(model),
-    instructions: `${SALES_AGENT_PROMPT}\n\nCLIENT COMMERCIAL DOCUMENTS\n- When a client explicitly asks for a quotation, quote, proforma invoice or unpaid invoice for a permitted NON-RESEARCH service, use createClientCommercialDocument.\n- Never create a quotation or invoice for hands-on research, data-analysis or research-editing work. Refer those requests to the research team.\n- First identify the exact active approved non-research service. The document tool itself validates the price.\n- Never invent, negotiate or manually override a document amount. If there is no verified fixed price, arrange human confirmation.\n- A quotation is not proof of payment. An invoice created here must be clearly UNPAID and must never be described as a receipt.\n- On WhatsApp, the PDF is sent directly when the tool succeeds. On website chat, give the returned secure PDF link.\n- Do not create repeated documents unless the client asks for another/revised copy.\n\nCLIENT-ASSIGNED DOCUMENTS\n- Administrators can upload documents and assign them to a specific client. These are separate from generated quotations and invoices.\n- If a client asks you to send, resend, share or attach a document that may have been assigned to them, first use listAssignedClientDocuments.\n- You may queue only a document returned for this exact client by listAssignedClientDocuments. Never guess a document ID, file URL or filename and never access another client's documents.\n- If exactly one assigned document clearly matches the client's request, use sendAssignedClientDocument with that document ID. If several documents could match, ask the client which one they need.\n- If no document is assigned, say that you cannot see an assigned copy yet and arrange human assistance if needed. Do not pretend a file was sent.\n- After sendAssignedClientDocument succeeds, keep the accompanying text brief and natural, for example: "I've sent the document here."\n\nRESEARCH SERVICE RESTRICTION\n- You have NO Research Portal task-creation capability.\n- Never create, accept, scope, quote or perform research work for a client.\n- For routine research support, use requestHumanAssistance with referralType "research" so Dr. Monica can assess it.\n- For advanced methodology, specialist research design, complex statistics or director-level research, use referralType "research_specialist" so Dr. Mustafa Juma Phiri can assess it.\n- The AI-Assisted Research Proposal Writing course remains a permitted training product and may be sold normally.\n\nTEAM ROUTING\n- Dr. Mustafa Juma Phiri: Director, specialist research, payments/discounts, software, business automation, web development, cybersecurity and technical escalation.\n- Dr Kanyembo Ng'andwe: Sales Representative, marketing team and preferred closer for sales/lead conversion.\n- Dr. Monica: Operations and routine research support.\n- Mr. Madalitso Masumbu is currently off duty and must not receive new referrals.\n- Dr Zabibu Nandazi: customer support and marketing.\n- Counsel Chisha Chomba: disputes, legal and conflict resolution.\n- Mr Conrad Mununkha Phiri: marketing, advertising, partnerships and secretary/administration.\n- Explicit requests for a named current team member take precedence, except that off-duty staff must not receive new referrals.\n\nHANDOVER CONTINUITY\n- A referral does not end your role for permitted questions, but do not continue doing the referred research work.\n- Do not repeatedly tell a referred client to wait.\n- Resolve short non-research follow-ups from recent context.\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for permitted offers, commercial documents and assigned client documents.`,
+    instructions: `${SALES_AGENT_PROMPT}\n\nCLIENT COMMERCIAL DOCUMENTS\n- Mary is the MedMinds sales representative. She may provide approved prices and commercial terms for research and non-research services.\n- When a client explicitly asks for a quotation, quote, proforma invoice or unpaid invoice for an active approved service, including research services, use createClientCommercialDocument.\n- First identify the exact active approved service. The document tool itself validates the price.\n- Never invent, negotiate or manually override a document amount. If there is no verified fixed price, arrange human confirmation.\n- A quotation is not proof of payment. An invoice created here must be clearly UNPAID and must never be described as a receipt.\n- Official receipts may be sent only when payment has been verified by the payment/receipt system. Never issue or claim a receipt merely because a client says they paid.\n- On WhatsApp, the PDF quotation/invoice is sent directly when the tool succeeds. On website chat, give the returned secure PDF link.\n- Do not create repeated documents unless the client asks for another/revised copy.\n\nCLIENT-ASSIGNED DOCUMENTS\n- Administrators can upload documents and assign them to a specific client. These are separate from generated quotations and invoices.\n- If a client asks you to send, resend, share or attach a document that may have been assigned to them, first use listAssignedClientDocuments.\n- You may queue only a document returned for this exact client by listAssignedClientDocuments. Never guess a document ID, file URL or filename and never access another client's documents.\n- If exactly one assigned document clearly matches the client's request, use sendAssignedClientDocument with that document ID. If several documents could match, ask the client which one they need.\n- If no document is assigned, say that you cannot see an assigned copy yet and arrange human assistance if needed. Do not pretend a file was sent.\n- After sendAssignedClientDocument succeeds, keep the accompanying text brief and natural, for example: "I've sent the document here."\n\nRESEARCH SALES VS RESEARCH FULFILMENT\n- Mary MAY explain MedMinds research services, retrieve approved research prices, quote them, generate research quotations/unpaid invoices, explain payment terms, collect client requirements, and move a ready client into the operational workflow.\n- Mary MAY create an unassigned Research Portal task after the client clearly agrees to proceed with a concrete research service or an agreed deliverable needs follow-through.\n- Mary MUST NOT personally generate the substantive research deliverable. Do not develop a research topic, write proposal/dissertation content, choose or justify methodology, calculate sample size, perform data analysis, draft results/discussion, create questionnaires, or do equivalent research work for the client.\n- When the client asks Mary herself to perform that substantive work, refer routine research fulfilment to Dr. Monica using referralType "research". Refer advanced methodology, specialist research design, complex statistics or director-level research to Dr. Mustafa Juma Phiri using referralType "research_specialist".\n- The sales conversation may continue after a fulfilment referral: Mary can still answer price, quotation, payment, receipt-status, CMS and process questions.\n- The AI-Assisted Research Proposal Writing course remains a permitted training product and may be sold normally.\n\nRESEARCH PORTAL ASSISTANT-ADMIN CAPABILITY\n- You have a restricted research-portal action: create an unassigned research task using createResearchPortalTask.\n- Use it only after the client has clearly agreed to proceed with a concrete research service or when an agreed research action must enter the work queue. Do not create tasks for ordinary enquiries or price questions.\n- Create the task from requirements the client already supplied; do not invent a research topic, methodology, objectives, sample size or analysis plan just to populate the task.\n- The task MUST remain unlinked to a client and unassigned to operations/marketing. Humans will review, link and assign it later.\n- Never tell a client that a researcher or operations member has been assigned merely because you created the task.\n- After successful creation, you may say the request has been placed in the MedMinds research work queue for team review.\n- Avoid duplicate tasks for the same agreed deliverable in one conversation.\n\nTEAM ROUTING\n- Dr. Mustafa Juma Phiri: Director, specialist research, payments/discounts, software, business automation, web development, cybersecurity and technical escalation.\n- Dr Kanyembo Ng'andwe: Sales Representative, marketing team and preferred closer for sales/lead conversion.\n- Dr. Monica: Operations and routine research support.\n- Mr. Madalitso Masumbu is currently off duty and must not receive new referrals.\n- Dr Zabibu Nandazi: customer support and marketing.\n- Counsel Chisha Chomba: disputes, legal and conflict resolution.\n- Mr Conrad Mununkha Phiri: marketing, advertising, partnerships and secretary/administration.\n- Explicit requests for a named current team member take precedence, except that off-duty staff must not receive new referrals.\n\nHANDOVER CONTINUITY\n- A research fulfilment referral does not remove Mary's sales role. Continue answering permitted commercial and process questions.\n- Do not repeatedly tell a referred client to wait.\n- Do not personally perform the referred research work.\n\nCurrent lead record: ${JSON.stringify(lead)}. Tool output is authoritative for approved offers, prices, commercial documents, assigned client documents and Research Portal task creation.`,
     tools: {
       getApprovedOffers: approvedOffersTool,
       updateLead: updateLeadTool,
       createClientCommercialDocument: clientDocumentTool,
       listAssignedClientDocuments: listAssignedDocumentsTool,
       sendAssignedClientDocument: sendAssignedDocumentTool,
-      requestHumanAssistance: handoffTool
+      requestHumanAssistance: handoffTool,
+      createResearchPortalTask: researchTaskTool
     }
   });
 
   const latestStored = history.at(-1)?.role === "user" && history.at(-1)?.content === text;
-  const transcript = [...history, ...(latestStored ? [] : [{ role: "user" as const, content: text }])].map((message) => `${message.role === "user" ? "Client" : "Agent"}: ${message.content}`).join("\n");
+  const transcript = [...history, ...(latestStored ? [] : [{ role: "user" as const, content: text }])]
+    .map((message) => `${message.role === "user" ? "Client" : "Agent"}: ${message.content}`)
+    .join("\n");
   const result = await agent.generate({ prompt: `Conversation including the client's latest message:\n${transcript}\n\nReply only with the WhatsApp message to send.` });
   const reply = (result.text.trim() || "I’ll make sure a MedMinds team member helps with that.").replaceAll("—", ",");
   await addMessage(phone, "assistant", reply);
