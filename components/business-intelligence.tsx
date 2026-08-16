@@ -24,7 +24,15 @@ function fmtDate(value?: string | null) {
 }
 
 function clientLabel(row: any) {
-  return row.leadName || row.leadPhone || "No client linked";
+  return row.leadName || row.leadPhone || row.source_client || "No client linked";
+}
+
+function taskPriorityStyle(priority?: string): React.CSSProperties {
+  const value = String(priority || "standard").toLowerCase();
+  if (value === "urgent") return dangerPill;
+  if (value === "high") return warningPill;
+  if (value === "low") return donePill;
+  return statusPill;
 }
 
 export function BusinessIntelligence() {
@@ -81,7 +89,7 @@ export function BusinessIntelligence() {
   function openForm(kind: Exclude<FormKind, null>, lead?: any) {
     setFormKind(kind);
     setFormLead(lead || null);
-    if (kind === "task") setForm({ title: lead ? `Follow up ${lead.name || lead.phone}` : "", assignedTo: "", dueAt: "", notes: "" });
+    if (kind === "task") setForm({ title: lead ? `Follow up ${lead.name || lead.phone}` : "", assignedTo: "", dueAt: "", notes: "", priority: "standard" });
     if (kind === "quote") setForm({ service: lead?.serviceInterest || lead?.packageName || "", amountZmw: "", details: "" });
     if (kind === "payment") setForm({ amountZmw: "", reference: "", verified: false });
   }
@@ -91,7 +99,7 @@ export function BusinessIntelligence() {
     if (formKind === "task") {
       if (!form.title?.trim()) return setError("Enter a task title.");
       const dueAt = form.dueAt ? new Date(form.dueAt).toISOString() : undefined;
-      const result = await action({ action: "task", leadId: formLead?.id, title: form.title.trim(), assignedTo: form.assignedTo || undefined, dueAt, notes: form.notes || undefined }, "Task created and the appropriate team member was notified.");
+      const result = await action({ action: "task", leadId: formLead?.id, title: form.title.trim(), assignedTo: form.assignedTo || undefined, dueAt, notes: form.notes || undefined, priority: form.priority || "standard" }, "Task created in Business Intelligence and the Research Portal.");
       if (result) setFormKind(null);
     }
     if (formKind === "quote") {
@@ -169,7 +177,7 @@ export function BusinessIntelligence() {
             <Feature name="Payment workflow" detail={`${data.metrics.paymentPending} pending · verification enabled`} ok />
             <Feature name="Quotation workflow" detail={`${data.metrics.quotesCreated ?? data.quotes.length} stored`} ok />
             <Feature name="WhatsApp event routing" detail="Important business events route by staff role" ok />
-            <Feature name="Research Portal bridge" detail="Restricted, unassigned-task creation; active after shared secret is configured" ok />
+            <Feature name="Research Portal bridge" detail="Bidirectional task creation sync with duplicate protection" ok />
             <Feature name="Daily management brief" detail="Runs with the daily follow-up cron" ok />
           </article>
         </section>
@@ -186,7 +194,7 @@ export function BusinessIntelligence() {
       </>}
 
       {view === "operations" && <section style={twoCol}>
-        <article style={card}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}><SectionTitle title="Tasks" subtitle="Create, track and close internal work" /><button style={primaryButton} onClick={() => openForm("task")}>+ New task</button></div>{data.tasks.length ? data.tasks.slice(0, 40).map((task: any) => <div key={task.id} style={operationRow}><div style={{ minWidth: 0 }}><strong>{task.title}</strong><div style={miniMuted}>{clientLabel(task)} · {task.assigned_to || "Unassigned"}</div><div style={miniMuted}>{task.due_at ? `Due ${fmtDate(task.due_at)}` : "No deadline"}</div></div><div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}><span style={task.status === "COMPLETED" ? donePill : statusPill}>{task.status}</span>{task.status !== "COMPLETED" && <button disabled={busy} style={smallButton} onClick={() => void action({ action: "task_status", taskId: task.id, status: "COMPLETED" }, "Task marked complete.")}>Complete</button>}</div></div>) : <Empty text="No internal tasks yet." />}</article>
+        <article style={card}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}><SectionTitle title="Tasks" subtitle="Synchronized task structure across Business Intelligence and the Research Portal" /><button style={primaryButton} onClick={() => openForm("task")}>+ New task</button></div>{data.tasks.length ? data.tasks.slice(0, 40).map((task: any) => <div key={task.id} style={operationRow}><div style={{ minWidth: 0, flex: "1 1 260px" }}><div style={{ display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap" }}><strong>{task.title}</strong><span style={taskPriorityStyle(task.priority)}>{String(task.priority || "standard").toUpperCase()}</span>{task.source === "research-portal" && <span style={scorePill}>Research Portal</span>}</div><div style={miniMuted}>{clientLabel(task)} · {task.assigned_to || "Unassigned"}</div>{(task.program || task.academic_level) && <div style={miniMuted}>{[task.program, task.academic_level].filter(Boolean).join(" · ")}</div>}<div style={miniMuted}>{task.due_at ? `Due ${fmtDate(task.due_at)}` : "No deadline"}</div>{task.notes && <div style={messagePreview}>{task.notes}</div>}</div><div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}><span style={task.status === "COMPLETED" ? donePill : statusPill}>{task.status}</span>{task.status !== "COMPLETED" && <button disabled={busy} style={smallButton} onClick={() => void action({ action: "task_status", taskId: task.id, status: "COMPLETED" }, "Task marked complete.")}>Complete</button>}</div></div>) : <Empty text="No internal tasks yet." />}</article>
 
         <article style={card}><SectionTitle title="Payments" subtitle="Verification status and receipt references" />{data.payments.length ? data.payments.slice(0, 40).map((payment: any) => <div key={payment.id} style={operationRow}><div><strong>K{Number(payment.amount_zmw).toLocaleString()}</strong><div style={miniMuted}>{clientLabel(payment)}</div><div style={miniMuted}>{payment.reference || "No reference"} · MM-{String(payment.id).slice(0, 8).toUpperCase()}</div></div><div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}><span style={payment.status === "VERIFIED" ? donePill : warningPill}>{payment.status}</span>{payment.status === "PENDING" && <button disabled={busy} style={primarySmallButton} onClick={() => void action({ action: "verify_payment", paymentId: payment.id, verifiedBy: "Admin" }, "Payment verified and the team was notified.")}>Verify</button>}</div></div>) : <Empty text="No payment records yet." />}
           <h3 style={{ margin: "28px 0 4px" }}>Quotations</h3><p style={{ ...miniMuted, marginTop: 0 }}>Saved quotations remain linked to the originating lead.</p>{data.quotes.length ? data.quotes.slice(0, 30).map((quote: any) => <div key={quote.id} style={operationRow}><div style={{ minWidth: 0 }}><strong>{quote.service}</strong><div style={miniMuted}>{clientLabel(quote)}</div><div style={miniMuted}>{quote.details}</div></div><strong style={{ whiteSpace: "nowrap" }}>{quote.amount_zmw == null ? "Tailored" : `K${Number(quote.amount_zmw).toLocaleString()}`}</strong></div>) : <Empty text="No quotations yet." />}</article>
@@ -200,7 +208,7 @@ export function BusinessIntelligence() {
 
     {formKind && <div style={modalBackdrop} onMouseDown={(e) => { if (e.currentTarget === e.target && !busy) setFormKind(null); }}><div style={modalCard}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}><div><span style={eyebrow}>{formKind === "task" ? "Operations" : formKind === "quote" ? "Sales" : "Finance"}</span><h2 style={{ margin: "5px 0" }}>{formKind === "task" ? "Create task" : formKind === "quote" ? "Create quotation" : "Record payment"}</h2>{formLead && <p style={{ ...miniMuted, margin: 0 }}>{formLead.name || formLead.phone} · {formLead.phone}</p>}</div><button disabled={busy} onClick={() => setFormKind(null)} style={closeButton}>×</button></div>
           <div style={{ display: "grid", gap: 12, marginTop: 20 }}>
-            {formKind === "task" && <><Field label="Task title"><input style={inputStyle} value={form.title || ""} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field><Field label="Assign to"><select style={inputStyle} value={form.assignedTo || ""} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}><option value="">Leave unassigned</option>{teamDirectory.map((person) => <option key={person.name} value={person.name}>{person.name}</option>)}</select></Field><Field label="Due date/time"><input type="datetime-local" style={inputStyle} value={form.dueAt || ""} onChange={(e) => setForm({ ...form, dueAt: e.target.value })} /></Field><Field label="Notes"><textarea style={textareaStyle} value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field></>}
+            {formKind === "task" && <><Field label="Task title"><input style={inputStyle} value={form.title || ""} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field><Field label="Priority"><select style={inputStyle} value={form.priority || "standard"} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option value="low">Low</option><option value="standard">Standard</option><option value="high">High</option><option value="urgent">Urgent</option></select></Field><Field label="Assign to"><select style={inputStyle} value={form.assignedTo || ""} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}><option value="">Leave unassigned</option>{teamDirectory.map((person) => <option key={person.name} value={person.name}>{person.name}</option>)}</select></Field><Field label="Due date/time"><input type="datetime-local" style={inputStyle} value={form.dueAt || ""} onChange={(e) => setForm({ ...form, dueAt: e.target.value })} /></Field><Field label="Notes / instructions"><textarea style={textareaStyle} value={form.notes || ""} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field></>}
             {formKind === "quote" && <><Field label="Service"><input style={inputStyle} value={form.service || ""} onChange={(e) => setForm({ ...form, service: e.target.value })} /></Field><Field label="Amount (ZMW)"><input type="number" min="0" style={inputStyle} placeholder="Leave blank for tailored quotation" value={form.amountZmw ?? ""} onChange={(e) => setForm({ ...form, amountZmw: e.target.value })} /></Field><Field label="Quotation details"><textarea style={textareaStyle} value={form.details || ""} onChange={(e) => setForm({ ...form, details: e.target.value })} /></Field></>}
             {formKind === "payment" && <><Field label="Amount received (ZMW)"><input type="number" min="0" step="0.01" style={inputStyle} value={form.amountZmw ?? ""} onChange={(e) => setForm({ ...form, amountZmw: e.target.value })} /></Field><Field label="Reference / note"><input style={inputStyle} value={form.reference || ""} onChange={(e) => setForm({ ...form, reference: e.target.value })} /></Field><label style={{ display: "flex", gap: 10, alignItems: "center", fontWeight: 700 }}><input type="checkbox" checked={Boolean(form.verified)} onChange={(e) => setForm({ ...form, verified: e.target.checked })} /> Payment has already been independently verified</label></>}
           </div><div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 20, flexWrap: "wrap" }}><button disabled={busy} style={secondaryButton} onClick={() => setFormKind(null)}>Cancel</button><button disabled={busy} style={primaryButton} onClick={() => void submitForm()}>{busy ? "Saving…" : "Save"}</button></div></div></div>}
