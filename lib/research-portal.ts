@@ -9,6 +9,7 @@ export async function createResearchPortalTask(input: {
   program?: string;
   academicLevel?: string;
   lead?: Lead | null;
+  notify?: boolean;
 }) {
   const secret = process.env.RESEARCH_ASSISTANT_SECRET;
   const url = process.env.RESEARCH_PORTAL_TASK_URL || "https://www.medmindslc.online/api/research/assistant-admin/tasks";
@@ -30,13 +31,15 @@ export async function createResearchPortalTask(input: {
   const data = await response.json().catch(() => ({})) as { ok?: boolean; task?: { id?: string; title?: string; status?: string }; error?: string };
   if (!response.ok || !data.ok || !data.task?.id) throw new Error(data.error || `Research portal returned ${response.status}.`);
 
-  await notifyBusinessEvent({
-    type: "research_task_created",
-    eventKey: `research_task_created:${data.task.id}`,
-    title: "New unassigned research task",
-    body: `Task: ${input.title}\nPortal status: Available / unassigned\nNo client or operations member has been assigned. Please review it in the MedMinds Research Portal.`,
-    lead: input.lead || null
-  }).catch((error) => console.error("Research task notification failed", { taskId: data.task?.id, error }));
+  if (input.notify !== false) {
+    await notifyBusinessEvent({
+      type: "research_task_created",
+      eventKey: `research_task_created:${data.task.id}`,
+      title: "New unassigned research task",
+      body: `Task: ${input.title}\nPortal status: Available / unassigned\nNo client or operations member has been assigned. Please review it in the MedMinds Research Portal.`,
+      lead: input.lead || null
+    }).catch((error) => console.error("Research task notification failed", { taskId: data.task?.id, error }));
+  }
 
   return {
     created: true,
@@ -44,6 +47,6 @@ export async function createResearchPortalTask(input: {
     status: data.task.status || "available",
     assignedToClient: false,
     assignedToOperations: false,
-    instruction: "The unassigned research task was created successfully and the research/operations team was notified. Do not claim that it has been assigned to a client or staff member."
+    instruction: "The unassigned research task was created successfully. Do not claim that it has been assigned to a client or staff member."
   };
 }
