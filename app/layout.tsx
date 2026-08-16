@@ -5,6 +5,7 @@ import { AgentIdentityEnhancer } from "@/components/agent-identity-enhancer";
 import { ChatDeliveryTicksEnhancer } from "@/components/chat-delivery-ticks-enhancer";
 import { ChatLifecycleReliabilityEnhancer } from "@/components/chat-lifecycle-reliability-enhancer";
 import { ChatRichTextEnhancer } from "@/components/chat-rich-text-enhancer";
+import { ClientAttachmentEnhancer } from "@/components/client-attachment-enhancer";
 import { ClientRecordManagementEnhancer } from "@/components/client-record-management-enhancer";
 import { MobileAdminEnhancer } from "@/components/mobile-admin-enhancer";
 import "./globals.css";
@@ -15,6 +16,7 @@ import "./admin-mobile-v6.css";
 import "./admin-mobile-v7.css";
 import "./admin-mobile-v8.css";
 import "./admin-documents.css";
+import "./admin-attachments.css";
 import "./brand-v2.css";
 import "./brand-v2-fix.css";
 import "./home-hero-generated.css";
@@ -41,5 +43,5 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
-  return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><MobileAdminEnhancer /><ClientRecordManagementEnhancer /><ChatLifecycleReliabilityEnhancer /><AdminDocumentsV2 /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
+  return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><MobileAdminEnhancer /><ClientRecordManagementEnhancer /><ChatLifecycleReliabilityEnhancer /><AdminDocumentsV2 /><ClientAttachmentEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
 }
