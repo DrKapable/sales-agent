@@ -2,6 +2,12 @@
 
 import { useEffect } from "react";
 
+function cleanInternalFollowUpLabel(raw: string) {
+  return raw
+    .replace(/^\s*\[Ask Intelligence follow-up\]\s*/i, "")
+    .replace(/^\s*\[Ask Intelligence follow-up sent using approved WhatsApp template:\s*[^\]]+\]\s*/i, "Follow-up sent using the approved WhatsApp template.");
+}
+
 function formatDocumentBubble(element: HTMLParagraphElement, raw: string) {
   if (!raw.startsWith("[DOCUMENT] ")) return false;
   const body = raw.slice("[DOCUMENT] ".length);
@@ -20,7 +26,9 @@ function formatDocumentBubble(element: HTMLParagraphElement, raw: string) {
 }
 
 function formatBubble(element: HTMLParagraphElement) {
-  const raw = element.textContent || "";
+  const original = element.textContent || "";
+  const raw = cleanInternalFollowUpLabel(original);
+  if (raw !== original) element.textContent = raw;
   if (formatDocumentBubble(element, raw)) return;
   if (!raw.includes("*")) return;
   const normalized = raw.replace(/\*\*([^*\n]+)\*\*/g, "*$1*");
