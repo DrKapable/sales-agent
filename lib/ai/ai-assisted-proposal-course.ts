@@ -8,6 +8,25 @@ export const AI_ASSISTED_PROPOSAL_COURSE_KNOWLEDGE = `APPROVED AI-ASSISTED RESEA
 - Access: lifetime access after enrolment. The learner can start immediately after enrolment/account activation.
 - Videos remain on the platform for copyright reasons; they are streamed rather than downloaded. Lifetime access means the learner can return to them later.
 - The course takes a learner from defining the research problem through a submission-ready proposal workflow.
+- The current campaign identifies Dr. Mustafa J. Phiri as the instructor and describes him as a Medical Doctor and Clinical Researcher.
+
+ACTIVE CLICK-TO-WHATSAPP RESEARCH CAMPAIGN
+- MedMinds is currently running an advert for this course with the headline/theme: "Don't let a 20-page document delay your graduation" and "You're not bad at research. You just haven't been taught yet."
+- The campaign message is that many learners understand their subject but were never given a clear, efficient system for moving from a research idea to a completed proposal.
+- The advert describes a pathway from research idea -> literature -> methodology -> data -> completed proposal.
+- The advert says learners will be shown how to find and organise evidence without drowning in it, use AI appropriately in research, choose and justify a defensible methodology, calculate sample size, manage references, understand analysis of findings in the wider research workflow, and produce a clear proposal.
+- The advert's call to action asks the learner to message MedMinds and say where they are stuck.
+
+AD-ENQUIRY INTERPRETATION RULE
+- If a new WhatsApp lead opens with a vague ad-style message such as "Can I get more info on this?", "More info please", "Tell me more about this", "How does this work?", "I saw your ad", "I'm interested", or similar wording, and there is no stronger conflicting context in the conversation, treat it as an enquiry about the currently advertised AI-Assisted Research Proposal Writing course.
+- Do NOT respond to that opening by asking "Which service do you mean?" or by listing unrelated MedMinds services.
+- Start by identifying the course naturally and explaining the most useful facts: it is a practical self-paced course for people struggling to structure or complete a research proposal; current fee K350; approximately 2 hours across 10 short modules; lifetime access.
+- Briefly mention the outcomes most relevant to the advert: finding and organising literature, using AI responsibly, structuring the proposal, choosing/justifying methodology, sample-size calculation, references/citations and professional formatting.
+- Keep the first response conversational. Do not paste the entire advert or dump every module at once.
+- A good first response pattern is: identify the course, give price/duration/access, summarise what it helps the learner do, then ask where they are currently stuck or whether they would like to enrol.
+- If the client says where they are stuck, answer that specific concern before continuing the sales process.
+- If the client asks for detailed data-analysis training, do not misrepresent this proposal course as a full standalone data-analysis course. Explain the proposal/research-workflow scope and use the approved Data Analysis offer where appropriate.
+- Course enrolment/payment follows the verified course instructions below. Do not apply the two-equal-instalment rule used for task-based research services to this fixed-price course unless management changes the approved offer.
 
 COURSE CONTENT
 1. Defining a research problem versus a research topic.
