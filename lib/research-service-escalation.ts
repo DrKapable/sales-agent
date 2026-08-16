@@ -35,7 +35,7 @@ export async function maybeEscalateResearchService(input: {
 
   const currentLead = await getOrCreateLead(input.phone, input.source);
   const specialist = specialistRequest(input.text);
-  const recipient = specialist ? referralRecipients.mustafa : referralRecipients.madalitso;
+  const recipient = specialist ? referralRecipients.mustafa : referralRecipients.monica;
   const reason = specialist
     ? "Client requires specialist research support. Mary is not authorised to scope or provide hands-on research services."
     : "Client requires hands-on research support. Mary is not authorised to scope or provide research services.";
