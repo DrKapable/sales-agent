@@ -16,6 +16,13 @@ async function ensureTables() {
   if (!database) return;
   setup ??= (async () => {
     await database.query(`CREATE TABLE IF NOT EXISTS business_tasks (id UUID PRIMARY KEY, lead_id UUID, title TEXT NOT NULL, assigned_to TEXT, due_at TIMESTAMPTZ, status TEXT NOT NULL DEFAULT 'OPEN', notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ)`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'standard'`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS source TEXT`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS external_id TEXT`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS program TEXT`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS academic_level TEXT`);
+    await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS source_client TEXT`);
+    await database.query(`CREATE UNIQUE INDEX IF NOT EXISTS business_tasks_source_external_id_uidx ON business_tasks(source, external_id)`);
     await database.query(`CREATE TABLE IF NOT EXISTS client_payments (id UUID PRIMARY KEY, lead_id UUID, amount_zmw NUMERIC NOT NULL, reference TEXT, status TEXT NOT NULL DEFAULT 'PENDING', verified_by TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), verified_at TIMESTAMPTZ)`);
     await database.query(`CREATE TABLE IF NOT EXISTS sales_quotes (id UUID PRIMARY KEY, lead_id UUID, service TEXT NOT NULL, amount_zmw NUMERIC, details TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'DRAFT', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
     await database.query(`CREATE TABLE IF NOT EXISTS client_feedback (id UUID PRIMARY KEY, lead_id UUID, rating INTEGER, comment TEXT, review_requested BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
