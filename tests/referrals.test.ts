@@ -35,9 +35,10 @@ describe("referral notifications", () => {
     expect(recipientForReferral("sales").name).toBe("Dr Kanyembo Ng'andwe");
   });
 
-  it("routes routine research support to Mr. Madalitso Masumbu", () => {
-    expect(recipientForReferral("research").name).toBe("Mr. Madalitso Masumbu");
-    expect(recipientForReferral("research").phone).toBe("260979104893");
+  it("routes routine research support and operations to Dr Monica", () => {
+    expect(recipientForReferral("research").name).toBe("Dr. Monica");
+    expect(recipientForReferral("research").phone).toBe("260968441133");
+    expect(recipientForReferral("operations").name).toBe("Dr. Monica");
   });
 
   it("routes legal disputes to Counsel Chisha Chomba", () => {
@@ -45,14 +46,14 @@ describe("referral notifications", () => {
     expect(recipientForReferral("dispute").name).toBe("Counsel Chisha Chomba");
   });
 
-  it("routes cybersecurity to Ms Kabosha Kayonga", () => {
-    expect(recipientForReferral("cybersecurity").name).toBe("Ms Kabosha Kayonga");
+  it("routes cybersecurity to Dr Mustafa", () => {
+    expect(recipientForReferral("cybersecurity").name).toBe("Dr. Mustafa Juma Phiri");
   });
 
-  it("honours an explicitly requested staff member", () => {
+  it("honours an explicitly requested active staff member", () => {
     expect(recipientForReferral("general", "Client asked for Counsel Chisha Chomba").name).toBe("Counsel Chisha Chomba");
     expect(recipientForReferral("general", "Please connect me with Dr Mustafa").name).toBe("Dr. Mustafa Juma Phiri");
-    expect(recipientForReferral("general", "Please connect me with Madalitso Masumbu").name).toBe("Mr. Madalitso Masumbu");
+    expect(recipientForReferral("general", "Please connect me with Dr Monica").name).toBe("Dr. Monica");
   });
 
   it("includes client identity, contact and case summary", () => {
