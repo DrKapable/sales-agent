@@ -14,7 +14,7 @@ import { getWhatsAppSender } from "@/lib/whatsapp-sender-context";
 import { markQuoteAccepted } from "@/lib/quotation-delivery";
 
 const actionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("task"), leadId: z.string().optional(), title: z.string().min(2).max(240), assignedTo: z.string().max(160).optional(), dueAt: z.string().datetime().optional(), notes: z.string().max(1200).optional() }),
+  z.object({ action: z.literal("task"), leadId: z.string().optional(), title: z.string().min(2).max(240), assignedTo: z.string().max(160).optional(), dueAt: z.string().datetime().optional(), notes: z.string().max(1200).optional(), priority: z.enum(["low", "standard", "high", "urgent"]).default("standard") }),
   z.object({ action: z.literal("task_status"), taskId: z.string().uuid(), status: z.enum(["OPEN", "COMPLETED"]) }),
   z.object({ action: z.literal("payment"), leadId: z.string().min(1), amountZmw: z.number().positive(), reference: z.string().max(160).optional(), verified: z.boolean().optional(), verifiedBy: z.string().max(160).optional() }),
   z.object({ action: z.literal("verify_payment"), paymentId: z.string().uuid(), verifiedBy: z.string().max(160).optional() }),
@@ -140,7 +140,7 @@ export async function POST(request: Request) {
         type: "operations_task",
         eventKey: `operations_task:${String((task as { id?: string }).id)}`,
         title: "New MedMinds operations task",
-        body: `Task: ${input.title}\nAssigned to: ${input.assignedTo || "Unassigned"}${input.dueAt ? `\nDue: ${input.dueAt}` : ""}\nResearch Portal: synced`,
+        body: `Task: ${input.title}\nPriority: ${input.priority}\nAssigned to: ${input.assignedTo || "Unassigned"}${input.dueAt ? `\nDue: ${input.dueAt}` : ""}\nResearch Portal: synced`,
         lead
       }).catch(() => undefined);
       return NextResponse.json(task);
