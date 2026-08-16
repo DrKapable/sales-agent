@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { clientAttachmentChatContent, type ClientAttachmentKind } from "@/lib/client-attachment-content";
 import { normalizeWhatsAppReply } from "@/lib/whatsapp-format";
 
 export function verifyWhatsAppSignature(rawBody: string, signature: string | null, secret = process.env.WHATSAPP_APP_SECRET) {
@@ -60,6 +61,35 @@ export function sanitizeWhatsAppApiError(rawBody: string) {
   }
 }
 
+const extensionByMime: Record<string, string> = {
+  "application/pdf": "pdf",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.ms-excel": "xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.ms-powerpoint": "ppt",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "text/plain": "txt",
+  "text/csv": "csv",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "audio/aac": "aac",
+  "audio/amr": "amr",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/ogg": "ogg",
+  "video/mp4": "mp4",
+  "video/3gpp": "3gp"
+};
+
+function mediaFilename(kind: ClientAttachmentKind, mediaId: string, supplied: string | undefined, mimeType: string | undefined) {
+  const clean = supplied?.replaceAll("\\", "/").split("/").pop()?.trim().slice(0, 220);
+  if (clean) return clean;
+  const extension = mimeType ? extensionByMime[mimeType.toLowerCase()] : undefined;
+  return `${kind}-${mediaId.slice(-8)}${extension ? `.${extension}` : ""}`;
+}
+
 export function parseIncomingMessages(payload: unknown): IncomingWhatsAppMessage[] {
   if (!payload || typeof payload !== "object") return [];
   const entries = (payload as { entry?: unknown[] }).entry;
@@ -80,13 +110,42 @@ export function parseIncomingMessages(payload: unknown): IncomingWhatsAppMessage
       const phoneNumberId = value.metadata?.phone_number_id ?? null;
       const displayPhoneNumber = value.metadata?.display_phone_number ?? null;
       for (const message of value.messages) {
-        const item = message as { id?: string; from?: string; type?: string; text?: { body?: string } };
-        if (item.type !== "text" || !item.id || !item.from || !item.text?.body) continue;
+        const item = message as {
+          id?: string;
+          from?: string;
+          type?: string;
+          text?: { body?: string };
+          document?: { id?: string; filename?: string; mime_type?: string; caption?: string };
+          image?: { id?: string; mime_type?: string; caption?: string };
+          audio?: { id?: string; mime_type?: string };
+          video?: { id?: string; mime_type?: string; caption?: string };
+        };
+        if (!item.id || !item.from) continue;
+
+        let text: string | null = null;
+        if (item.type === "text" && item.text?.body) {
+          text = item.text.body.trim().slice(0, 4000);
+        } else if (["document", "image", "audio", "video"].includes(item.type || "")) {
+          const kind = item.type as ClientAttachmentKind;
+          const media = kind === "document" ? item.document : kind === "image" ? item.image : kind === "audio" ? item.audio : item.video;
+          if (!media?.id) continue;
+          const mimeType = media.mime_type?.trim().slice(0, 160) || null;
+          const caption = "caption" in media && typeof media.caption === "string" ? media.caption.trim().slice(0, 1000) || null : null;
+          text = clientAttachmentChatContent({
+            kind,
+            mediaId: media.id,
+            fileName: mediaFilename(kind, media.id, kind === "document" ? item.document?.filename : undefined, mimeType || undefined),
+            mimeType,
+            caption
+          });
+        }
+        if (!text) continue;
+
         parsed.push({
           id: item.id,
           phone: item.from,
           name: value.contacts?.[0]?.profile?.name ?? null,
-          text: item.text.body.trim().slice(0, 4000),
+          text,
           phoneNumberId,
           displayPhoneNumber
         });
