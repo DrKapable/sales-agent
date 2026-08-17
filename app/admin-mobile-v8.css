@@ -100,4 +100,20 @@ body:has(.dashboard)>iframe[title="Chat with MedMinds"]{display:none!important}
     min-height:0!important;
     max-height:none!important;
   }
+
+  /* Keep chat actions available without sacrificing the conversation viewport. */
+  .dashboard.mobileChatOpen .conversationHeader{grid-template-columns:38px minmax(0,1fr) 118px!important}
+  .dashboard.mobileChatOpen .conversationActions{width:118px!important;justify-content:flex-end!important;gap:2px!important}
+  .dashboard.mobileChatOpen .conversationActions>.iconButton{display:none!important}
+  .dashboard.mobileChatOpen .conversationActions>a.iconButton[href^="https://wa.me/"]{
+    display:grid!important;place-items:center!important;width:34px!important;height:34px!important;min-width:34px!important;padding:0!important;border:0!important;border-radius:50%!important;background:rgba(37,211,102,.18)!important;color:#fff!important;font-size:0!important;text-decoration:none!important;box-shadow:none!important
+  }
+  .dashboard.mobileChatOpen .conversationActions>a.iconButton[href^="https://wa.me/"]::before{content:"WA";font-size:9px!important;font-weight:900!important;letter-spacing:.02em}
+  .dashboard.mobileChatOpen .conversationDocumentsButton{
+    display:grid!important;place-items:center!important;position:relative!important;width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important;padding:0!important;border:0!important;border-radius:50%!important;background:rgba(255,255,255,.1)!important;color:#fff!important;box-shadow:none!important
+  }
+  .dashboard.mobileChatOpen .conversationDocumentsButtonIcon{font-size:17px!important}.dashboard.mobileChatOpen .conversationDocumentsButtonLabel{display:none!important}.dashboard.mobileChatOpen .conversationDocumentsButton>b{position:absolute!important;right:-1px!important;top:-2px!important;min-width:15px!important;height:15px!important;padding:0 3px!important;background:#27a99a!important;color:#fff!important;font-size:8px!important}
+  .dashboard.mobileChatOpen .mobileToolsButton{width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important}
 }
+
+@media(max-width:430px){.dashboard.mobileChatOpen .conversationHeader{grid-template-columns:36px minmax(0,1fr) 112px!important}.dashboard.mobileChatOpen .conversationActions{width:112px!important}.dashboard.mobileChatOpen .conversationActions>a.iconButton[href^="https://wa.me/"],.dashboard.mobileChatOpen .conversationDocumentsButton,.dashboard.mobileChatOpen .mobileToolsButton{width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important}}
