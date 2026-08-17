@@ -21,12 +21,12 @@ export default function RootTemplate({ children }: Readonly<{ children: ReactNod
       }
     };
 
-    if (document.readyState === "complete") void register();
-    else window.addEventListener("load", register, { once: true });
+    // Register immediately instead of waiting for the full load event so Chromium
+    // can evaluate PWA installability as early as possible on first use.
+    void register();
 
     return () => {
       cancelled = true;
-      window.removeEventListener("load", register);
     };
   }, []);
 
