@@ -1,0 +1,58 @@
+.pwaStartupSplash{display:none}
+
+@media (display-mode:standalone){
+  .pwaStartupSplash{
+    position:fixed;
+    inset:0;
+    z-index:2147483646;
+    display:grid;
+    place-items:center;
+    padding:28px;
+    background:#fff;
+    opacity:1;
+    transition:opacity .24s ease;
+    pointer-events:auto;
+  }
+  .pwaStartupSplash.isLeaving{opacity:0;pointer-events:none}
+  .pwaStartupSplashInner{
+    display:grid;
+    justify-items:center;
+    gap:22px;
+    width:min(82vw,560px);
+    transform:translateY(-2vh);
+  }
+  .pwaStartupSplash img{
+    display:block;
+    width:100%;
+    height:auto;
+    max-height:38vh;
+    object-fit:contain;
+  }
+  .pwaStartupSplashBar{
+    position:relative;
+    width:min(180px,42vw);
+    height:3px;
+    overflow:hidden;
+    border-radius:999px;
+    background:rgba(43,157,141,.16);
+  }
+  .pwaStartupSplashBar>span{
+    position:absolute;
+    inset:0 auto 0 0;
+    width:42%;
+    border-radius:inherit;
+    background:#2b9d8d;
+    animation:pwaSplashProgress 1s ease-in-out infinite;
+  }
+}
+
+@keyframes pwaSplashProgress{
+  0%{transform:translateX(-120%)}
+  55%{transform:translateX(120%)}
+  100%{transform:translateX(250%)}
+}
+
+@media (display-mode:standalone) and (prefers-reduced-motion:reduce){
+  .pwaStartupSplash{transition:none}
+  .pwaStartupSplashBar>span{animation:none;width:100%}
+}
