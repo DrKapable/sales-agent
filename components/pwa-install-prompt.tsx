@@ -29,11 +29,10 @@ function recentlyDismissed() {
 export function PwaInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEventLike | null>(null);
   const [visible, setVisible] = useState(false);
-  const [manualMode, setManualMode] = useState<"ios" | "android" | null>(null);
+  const [manualMode, setManualMode] = useState<"ios" | null>(null);
 
   const userAgent = typeof navigator === "undefined" ? "" : navigator.userAgent;
   const isIos = useMemo(() => /iphone|ipad|ipod/i.test(userAgent), [userAgent]);
-  const isAndroid = useMemo(() => /android/i.test(userAgent), [userAgent]);
 
   useEffect(() => {
     if (typeof window === "undefined" || isStandalone()) return;
@@ -44,7 +43,7 @@ export function PwaInstallPrompt() {
       event.preventDefault();
       setDeferredPrompt(event as BeforeInstallPromptEventLike);
       setManualMode(null);
-      window.setTimeout(() => setVisible(true), 500);
+      window.setTimeout(() => setVisible(true), 350);
     };
 
     const onInstalled = () => {
@@ -57,23 +56,21 @@ export function PwaInstallPrompt() {
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
 
-    const fallbackTimer = window.setTimeout(() => {
-      if (isStandalone() || recentlyDismissed()) return;
-      if (isIos) {
-        setManualMode("ios");
-        setVisible(true);
-      } else if (isAndroid) {
-        setManualMode("android");
-        setVisible(true);
-      }
-    }, 3500);
+    // iOS does not expose beforeinstallprompt, so Safari still needs manual guidance.
+    // Android intentionally has no manual fallback: showing Add to Home Screen before
+    // Chromium marks the app installable can create a plain shortcut instead of a PWA.
+    const iosFallbackTimer = window.setTimeout(() => {
+      if (!isIos || isStandalone() || recentlyDismissed()) return;
+      setManualMode("ios");
+      setVisible(true);
+    }, 2500);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
-      window.clearTimeout(fallbackTimer);
+      window.clearTimeout(iosFallbackTimer);
     };
-  }, [isAndroid, isIos]);
+  }, [isIos]);
 
   if (!visible) return null;
 
@@ -98,14 +95,12 @@ export function PwaInstallPrompt() {
       return;
     }
 
-    setManualMode(isIos ? "ios" : "android");
+    if (isIos) setManualMode("ios");
   };
 
-  const manualText = manualMode === "ios"
+  const promptText = manualMode === "ios"
     ? "Tap Share in Safari, then choose Add to Home Screen."
-    : manualMode === "android"
-      ? "Open your browser menu and choose Install app or Add to Home screen."
-      : "Install the MedMinds Sales Agent for faster access from your home screen.";
+    : "Install the MedMinds Sales Agent as a standalone app for faster access from your home screen.";
 
   return (
     <div style={{ position: "fixed", inset: "auto 12px 14px 12px", zIndex: 2147483000, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
@@ -114,7 +109,7 @@ export function PwaInstallPrompt() {
           <img src="/pwa-icon-192.png" alt="" width={54} height={54} style={{ borderRadius: 14, flex: "0 0 auto" }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.2 }}>Install MedMinds Sales Agent</div>
-            <div style={{ marginTop: 5, fontSize: 13, lineHeight: 1.5, color: "#60717f" }}>{manualText}</div>
+            <div style={{ marginTop: 5, fontSize: 13, lineHeight: 1.5, color: "#60717f" }}>{promptText}</div>
           </div>
           <button type="button" onClick={dismiss} aria-label="Dismiss install prompt" style={{ border: 0, background: "transparent", color: "#60717f", fontSize: 24, lineHeight: 1, cursor: "pointer", padding: 2 }}>×</button>
         </div>
