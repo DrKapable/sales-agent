@@ -43,6 +43,7 @@ export const metadata: Metadata = {
   }
 };
 
+// Admin document enhancers are mounted at the root so the active client conversation can render shared files immediately.
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
   return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><MobileAdminEnhancer /><ClientRecordManagementEnhancer /><ChatLifecycleReliabilityEnhancer /><AdminDocumentsV2 /><ConversationDocumentsEnhancer /><ClientAttachmentEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
