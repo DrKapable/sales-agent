@@ -1,9 +1,10 @@
 import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
+import { attachmentDisplayName, parseClientAttachmentChatContent } from "@/lib/client-attachment-content";
 import { commercialDocumentNumber } from "@/lib/commercial-document";
 import { listClientDocuments } from "@/lib/client-documents";
 import { ensureQuoteDeliveryColumns } from "@/lib/quotation-delivery";
-import { listLeads } from "@/lib/store";
+import { getConversation, listLeads } from "@/lib/store";
 
 function digits(value: string) {
   return value.replace(/\D/g, "");
@@ -41,6 +42,33 @@ export async function GET(request: Request) {
       deliveryError: null,
       downloadUrl: `/api/admin/client-documents/${document.id}?phone=${encodeURIComponent(lead.phone)}`
     }));
+
+  const inboundMessages = await getConversation(lead.phone, 500);
+  const seenMediaIds = new Set<string>();
+  const clientShared = inboundMessages.flatMap((message) => {
+    if (message.role !== "user") return [];
+    const attachment = parseClientAttachmentChatContent(message.content);
+    if (!attachment || attachment.kind !== "document" || seenMediaIds.has(attachment.mediaId)) return [];
+    seenMediaIds.add(attachment.mediaId);
+    const fileName = attachmentDisplayName(attachment);
+    return [{
+      id: message.id,
+      kind: "shared_file" as const,
+      title: fileName,
+      fileName,
+      mimeType: attachment.mimeType || "application/octet-stream",
+      service: null,
+      amountZmw: null,
+      details: attachment.caption ? `Client note: ${attachment.caption}` : "Received from client via WhatsApp",
+      documentNumber: null,
+      createdAt: message.createdAt,
+      sharedAt: message.createdAt,
+      sharedBy: lead.name || "Client",
+      deliveryStatus: "SENT",
+      deliveryError: null,
+      downloadUrl: `/api/admin/whatsapp-media/${encodeURIComponent(attachment.mediaId)}?filename=${encodeURIComponent(fileName)}`
+    }];
+  });
 
   const commercial: Array<Record<string, unknown>> = [];
   if (process.env.DATABASE_URL) {
@@ -90,7 +118,7 @@ export async function GET(request: Request) {
     }
   }
 
-  const documents = [...commercial, ...assigned].sort((a, b) =>
+  const documents = [...commercial, ...assigned, ...clientShared].sort((a, b) =>
     String(b.sharedAt || b.createdAt).localeCompare(String(a.sharedAt || a.createdAt))
   );
 
