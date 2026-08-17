@@ -7,7 +7,7 @@ import { getAiModelCandidates, getSetupState } from "@/lib/env";
 import { verifiedConversationFallback } from "@/lib/recovery-reply";
 import { allowRequest } from "@/lib/rate-limit";
 import { wait } from "@/lib/timing";
-import { sendWhatsAppText } from "@/lib/whatsapp";
+import { sendTeamCopies } from "@/lib/team-notifications";
 import { notifyDirectorOfNewClient } from "@/lib/new-client-alert";
 
 const requestSchema = z.object({
@@ -27,7 +27,14 @@ function normalizeWhatsAppNumber(value: string) {
 async function sendReferralNotification(result: SalesAgentResult) {
   if (!result.referralNotification || !getSetupState().whatsappConfigured) return;
   try {
-    await sendWhatsAppText(result.referralNotification.phone, result.referralNotification.body);
+    await sendTeamCopies({
+      heading: "Client referral",
+      body: result.referralNotification.body,
+      primary: {
+        name: result.referralNotification.recipientName,
+        phone: result.referralNotification.phone
+      }
+    });
   } catch (error) {
     console.error("Public chat referral notification failed", { recipient: result.referralNotification.recipientName, error });
   }
@@ -85,7 +92,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ reply: result.reply });
   }
 
-  const reply = await verifiedConversationFallback(phone, parsed.data.message).catch(() => "I’m here and I can help. Tell me a little more about what you need and I’ll continue from there.");
+  const reply = await verifiedConversationFallback(phone, parsed.data.message).catch(() => "I'm here and I can help. Tell me a little more about what you need and I'll continue from there.");
   await addMessage(phone, "assistant", reply).catch(() => undefined);
   queueNewClientAlert();
   return NextResponse.json({ reply, recovered: true });

@@ -2,7 +2,7 @@ import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { getBusinessSnapshot } from "@/lib/business-ops";
 import { getFollowUpPerformance } from "@/lib/follow-up";
 import { referralRecipients } from "@/lib/referrals";
-import { sendWhatsAppText } from "@/lib/whatsapp";
+import { sendTeamCopies } from "@/lib/team-notifications";
 
 let sql: NeonQueryFunction<false, false> | null = null;
 function db() { if (!process.env.DATABASE_URL) return null; sql ??= neon(process.env.DATABASE_URL); return sql; }
@@ -25,7 +25,6 @@ export async function runDailyManagementBrief() {
   const hot = snapshot.leads.filter((lead) => lead.scoreBand === "HOT" && lead.status !== "CONVERTED").slice(0, 5).map((lead) => `${lead.name || lead.phone} (${lead.leadScore}/100) - ${lead.serviceInterest || "service not established"}`).join("\n") || "None";
   const lost = snapshot.lostReasons.slice(0, 3).map((row) => `${row.reason}: ${row.count}`).join("\n") || "None";
   const body = [
-    "MedMinds daily management brief",
     `Total leads: ${snapshot.metrics.totalLeads}`,
     `Conversion: ${snapshot.metrics.conversionRate}% (${snapshot.metrics.converted} converted)`,
     `Hot unconverted leads: ${snapshot.metrics.hotLeads}`,
@@ -38,17 +37,14 @@ export async function runDailyManagementBrief() {
     "", "Lost-lead signals", lost
   ].join("\n");
 
-  const recipients = [
-    { recipient: referralRecipients.kanyembo, label: "PRIMARY" },
-    { recipient: referralRecipients.mustafa, label: "CC" },
-    { recipient: referralRecipients.conrad, label: "CC" },
-    { recipient: referralRecipients.zabibu, label: "CC" }
-  ];
-  const results = [];
-  for (const { recipient, label } of recipients) {
-    if (!recipient.phone) continue;
-    try { await sendWhatsAppText(recipient.phone, `${label} - ${body}`); results.push({ recipient: recipient.name, sent: true }); }
-    catch (error) { console.error("Daily management brief failed", { recipient: recipient.name, error }); results.push({ recipient: recipient.name, sent: false }); }
-  }
-  return { sent: results.some((item) => item.sent), results, followUpPerformance };
+  const results = await sendTeamCopies({
+    heading: "MedMinds daily management brief",
+    body,
+    primary: referralRecipients.kanyembo
+  });
+  return {
+    sent: results.some((result) => result.status === "fulfilled" && result.value.sent),
+    results,
+    followUpPerformance
+  };
 }

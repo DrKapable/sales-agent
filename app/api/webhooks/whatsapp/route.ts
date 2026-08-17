@@ -3,8 +3,9 @@ import { clientDocumentChatContent, getClientDocumentForLead, markClientDocument
 import { sendClientWhatsAppDocument } from "@/lib/client-document-whatsapp";
 import { addMessage, getConversation, getOrCreateLead, updateLead } from "@/lib/store";
 import { humanReplyDelayMs, wait } from "@/lib/timing";
+import { sendTeamCopies } from "@/lib/team-notifications";
 import { generateWhatsAppReplyWithRecovery, sendWhatsAppTextWithRetry } from "@/lib/whatsapp-recovery";
-import { parseDeliveryReceipts, parseIncomingMessages, sendWhatsAppText, sendWhatsAppTypingIndicator, verifyWhatsAppSignature } from "@/lib/whatsapp";
+import { parseDeliveryReceipts, parseIncomingMessages, sendWhatsAppTypingIndicator, verifyWhatsAppSignature } from "@/lib/whatsapp";
 import { notifyDirectorOfNewClient } from "@/lib/new-client-alert";
 import { sendCommercialPdf } from "@/lib/commercial-document";
 import { getLatestPreparedQuotation, isPreparedQuotationRequest, preparedQuotationFallbackText } from "@/lib/prepared-quotation";
@@ -201,8 +202,20 @@ export async function POST(request: NextRequest) {
 
         if (result.referralNotification) {
           try {
-            await sendWhatsAppText(result.referralNotification.phone, result.referralNotification.body, message.phoneNumberId ?? undefined);
-            console.info("WhatsApp referral notification sent", { messageId: message.id, recipient: result.referralNotification.recipientName });
+            const copies = await sendTeamCopies({
+              heading: "Client referral",
+              body: result.referralNotification.body,
+              primary: {
+                name: result.referralNotification.recipientName,
+                phone: result.referralNotification.phone
+              },
+              phoneNumberIdOverride: message.phoneNumberId ?? undefined
+            });
+            console.info("WhatsApp referral notification sent", {
+              messageId: message.id,
+              recipient: result.referralNotification.recipientName,
+              copies: copies.filter((copy) => copy.status === "fulfilled" && copy.value.sent).length
+            });
           } catch (error) {
             console.error("WhatsApp referral notification failed", { messageId: message.id, recipient: result.referralNotification.recipientName, error });
           }

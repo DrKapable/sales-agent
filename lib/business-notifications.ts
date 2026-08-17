@@ -1,19 +1,19 @@
 import { referralRecipients } from "@/lib/referrals";
-import { sendWhatsAppText } from "@/lib/whatsapp";
 import { listLeads } from "@/lib/store";
+import { sendTeamCopies } from "@/lib/team-notifications";
 import type { Lead } from "@/lib/types";
 
 export type BusinessEventType = "hot_lead" | "quote_created" | "payment_pending" | "payment_verified" | "receipt_sent" | "research_task_created" | "review_requested" | "operations_task";
 
 const recipientMap: Record<BusinessEventType, { primary: string; cc: string[] }> = {
-  hot_lead: { primary: "kanyembo", cc: ["mustafa"] },
-  quote_created: { primary: "kanyembo", cc: ["mustafa"] },
+  hot_lead: { primary: "kanyembo", cc: [] },
+  quote_created: { primary: "kanyembo", cc: [] },
   payment_pending: { primary: "mustafa", cc: ["kanyembo"] },
   payment_verified: { primary: "mustafa", cc: ["kanyembo"] },
   receipt_sent: { primary: "mustafa", cc: ["kanyembo"] },
-  research_task_created: { primary: "madalitso", cc: ["mustafa"] },
-  review_requested: { primary: "zabibu", cc: ["conrad"] },
-  operations_task: { primary: "madalitso", cc: ["mustafa"] }
+  research_task_created: { primary: "monica", cc: [] },
+  review_requested: { primary: "zabibu", cc: [] },
+  operations_task: { primary: "monica", cc: [] }
 };
 
 const memoryClaims = new Set<string>();
@@ -41,21 +41,23 @@ export async function notifyBusinessEvent(input: {
   if (!(await claimEvent(input.eventKey))) return { sent: false, reason: "duplicate" };
   const route = recipientMap[input.type];
   const primary = referralRecipients[route.primary];
-  const cc = route.cc.map((key) => referralRecipients[key]).filter(Boolean);
-  const leadLine = input.lead ? `\nClient: ${input.lead.name || "Not provided"} (${input.lead.phone.startsWith("+") ? input.lead.phone : `+${input.lead.phone}`})` : "";
-  const base = `${input.title}${leadLine}\n${input.body}`.replaceAll("—", ",");
-  const results: Array<{ recipient: string; sent: boolean }> = [];
-  for (const [index, recipient] of [primary, ...cc].entries()) {
-    if (!recipient?.phone) continue;
-    try {
-      await sendWhatsAppText(recipient.phone, `${index === 0 ? "PRIMARY" : "CC"} - ${base}`);
-      results.push({ recipient: recipient.name, sent: true });
-    } catch (error) {
-      console.error("Business event WhatsApp notification failed", { type: input.type, recipient: recipient.name, error });
-      results.push({ recipient: recipient.name, sent: false });
-    }
+  if (!primary) {
+    console.error("Business event has no valid primary recipient", { type: input.type, recipientKey: route.primary });
+    return { sent: false, reason: "missing_primary" };
   }
-  return { sent: results.some((item) => item.sent), results };
+  const cc = route.cc.map((key) => referralRecipients[key]).filter(Boolean);
+  const leadLine = input.lead ? `Client: ${input.lead.name || "Not provided"} (${input.lead.phone.startsWith("+") ? input.lead.phone : `+${input.lead.phone}`})` : null;
+  const body = [leadLine, input.body].filter(Boolean).join("\n").replaceAll("—", ",");
+  const results = await sendTeamCopies({
+    heading: input.title,
+    body,
+    primary,
+    cc
+  });
+  return {
+    sent: results.some((result) => result.status === "fulfilled" && result.value.sent),
+    results
+  };
 }
 
 export async function maybeNotifyHotLead(phone: string) {
