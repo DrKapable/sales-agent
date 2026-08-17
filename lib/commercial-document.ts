@@ -1,4 +1,5 @@
 import { createCommercialPdf } from "@/lib/commercial-pdf";
+import { markQuoteAccepted } from "@/lib/quotation-delivery";
 import { sendWhatsAppPdfDocument } from "@/lib/whatsapp";
 import type { Lead } from "@/lib/types";
 
@@ -41,6 +42,9 @@ export async function sendCommercialPdf(input: { lead: Lead; record: CommercialR
       ? `MedMinds unpaid invoice ${number}. Please review the attached document.`
       : `MedMinds quotation ${number}. Please review the attached document.`,
     phoneNumberIdOverride: input.phoneNumberIdOverride
+  });
+  await markQuoteAccepted(input.record.id, result.messageId).catch((error) => {
+    console.warn("Unable to link commercial document delivery", { quoteId: input.record.id, error });
   });
   return { ...result, documentNumber: number, filename, kind: isInvoice ? "invoice" as const : "quotation" as const };
 }
