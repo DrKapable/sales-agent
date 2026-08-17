@@ -3,9 +3,6 @@ const LEGACY_MAX_REPLY_TARGET_MS = 15000;
 const MIN_REPLY_TARGET_MS = 15000;
 const MAX_REPLY_TARGET_MS = 120000;
 const CHARACTERS_TO_MAX_DELAY = 800;
-const MIN_TYPING_DELAY_MS = 2500;
-const MAX_TYPING_DELAY_MS = 18000;
-const MS_PER_CHARACTER = 30;
 
 // Retained for older deterministic tests and any legacy callers.
 export function humanReplyDelayMs(elapsedMs: number, randomValue?: number) {
@@ -17,8 +14,6 @@ export function humanReplyDelayMs(elapsedMs: number, randomValue?: number) {
 
 // Mary's live WhatsApp response delay. Short replies target roughly 15-30 seconds,
 // medium replies roughly 30-75 seconds, and long replies roughly 1-2 minutes.
-// Time already spent generating the response counts toward the target so the
-// client experiences a natural total response time rather than stacked delays.
 export function humanTextReplyDelayMs(text: string, elapsedMs = 0, randomValue = Math.random()) {
   const length = text.trim().replace(/\s+/g, " ").length;
   const boundedRandom = Math.min(1, Math.max(0, randomValue));
@@ -30,12 +25,10 @@ export function humanTextReplyDelayMs(text: string, elapsedMs = 0, randomValue =
   return Math.max(0, Math.round(targetMs - Math.max(0, elapsedMs)));
 }
 
+// Existing WhatsApp send code calls this immediately before Mary's message is sent.
+// Keep that integration point but use the new 15-120 second length-based cadence.
 export function humanTextTypingDelayMs(text: string, randomValue = Math.random()) {
-  const length = text.trim().length;
-  const boundedRandom = Math.min(1, Math.max(0, randomValue));
-  const jitter = 0.9 + boundedRandom * 0.2;
-  const estimatedMs = (MIN_TYPING_DELAY_MS + length * MS_PER_CHARACTER) * jitter;
-  return Math.round(Math.min(MAX_TYPING_DELAY_MS, Math.max(MIN_TYPING_DELAY_MS, estimatedMs)));
+  return humanTextReplyDelayMs(text, 0, randomValue);
 }
 
 export async function wait(milliseconds: number) {
