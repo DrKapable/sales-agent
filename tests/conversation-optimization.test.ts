@@ -10,6 +10,15 @@ describe("Mary conversation optimization", () => {
     expect(signal.serviceNeed).toBe(true);
   });
 
+  it("preserves explicit self-directed proposal intent instead of flipping it to hands-on support", () => {
+    const signal = classifySalesTurn("I have already started and I want to write it myself", {
+      status: "QUALIFIED",
+      serviceInterest: "Research support",
+      packageName: null
+    });
+    expect(signal.inferredService).toBe("AI-Assisted Research Proposal Writing");
+  });
+
   it("recognizes payment and proceed intent as closer signals", () => {
     expect(classifySalesTurn("Send me the payment details, I am ready to pay", lead).closerAttention).toBe(true);
     expect(classifySalesTurn("Let's proceed with it", lead).closerAttention).toBe(true);
@@ -36,5 +45,18 @@ describe("Mary conversation optimization", () => {
     const shaped = shapeMaryReply(long, "I need help with my proposal", signal);
     expect((shaped.match(/\?/g) || []).length).toBeLessThanOrEqual(1);
     expect(shaped.length).toBeLessThan(long.length);
+  });
+
+  it("removes a repeated stock acknowledgement while preserving the useful sales message", () => {
+    const signal = classifySalesTurn("I have already started", lead);
+    const shaped = shapeMaryReply(
+      "That helps. Since you've already started, the self-paced course can help you strengthen what you have. Would you like the course fee?",
+      "I have already started",
+      signal,
+      ["That helps. When do you need it completed?"]
+    );
+    expect(shaped).not.toMatch(/^That helps/i);
+    expect(shaped).toContain("Since you've already started");
+    expect((shaped.match(/\?/g) || []).length).toBe(1);
   });
 });

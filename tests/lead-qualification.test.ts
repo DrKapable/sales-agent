@@ -53,6 +53,8 @@ describe("lead qualification before pricing", () => {
       latestText: "How much?"
     });
     expect(almost.missing).toBe("deadline");
+    expect(buildQualificationReply(almost)).toBe("What deadline are you working toward?");
+    expect(buildQualificationReply(almost)).not.toMatch(/that helps/i);
 
     const complete = assessLeadQualification({
       lead: lead({ serviceInterest: "Research support", programme: "MPH", deadline: "30 August 2026" }),
@@ -60,6 +62,20 @@ describe("lead qualification before pricing", () => {
       latestText: "How much?"
     });
     expect(complete.qualified).toBe(true);
+  });
+
+  it("lets the client's latest self-directed preference override an earlier hands-on enquiry", () => {
+    const result = assessLeadQualification({
+      lead: lead({ serviceInterest: "Research support", programme: "Master's/Postgraduate" }),
+      history: [
+        user("I need help with my proposal"),
+        user("Actually I have already started and I want to write it myself"),
+        user("What are your fees?")
+      ],
+      latestText: "What are your fees?"
+    });
+    expect(result.kind).toBe("course");
+    expect(result.qualified).toBe(true);
   });
 
   it("requires Pa Gym fit before pricing", () => {

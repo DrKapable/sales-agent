@@ -19,7 +19,9 @@ const PRICE_VALUE = /(?:\bK\s?\d[\d,]*(?:\.\d+)?\b|\bZMW\s?\d[\d,]*(?:\.\d+)?\b)
 
 const RESEARCH = /\b(proposal|dissertation|thesis|research|methodology|literature review|data analysis|statistical analysis|qualitative analysis|mixed methods|questionnaire|data collection tool|chapter\s*[1-6]|results|discussion|editing|proofread|referencing)\b/i;
 const RESEARCH_SCOPE = /\b(proposal|dissertation|thesis|methodology|literature review|data analysis|statistical analysis|qualitative analysis|mixed methods|questionnaire|data collection tool|chapter\s*[1-6]|results|discussion|editing|proofread|referencing|topic|objectives?)\b/i;
-const COURSE = /\b(ai[- ]?(?:assisted|enhanced).*proposal|proposal writing course|research proposal writing course|course|training|self[- ]?paced|learn (?:the )?(?:proposal|research) process|do it myself)\b/i;
+const COURSE = /\b(ai[- ]?(?:assisted|enhanced).*proposal|proposal writing course|research proposal writing course|course|training|self[- ]?paced|learn (?:the )?(?:proposal|research) process|do it myself|write it myself|work on it myself|complete it myself)\b/i;
+const SELF_DIRECTED_ROUTE = /\b(?:do|write|work on|complete|finish)\s+(?:it|the proposal|my proposal|the research|my research|the work|my work)?\s*myself\b|\bi want to (?:do|write|work on|complete|finish)\b.{0,35}\bmyself\b/ig;
+const HANDS_ON_ROUTE = /\b(?:do it for me|hands[- ]?on|direct support|help with my|assist me with my|help me with my|handle (?:it|this|the work)|complete (?:it|this|the work) for me)\b/ig;
 const PA_GYM = /\b(pa\s*gym|osce|theory practice|question practice|exam prep|exam preparation)\b/i;
 const PA_GYM_FORMAT = /\b(theory|osce|both|question practice|questions)\b/i;
 const DIGITAL = /\b(website|web development|software|system|app|application|automation|business automation|cybersecurity|portal|dashboard)\b/i;
@@ -33,11 +35,32 @@ function conversationText(history: Pick<ConversationMessage, "role" | "content">
   return client.join("\n");
 }
 
+function lastMatchIndex(text: string, pattern: RegExp) {
+  let last = -1;
+  for (const match of text.matchAll(pattern)) last = match.index ?? last;
+  pattern.lastIndex = 0;
+  return last;
+}
+
+function latestResearchRoute(transcript: string): "course" | "research" | null {
+  const selfDirectedIndex = lastMatchIndex(transcript, SELF_DIRECTED_ROUTE);
+  const handsOnIndex = lastMatchIndex(transcript, HANDS_ON_ROUTE);
+  if (selfDirectedIndex < 0 && handsOnIndex < 0) return null;
+  return selfDirectedIndex > handsOnIndex ? "course" : "research";
+}
+
 function kindFor(lead: Pick<Lead, "serviceInterest" | "packageName">, transcript: string): QualificationKind {
   const context = `${lead.serviceInterest || ""} ${lead.packageName || ""} ${transcript}`;
   if (PA_GYM.test(context)) return "pa_gym";
   if (DIGITAL.test(context)) return "digital";
-  if (COURSE.test(context) && !/hands[- ]?on|do it for me|help with my|assist me with my/i.test(context)) return "course";
+
+  if (RESEARCH.test(context) || COURSE.test(context)) {
+    const latestRoute = latestResearchRoute(transcript);
+    if (latestRoute === "course") return "course";
+    if (latestRoute === "research") return "research";
+  }
+
+  if (COURSE.test(context)) return "course";
   if (RESEARCH.test(context)) return "research";
   return "other";
 }
@@ -68,7 +91,7 @@ function questionFor(kind: QualificationKind, missing: QualificationMissing) {
     return "What part of the work do you want MedMinds to handle?";
   }
   if (missing === "format") return "Do you need theory practice, OSCE preparation, or both?";
-  if (missing === "deadline") return "That helps. When do you need it completed?";
+  if (missing === "deadline") return "What deadline are you working toward?";
   return null;
 }
 
@@ -92,7 +115,7 @@ export function assessLeadQualification(input: {
     else if (!hasProgramme(input.lead, transcript)) missing = "programme";
     else if (!hasDeadline(input.lead, transcript)) missing = "deadline";
   } else if (kind === "course") {
-    if (!COURSE.test(transcript)) missing = "path";
+    if (!COURSE.test(transcript) && latestResearchRoute(transcript) !== "course") missing = "path";
   } else if (kind === "pa_gym") {
     if (!hasProgramme(input.lead, transcript)) missing = "programme";
     else if (!PA_GYM_FORMAT.test(transcript)) missing = "format";

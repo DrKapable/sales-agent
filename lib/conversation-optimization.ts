@@ -21,9 +21,11 @@ export type ConversationOptimization = {
   analysis: SalesTurnAnalysis;
   clientMessageCount: number;
   closerReason: string | null;
+  recentAssistantReplies: string[];
 };
 
-const COURSE_INTENT = /\b(course|training|class|modules?|certificate|enrol|enroll|self[- ]?paced|ai[- ]?(?:assisted|enhanced).*proposal|learn.*research)\b/i;
+const SELF_DIRECTED = /\b(?:do|write|work on|complete|finish)\s+(?:it|the proposal|my proposal|the research|my research|the work|my work)?\s*myself\b|\bi want to (?:do|write|work on|complete|finish)\b.{0,35}\bmyself\b/i;
+const COURSE_INTENT = /\b(course|training|class|modules?|certificate|enrol|enroll|self[- ]?paced|ai[- ]?(?:assisted|enhanced).*proposal|learn.*research|do it myself|write it myself|work on it myself|complete it myself)\b/i;
 const RESEARCH_TERMS = /\b(proposal|dissertation|thesis|research|methodology|literature review|data analysis|statistical analysis|qualitative analysis|mixed methods|questionnaire|data collection tool|chapter\s*[1-6]|results|discussion|editing|proofread|referencing)\b/i;
 const HANDS_ON = /\b(help|assist|support|do|write|develop|prepare|review|edit|analyse|analyze|fix|work on|complete)\b/i;
 const PRICE_INTENT = /\b(how much|price|pricing|cost|fee|fees|charge|charges|rate)\b/i;
@@ -46,10 +48,19 @@ const STATUS_STAGE: Partial<Record<LeadStatus, number>> = {
 const PRIORITY_STAGE: Record<LeadPriority, number> = { STANDARD: 0, WARM: 1, HOT: 2 };
 const CLOSER = "Dr Kanyembo Ng'andwe";
 
+function inferProgramme(text: string) {
+  if (/\b(?:masters?|master['’]?s|msc|mph|ma\b|postgraduate|post-graduate)\b/i.test(text)) return "Master's/Postgraduate";
+  if (/\b(?:phd|doctorate|doctoral)\b/i.test(text)) return "PhD/Doctoral";
+  if (/\b(?:undergraduate|bachelor['’]?s|degree|mbchb)\b/i.test(text)) return "Undergraduate";
+  if (/\b(?:diploma)\b/i.test(text)) return "Diploma";
+  return null;
+}
+
 function inferService(text: string) {
   const research = RESEARCH_TERMS.test(text);
-  if (research && HANDS_ON.test(text)) return "Research support";
+  if (SELF_DIRECTED.test(text)) return "AI-Assisted Research Proposal Writing";
   if (COURSE_INTENT.test(text)) return "AI-Assisted Research Proposal Writing";
+  if (research && HANDS_ON.test(text)) return "Research support";
   if (research) return "Research support";
   return null;
 }
@@ -119,24 +130,31 @@ function shouldReplaceService(current: string | null, inferred: string | null, t
   if (!inferred) return false;
   if (!current || current === "Research enquiry" || current === "Service not established") return true;
   if (current === inferred) return false;
-  if (inferred === "Research support" && HANDS_ON.test(text)) return true;
+  if (SELF_DIRECTED.test(text)) return inferred === "AI-Assisted Research Proposal Writing";
+  if (inferred === "Research support" && HANDS_ON.test(text) && !SELF_DIRECTED.test(text)) return true;
   if (inferred === "AI-Assisted Research Proposal Writing" && COURSE_INTENT.test(text)) return true;
   return false;
 }
 
 export async function optimizeInboundLead(phone: string, text: string, source: "whatsapp" | "simulator"): Promise<ConversationOptimization> {
   let lead = await getOrCreateLead(phone, source);
-  const history = await getConversation(phone, 30).catch(() => []);
+  const history = await getConversation(phone, 48).catch(() => []);
   const analysis = classifySalesTurn(text, lead);
   const clientMessageCount = history.filter((message) => message.role === "user").length;
+  const recentAssistantReplies = history
+    .filter((message) => message.role === "assistant")
+    .slice(-6)
+    .map((message) => message.content);
 
   if (!["CONVERTED", "LOST LEAD", "HUMAN ASSISTANCE REQUIRED"].includes(lead.status)) {
     const patch: LeadPatch = {};
     const status = nextStatus(lead.status, analysis);
     const priority = nextPriority(lead.priority, analysis);
+    const programme = lead.programme ? null : inferProgramme(text);
     if (status !== lead.status) patch.status = status;
     if (priority !== lead.priority) patch.priority = priority;
     if (shouldReplaceService(lead.serviceInterest, analysis.inferredService, text)) patch.serviceInterest = analysis.inferredService;
+    if (programme) patch.programme = programme;
 
     if (analysis.objection === "timing") {
       patch.followUpAt = followUpTime(text);
@@ -162,7 +180,7 @@ export async function optimizeInboundLead(phone: string, text: string, source: "
               : "High-intent sales lead."
     : null;
 
-  return { lead, analysis, clientMessageCount, closerReason };
+  return { lead, analysis, clientMessageCount, closerReason, recentAssistantReplies };
 }
 
 function enforceSingleQuestion(text: string) {
@@ -195,8 +213,41 @@ function compactSentences(text: string, maxLength: number) {
   return selected.join(" ") || text;
 }
 
-export function shapeMaryReply(reply: string, clientText: string, analysis: SalesTurnAnalysis) {
+const ACKNOWLEDGEMENT_PATTERNS: Array<{ key: string; pattern: RegExp }> = [
+  { key: "that helps", pattern: /^(?:thanks[,!]?\s*)?(?:got it[,!]?\s*)?that helps[.!,:]?\s*/i },
+  { key: "thanks", pattern: /^(?:thanks|thank you)(?:\s+for\s+[^.!?]{1,80})?[.!,:]?\s*/i },
+  { key: "got it", pattern: /^got it[.!,:]?\s*/i },
+  { key: "great", pattern: /^great[.!,:]?\s*/i },
+  { key: "absolutely", pattern: /^absolutely[.!,:]?\s*/i },
+  { key: "okay", pattern: /^(?:okay|ok)[.!,:]?\s*/i },
+  { key: "makes sense", pattern: /^(?:that )?makes sense[.!,:]?\s*/i },
+  { key: "understood", pattern: /^understood[.!,:]?\s*/i }
+];
+
+function acknowledgementKey(text: string) {
+  return ACKNOWLEDGEMENT_PATTERNS.find(({ pattern }) => pattern.test(text.trim()))?.key ?? null;
+}
+
+function stripRepeatedAcknowledgement(text: string, recentAssistantReplies: string[]) {
+  const key = acknowledgementKey(text);
+  if (!key) return text;
+  const recentKeys = new Set(recentAssistantReplies.map(acknowledgementKey).filter(Boolean));
+  if (!recentKeys.has(key)) return text;
+  const pattern = ACKNOWLEDGEMENT_PATTERNS.find((item) => item.key === key)?.pattern;
+  if (!pattern) return text;
+  const stripped = text.replace(pattern, "").trim();
+  if (!stripped) return text;
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
+
+export function shapeMaryReply(
+  reply: string,
+  clientText: string,
+  analysis: SalesTurnAnalysis,
+  recentAssistantReplies: string[] = []
+) {
   let shaped = reply.trim().replaceAll("—", ",");
+  shaped = stripRepeatedAcknowledgement(shaped, recentAssistantReplies);
   shaped = enforceSingleQuestion(shaped);
 
   const containsCriticalInstructions = /https?:\/\//i.test(shaped) || analysis.paymentIntent || analysis.paymentConfirmation;

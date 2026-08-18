@@ -47,7 +47,7 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
     try {
       const result = await replyToClient(phone, text, "whatsapp", model);
       if (!optimization) return result;
-      const shaped = shapeMaryReply(result.reply, text, optimization.analysis);
+      const shaped = shapeMaryReply(result.reply, text, optimization.analysis, optimization.recentAssistantReplies);
       if (shaped === result.reply) return result;
 
       const rewritten = await rewriteLatestUnsentAssistantMessage({ phone, from: result.reply, to: shaped }).catch(() => false);
@@ -59,7 +59,9 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
   }
 
   const fallback = await verifiedConversationFallback(phone, text).catch(() => "I’m here and I can help. Tell me a little more about what you need and I’ll continue from there.");
-  const reply = optimization ? shapeMaryReply(fallback, text, optimization.analysis) : fallback;
+  const reply = optimization
+    ? shapeMaryReply(fallback, text, optimization.analysis, optimization.recentAssistantReplies)
+    : fallback;
   await addMessage(phone, "assistant", reply).catch((error) => {
     console.error("WhatsApp fallback could not be saved", { phoneSuffix: phone.slice(-4), error });
   });
