@@ -1,6 +1,6 @@
 import { referralRecipients } from "@/lib/referrals";
 import { listLeads } from "@/lib/store";
-import { sendTeamCopies } from "@/lib/team-notifications";
+import { sendSalesPipelineCopies } from "@/lib/team-notifications";
 import type { Lead } from "@/lib/types";
 
 export type BusinessEventType = "hot_lead" | "quote_created" | "payment_pending" | "payment_verified" | "receipt_sent" | "research_task_created" | "review_requested" | "operations_task";
@@ -48,11 +48,12 @@ export async function notifyBusinessEvent(input: {
   const cc = route.cc.map((key) => referralRecipients[key]).filter(Boolean);
   const leadLine = input.lead ? `Client: ${input.lead.name || "Not provided"} (${input.lead.phone.startsWith("+") ? input.lead.phone : `+${input.lead.phone}`})` : null;
   const body = [leadLine, input.body].filter(Boolean).join("\n").replaceAll("—", ",");
-  const results = await sendTeamCopies({
+  const results = await sendSalesPipelineCopies({
     heading: input.title,
     body,
     primary,
-    cc
+    cc,
+    lead: input.lead
   });
   return {
     sent: results.some((result) => result.status === "fulfilled" && result.value.sent),

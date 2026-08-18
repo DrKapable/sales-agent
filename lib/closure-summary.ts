@@ -83,6 +83,7 @@ export async function notifyConversationClosed(input: {
   await sendTeamNotification({
     kind: "conversation_closed",
     body,
+    lead: input.lead,
     phoneNumberIdOverride: input.phoneNumberIdOverride
   });
   return true;

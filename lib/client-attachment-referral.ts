@@ -1,7 +1,7 @@
 import { attachmentDisplayName, parseClientAttachmentChatContent } from "@/lib/client-attachment-content";
 import { referralRecipients } from "@/lib/referrals";
 import { addMessage, getOrCreateLead, updateLead } from "@/lib/store";
-import { sendTeamCopies } from "@/lib/team-notifications";
+import { sendSalesPipelineCopies } from "@/lib/team-notifications";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 const KANYEMBO = "Dr Kanyembo Ng'andwe";
@@ -41,7 +41,7 @@ export async function handleIncomingClientAttachment(phone: string, text: string
     return { reply, referralNotification: null, documentIds: [] };
   }
 
-  const reason = `${HUMAN_TAKEOVER_PREFIX} Client sent document ${fileName}. Referred to ${KANYEMBO}; Dr. Mustafa Juma Phiri, Mr Conrad Mununkha Phiri and Dr Zabibu Nandazi copied.`;
+  const reason = `${HUMAN_TAKEOVER_PREFIX} Client sent document ${fileName}. Referred to ${KANYEMBO}; Dr. Mustafa Juma Phiri and the relevant service specialist notified.`;
   const savedLead = await updateLead(phone, {
     status: "HUMAN ASSISTANCE REQUIRED",
     handoffReason: reason,
@@ -49,9 +49,10 @@ export async function handleIncomingClientAttachment(phone: string, text: string
     assignedTo: KANYEMBO
   });
 
-  await sendTeamCopies({
+  await sendSalesPipelineCopies({
     heading: "Client document referral",
     primary: referralRecipients.kanyembo,
+    lead: savedLead,
     body: referralBody({
       clientName: savedLead.name,
       phone: savedLead.phone,

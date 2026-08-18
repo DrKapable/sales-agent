@@ -31,7 +31,7 @@ export async function notifyDirectorOfNewClient(input: {
 }) {
   const attachment = parseClientAttachmentChatContent(input.firstMessage);
   if (attachment?.kind === "document") {
-    console.info("General new-client alert skipped because document referral already notified Kanyembo and Director", { phoneSuffix: input.lead.phone.slice(-4) });
+    console.info("General new-client alert skipped because document referral already notified the sales pipeline team", { phoneSuffix: input.lead.phone.slice(-4) });
     return true;
   }
 
@@ -39,6 +39,7 @@ export async function notifyDirectorOfNewClient(input: {
     const results = await sendTeamNotification({
       kind: "new_client",
       body: buildNewClientAlert(input),
+      lead: input.lead,
       phoneNumberIdOverride: input.phoneNumberIdOverride
     });
     return results.some((result) => result.status === "fulfilled" && result.value.sent);
