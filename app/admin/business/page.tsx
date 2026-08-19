@@ -1,7 +1,7 @@
-import { BusinessIntelligenceResponsive } from "@/components/business-intelligence-responsive";
+import { BusinessIntelligenceSuite } from "@/components/business-intelligence-suite";
 
 export const dynamic = "force-dynamic";
 
 export default function BusinessIntelligencePage() {
-  return <BusinessIntelligenceResponsive />;
+  return <BusinessIntelligenceSuite />;
 }
