@@ -97,6 +97,19 @@ export function MobileAdminEnhancer() {
 
   useEffect(() => { setToolsOpen(false); }, [actionsTarget]);
 
+  function searchClients() {
+    setToolsOpen(false);
+    setMenuOpen(false);
+    setChatOpen(false);
+    window.setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>(".leadToolbar input");
+      if (!input) return;
+      input.scrollIntoView({ block: "start", behavior: "smooth" });
+      input.focus({ preventScroll: true });
+      input.select();
+    }, 90);
+  }
+
   function currentLead() {
     const identity = document.querySelector<HTMLElement>(".conversationPanel .clientIdentity");
     const phoneText = identity?.querySelector<HTMLElement>("div span")?.textContent || "";
@@ -187,6 +200,12 @@ export function MobileAdminEnhancer() {
       <button type="button" className="mobileChatBack" aria-label="Back to chats" onClick={() => { setChatOpen(false); setToolsOpen(false); }}>←</button>,
       headerTarget
     ) : null}
+    {actionsTarget && chatOpen ? createPortal(
+      <button type="button" className="mobileClientSearchButton" aria-label="Search clients" title="Search clients" onClick={searchClients}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
+      </button>,
+      actionsTarget
+    ) : null}
     {actionsTarget ? createPortal(
       <button type="button" className={`mobileToolsButton ${toolsOpen ? "isOpen" : ""}`} aria-label={toolsOpen ? "Close client controls" : "Open client controls"} aria-expanded={toolsOpen} title={toolsOpen ? "Close client controls" : "Client controls"} onClick={() => setToolsOpen((value) => !value)}>
         <span className="mobileToolsLabel">{toolsOpen ? "Close controls" : "Client controls"}</span><span className="mobileToolsDots" aria-hidden="true">{toolsOpen ? "×" : "⋮"}</span>
@@ -202,6 +221,7 @@ export function MobileAdminEnhancer() {
 
     {controlsTarget ? createPortal(
       <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: 8, paddingTop: 4 }}>
+        <button type="button" className="button buttonGhost" onClick={searchClients}>Search clients</button>
         <button type="button" className="button buttonGhost" disabled={lifecycleBusy} onClick={() => void manageCurrent("archive")}>Archive chat</button>
         <button type="button" className="button buttonGhost" disabled={lifecycleBusy} onClick={() => void openArchivedChats()}>Archived chats</button>
         <button type="button" className="button buttonGhost" disabled={lifecycleBusy} style={{ color: "#a62a2a", borderColor: "#e7bcbc" }} onClick={() => void manageCurrent("delete")}>Delete chat</button>
