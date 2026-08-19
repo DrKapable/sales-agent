@@ -1,7 +1,8 @@
 import { buildBusinessAnalytics, type AnalyticsGap, type AnalyticsSeverity } from "@/lib/business-analytics";
 import { buildInboxConversationIntelligence, type InboxLeadSignals } from "@/lib/inbox-conversation-intelligence";
+import { SERVICE_CATEGORY_ORDER, harmonizeServiceCategory, serviceCategoryForLead, summarizeServiceCategories } from "@/lib/service-categories";
 
-type SnapshotLike = Parameters<typeof buildBusinessAnalytics>[0] & { leads?: any[] };
+type SnapshotLike = Parameters<typeof buildBusinessAnalytics>[0] & { leads?: any[]; offers?: any[] };
 
 type SignalKey = keyof InboxLeadSignals["signals"];
 
@@ -9,7 +10,7 @@ function activeLead(lead: any) {
   return !["CONVERTED", "LOST LEAD"].includes(String(lead?.status || ""));
 }
 
-function serviceForLead(lead: any) {
+function rawServiceForLead(lead: any) {
   return String(lead?.serviceInterest || lead?.packageName || "").trim() || null;
 }
 
@@ -25,9 +26,28 @@ function rankSeverity(value: AnalyticsSeverity) {
   return value === "high" ? 3 : value === "medium" ? 2 : 1;
 }
 
+function dateWithin(value: unknown, start: Date, end: Date) {
+  if (!value) return false;
+  const date = new Date(String(value));
+  return Number.isFinite(date.getTime()) && date >= start && date < end;
+}
+
 export async function buildBusinessAnalyticsWithInbox(snapshot: SnapshotLike, days = 90, now = new Date()) {
   const base = buildBusinessAnalytics(snapshot, days, now);
   const leads = Array.isArray(snapshot.leads) ? snapshot.leads : [];
+  const offers = Array.isArray(snapshot.offers) ? snapshot.offers : [];
+  const leadMap = new Map(leads.map((lead) => [String(lead.id), lead]));
+  const categoryForLead = (lead: any) => serviceCategoryForLead(lead, offers);
+  const categoryFromSample = (sample: any) => {
+    const lead = leadMap.get(String(sample?.id || ""));
+    return lead ? categoryForLead(lead) : harmonizeServiceCategory(sample?.service || "", offers);
+  };
+
+  const periodStart = new Date(base.period.start);
+  const periodEnd = new Date(base.period.end);
+  const periodLeads = leads.filter((lead) => dateWithin(lead.createdAt || lead.created_at, periodStart, periodEnd));
+  const servicePerformance = summarizeServiceCategories(periodLeads, offers);
+
   const inbox = await buildInboxConversationIntelligence(leads, 40);
   const active = leads.filter(activeLead);
 
@@ -39,7 +59,7 @@ export async function buildBusinessAnalyticsWithInbox(snapshot: SnapshotLike, da
       name: lead.name ? String(lead.name) : null,
       phone: String(lead.phone || ""),
       status: String(lead.status || ""),
-      service: serviceForLead(lead),
+      service: categoryForLead(lead),
       excerpt: signal?.evidence[key]?.[0] || signal?.latestClientExcerpt || null
     };
   });
@@ -105,18 +125,30 @@ export async function buildBusinessAnalyticsWithInbox(snapshot: SnapshotLike, da
     }
   ];
 
-  const gaps = [...base.gaps, ...conversationGaps].sort((a, b) => rankSeverity(b.severity) - rankSeverity(a.severity) || b.count - a.count);
+  const baseGaps = base.gaps.map((gap) => ({
+    ...gap,
+    sampleLeads: gap.sampleLeads.map((row) => ({ ...row, service: categoryFromSample(row) }))
+  }));
+  const gaps = [...baseGaps, ...conversationGaps].sort((a, b) => rankSeverity(b.severity) - rankSeverity(a.severity) || b.count - a.count);
+
+  const inboxPatterns = inbox.patterns.map((pattern) => ({
+    ...pattern,
+    sampleLeads: pattern.sampleLeads.map((row) => ({ ...row, service: categoryFromSample(row) }))
+  }));
 
   return {
     ...base,
+    serviceCategories: SERVICE_CATEGORY_ORDER,
+    servicePerformance,
     inbox: {
       analysedLeads: inbox.analysedLeads,
       analysedMessages: inbox.analysedMessages,
-      patterns: inbox.patterns
+      patterns: inboxPatterns
     },
     gaps,
     limitations: [
       ...base.limitations,
+      "Management service reporting is harmonized into five categories: Research Support Services, Online Courses, Pa Gym Services, Software, AI & Automation, and Others. Exact service names remain available internally for quotations and fulfilment.",
       "Inbox conversation signals are pattern-based screening of recent stored messages. They identify conversations worth reviewing but do not prove the client’s underlying motive or sentiment.",
       "Only recent stored inbox turns are analysed per lead, so very old objections may not appear if they are outside the current analysis window."
     ]

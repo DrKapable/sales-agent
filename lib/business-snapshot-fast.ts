@@ -1,5 +1,6 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { getConversation, listLeads, listOffers } from "@/lib/store";
+import { managementCategoryForOffer, serviceCategoryForLead, summarizeServiceCategories } from "@/lib/service-categories";
 import type { Lead } from "@/lib/types";
 
 let sql: NeonQueryFunction<false, false> | null = null;
@@ -115,24 +116,18 @@ export async function getFastBusinessSnapshot() {
     const summary = summaries.get(lead.phone) || { messageCount: 0, recentText: "", lastMessage: null, lastActivityAt: null };
     const scored = scoreLead(lead, summary.recentText, summary.messageCount);
     const lastActivityAt = summary.lastActivityAt || lead.createdAt;
-    return { ...lead, leadScore: scored.score, scoreBand: scored.band, messageCount: scored.messageCount, lostReason: lead.status === "LOST LEAD" ? inferLostReason(summary.recentText) : null, lastMessage: summary.lastMessage, lastActivityAt, ageDays: Math.round(ageDays(lead.createdAt)), inactiveDays: Math.round(ageDays(lastActivityAt)) };
+    const serviceCategory = serviceCategoryForLead(lead, offers);
+    return { ...lead, serviceCategory, leadScore: scored.score, scoreBand: scored.band, messageCount: scored.messageCount, lostReason: lead.status === "LOST LEAD" ? inferLostReason(summary.recentText) : null, lastMessage: summary.lastMessage, lastActivityAt, ageDays: Math.round(ageDays(lead.createdAt)), inactiveDays: Math.round(ageDays(lastActivityAt)) };
   });
 
   const converted = enriched.filter((lead) => lead.status === "CONVERTED");
   const lost = enriched.filter((lead) => lead.status === "LOST LEAD");
-  const serviceCounts = new Map<string, { leads: number; converted: number }>();
-  for (const lead of enriched) {
-    const service = lead.serviceInterest || lead.packageName || "Not established";
-    const row = serviceCounts.get(service) ?? { leads: 0, converted: 0 };
-    row.leads += 1;
-    if (lead.status === "CONVERTED") row.converted += 1;
-    serviceCounts.set(service, row);
-  }
+  const services = summarizeServiceCategories(enriched, offers);
 
   const leadMap = new Map(enriched.map((lead) => [lead.id, lead]));
   const attachLead = (row: any) => {
     const lead = row.lead_id ? leadMap.get(row.lead_id) : null;
-    return { ...row, leadName: lead?.name || null, leadPhone: lead?.phone || null, serviceInterest: lead?.serviceInterest || lead?.packageName || null };
+    return { ...row, leadName: lead?.name || null, leadPhone: lead?.phone || null, serviceInterest: lead?.serviceInterest || lead?.packageName || null, serviceCategory: lead?.serviceCategory || "Others" };
   };
   tasks = tasks.map(attachLead); payments = payments.map(attachLead); quotes = quotes.map(attachLead); feedback = feedback.map(attachLead);
 
@@ -146,9 +141,9 @@ export async function getFastBusinessSnapshot() {
     generatedAt: new Date().toISOString(),
     metrics: { totalLeads: enriched.length, converted: converted.length, lost: lost.length, conversionRate: enriched.length ? Math.round((converted.length / enriched.length) * 100) : 0, hotLeads: enriched.filter((lead) => lead.scoreBand === "HOT" && !["CONVERTED", "LOST LEAD"].includes(lead.status)).length, followUpsDue: dueFollowUps.length, paymentPending: pendingPayments.length, paymentPendingLeads: enriched.filter((lead) => lead.status === "PAYMENT PENDING").length, openTasks: openTasks.length, overdueTasks: overdueTasks.length, quotesCreated: quotes.length, staleWarmLeads: staleWarmLeads.length },
     leads: enriched.sort((a, b) => b.leadScore - a.leadScore || new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime()),
-    services: [...serviceCounts.entries()].map(([service, values]) => ({ service, ...values, conversionRate: values.leads ? Math.round(values.converted / values.leads * 100) : 0 })).sort((a, b) => b.leads - a.leads),
+    services,
     lostReasons: [...new Set(lost.map((lead) => lead.lostReason || "Reason not established"))].map((reason) => ({ reason, count: lost.filter((lead) => lead.lostReason === reason).length })).sort((a, b) => b.count - a.count),
-    offers: offers.map((offer) => ({ slug: offer.slug, name: offer.name, category: offer.category, priceZmw: offer.priceZmw, rushPriceZmw: offer.rushPriceZmw })),
+    offers: offers.map((offer) => ({ slug: offer.slug, name: offer.name, category: managementCategoryForOffer(offer), catalogueCategory: offer.category, priceZmw: offer.priceZmw, rushPriceZmw: offer.rushPriceZmw })),
     tasks, payments, quotes, feedback,
     attention: { followUpsDue: dueFollowUps.slice(0, 12), overdueTasks: overdueTasks.slice(0, 12), staleWarmLeads: staleWarmLeads.slice(0, 12) }
   };
