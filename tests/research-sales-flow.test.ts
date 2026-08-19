@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferResearchCatalogueService, inferResearchDeadline, isExplicitResearchHumanRequest, researchSalesHasCommercialIntent } from "@/lib/research-sales-flow";
+import { inferResearchCatalogueService, inferResearchDeadline, isExplicitResearchHumanRequest, researchQualificationQuestion, researchSalesHasCommercialIntent } from "@/lib/research-sales-flow";
 
 describe("research sales conversion-first flow", () => {
   it("keeps the screenshot scenario on the research-proposal sales path", () => {
@@ -16,6 +16,22 @@ describe("research sales conversion-first flow", () => {
     expect(inferResearchCatalogueService("I need help with my dissertation", "Research support")).toBe("Dissertation or Thesis");
     expect(inferResearchCatalogueService("Please help with qualitative data analysis", "Research support")).toBe("Qualitative Analysis");
     expect(inferResearchCatalogueService("I need a questionnaire for data collection", "Research support")).toBe("Data Collection Tool");
+  });
+
+  it("lets the latest client clarification replace an older or stored research service", () => {
+    const transcript = [
+      "I was asking about proposal support",
+      "Actually I need help with my dissertation"
+    ].join("\n");
+
+    expect(inferResearchCatalogueService(transcript, "Research Proposal")).toBe("Dissertation or Thesis");
+    expect(inferResearchCatalogueService("Dissertation", "Research Proposal")).toBe("Dissertation or Thesis");
+  });
+
+  it("uses the identified deliverable in the qualification question", () => {
+    const question = researchQualificationQuestion("Dissertation or Thesis", null, null);
+    expect(question).toContain("dissertation/thesis service and fee");
+    expect(question).not.toContain("proposal service");
   });
 
   it("recognises explicit requests for a human or specialist as exceptions", () => {
