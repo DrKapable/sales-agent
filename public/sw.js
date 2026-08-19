@@ -1,6 +1,6 @@
 const CACHE_PREFIX = "medminds-sales-agent";
-const SHELL_CACHE = `${CACHE_PREFIX}-shell-v4`;
-const RUNTIME_CACHE = `${CACHE_PREFIX}-runtime-v4`;
+const SHELL_CACHE = `${CACHE_PREFIX}-shell-v5`;
+const RUNTIME_CACHE = `${CACHE_PREFIX}-runtime-v5`;
 const OFFLINE_URL = "/offline.html";
 
 const PRECACHE = [
@@ -11,6 +11,7 @@ const PRECACHE = [
   "/pwa-icon-192.png",
   "/pwa-icon-512.png",
   "/pwa-maskable-512.png",
+  "/pwa-screenshot-mobile.png",
   "/manifest.webmanifest"
 ];
 

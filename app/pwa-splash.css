@@ -17,21 +17,37 @@
   .pwaStartupSplashInner{
     display:grid;
     justify-items:center;
-    gap:22px;
-    width:min(82vw,560px);
-    transform:translateY(-2vh);
+    gap:18px;
+    width:min(88vw,560px);
+    transform:translateY(-3vh);
+    text-align:center;
+    color:#203952;
   }
-  .pwaStartupSplash img{
+  .pwaStartupSplashIcon{
     display:block;
-    width:100%;
+    width:clamp(116px,28vw,152px);
+    aspect-ratio:1;
     height:auto;
-    max-height:38vh;
     object-fit:contain;
+    border-radius:28%;
+  }
+  .pwaStartupSplashCopy{display:grid;gap:7px}
+  .pwaStartupSplashTitle{
+    font-size:clamp(25px,6vw,34px);
+    line-height:1.15;
+    font-weight:800;
+    letter-spacing:-.02em;
+  }
+  .pwaStartupSplashSubtitle{
+    color:#60717f;
+    font-size:clamp(13px,3.4vw,17px);
+    line-height:1.45;
   }
   .pwaStartupSplashBar{
     position:relative;
-    width:min(180px,42vw);
-    height:3px;
+    width:min(190px,44vw);
+    height:4px;
+    margin-top:10px;
     overflow:hidden;
     border-radius:999px;
     background:rgba(43,157,141,.16);
@@ -43,6 +59,12 @@
     border-radius:inherit;
     background:#2b9d8d;
     animation:pwaSplashProgress 1s ease-in-out infinite;
+  }
+  .pwaStartupSplashStatus{
+    margin-top:-6px;
+    color:#788b99;
+    font-size:13px;
+    line-height:1.3;
   }
 }
 

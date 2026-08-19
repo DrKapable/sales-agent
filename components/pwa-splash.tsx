@@ -2,49 +2,41 @@
 
 import { useEffect, useState } from "react";
 
-type SplashPhase = "visible" | "leaving" | "hidden";
+function isStandaloneMode() {
+  if (typeof window === "undefined") return false;
+  const iosStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+  return window.matchMedia("(display-mode: standalone)").matches || iosStandalone;
+}
 
 export function PwaSplash() {
-  const [phase, setPhase] = useState<SplashPhase>("visible");
+  const [visible, setVisible] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
-    const nav = navigator as Navigator & { standalone?: boolean };
-    const standalone = window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true;
-    if (!standalone) {
-      setPhase("hidden");
-      return;
-    }
+    if (!isStandaloneMode()) return;
+    setVisible(true);
 
-    let started = false;
-    let fadeTimer = 0;
-    let hideTimer = 0;
-    const beginExit = () => {
-      if (started) return;
-      started = true;
-      fadeTimer = window.setTimeout(() => {
-        setPhase("leaving");
-        hideTimer = window.setTimeout(() => setPhase("hidden"), 240);
-      }, 420);
-    };
-
-    if (document.readyState === "complete") beginExit();
-    else window.addEventListener("load", beginExit, { once: true });
-    const fallbackTimer = window.setTimeout(beginExit, 1100);
-
+    const leaveTimer = window.setTimeout(() => setLeaving(true), 760);
+    const removeTimer = window.setTimeout(() => setVisible(false), 1040);
     return () => {
-      window.removeEventListener("load", beginExit);
-      window.clearTimeout(fallbackTimer);
-      window.clearTimeout(fadeTimer);
-      window.clearTimeout(hideTimer);
+      window.clearTimeout(leaveTimer);
+      window.clearTimeout(removeTimer);
     };
   }, []);
 
-  if (phase === "hidden") return null;
+  if (!visible) return null;
 
-  return <div className={`pwaStartupSplash${phase === "leaving" ? " isLeaving" : ""}`} aria-hidden="true">
-    <div className="pwaStartupSplashInner">
-      <img src="/medminds-logo.png" alt="" />
-      <div className="pwaStartupSplashBar"><span /></div>
+  return (
+    <div className={`pwaStartupSplash${leaving ? " isLeaving" : ""}`} aria-hidden="true">
+      <div className="pwaStartupSplashInner">
+        <img className="pwaStartupSplashIcon" src="/pwa-icon-512.png" alt="" />
+        <div className="pwaStartupSplashCopy">
+          <div className="pwaStartupSplashTitle">MedMinds Sales Agent</div>
+          <div className="pwaStartupSplashSubtitle">Client conversations · Leads · Business intelligence</div>
+        </div>
+        <div className="pwaStartupSplashBar"><span /></div>
+        <div className="pwaStartupSplashStatus">Opening your workspace…</div>
+      </div>
     </div>
-  </div>;
+  );
 }
