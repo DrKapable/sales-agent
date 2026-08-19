@@ -1,0 +1,571 @@
+/* Chat inbox UX audit v2 — presentation only. Loaded after the legacy/mobile chat layers. */
+
+.dashboard .leadListItem,
+.dashboard .conversationHeader,
+.dashboard .timelineBubble,
+.dashboard .replyComposer,
+.dashboard .leadToolbar,
+.dashboard .controlStrip,
+.dashboard .followUpTools {
+  min-width: 0;
+}
+
+.dashboard .leadListItem:focus-visible,
+.dashboard .mobileChatBack:focus-visible,
+.dashboard .mobileToolsButton:focus-visible,
+.dashboard .conversationDocumentsButton:focus-visible,
+.dashboard .conversationActions .iconButton:focus-visible,
+.dashboard .takeoverButton:focus-visible,
+.dashboard .sendReplyButton:focus-visible {
+  outline: 3px solid rgba(42,169,155,.28) !important;
+  outline-offset: 2px;
+}
+
+.dashboard .timelineBubble p,
+.dashboard .documentMessageTitle,
+.dashboard .clientAttachmentCard,
+.dashboard .clientDocumentItem {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Desktop and landscape tablet: give more space to the conversation and make the list easier to scan. */
+@media (min-width: 821px) {
+  .dashboard .inboxLayout {
+    grid-template-columns: clamp(300px, 28vw, 380px) minmax(0,1fr) !important;
+    min-height: 760px !important;
+    height: min(860px, 78dvh) !important;
+    max-height: 860px !important;
+    border-radius: 18px !important;
+  }
+
+  .dashboard .leadList,
+  .dashboard .conversationPanel {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: none !important;
+  }
+
+  .dashboard .leadList {
+    background: #f9fbfa !important;
+  }
+
+  .dashboard .leadListTop {
+    padding: 13px 15px !important;
+    background: rgba(249,251,250,.96) !important;
+  }
+
+  .dashboard .leadListItem {
+    min-height: 82px;
+    padding: 13px 14px !important;
+    gap: 10px !important;
+    transition: background .16s ease, box-shadow .16s ease;
+  }
+
+  .dashboard .leadListItem:hover {
+    background: #f0f7f4 !important;
+  }
+
+  .dashboard .leadListItem.selected {
+    background: #e8f5f1 !important;
+    box-shadow: inset 4px 0 0 #2aa99b !important;
+  }
+
+  .dashboard .leadListCopy strong {
+    font-size: 14px !important;
+    line-height: 1.25;
+  }
+
+  .dashboard .leadListCopy small {
+    margin-top: 1px;
+    font-size: 11.5px !important;
+  }
+
+  .dashboard .leadListCopy em {
+    margin-top: 1px;
+    font-size: 10.5px !important;
+  }
+
+  .dashboard .leadBadges {
+    gap: 5px;
+  }
+
+  .dashboard .conversationHeader {
+    flex: 0 0 auto;
+    padding: 12px 16px !important;
+    background: rgba(255,255,255,.98) !important;
+  }
+
+  .dashboard .clientIdentity {
+    min-width: 0;
+  }
+
+  .dashboard .clientIdentity > div {
+    min-width: 0;
+  }
+
+  .dashboard .clientIdentity strong,
+  .dashboard .clientIdentity > div > span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dashboard .conversationActions {
+    flex: 0 0 auto;
+    gap: 7px !important;
+  }
+
+  .dashboard .conversationActions .iconButton,
+  .dashboard .conversationDocumentsButton {
+    min-height: 38px !important;
+    border-radius: 10px !important;
+  }
+
+  .dashboard .controlStrip {
+    padding: 9px 16px !important;
+  }
+
+  .dashboard .conversationMeta {
+    padding: 6px 16px !important;
+  }
+
+  .dashboard .followUpTools {
+    padding: 7px 16px !important;
+  }
+
+  .dashboard .messageTimeline {
+    min-height: 0 !important;
+    padding: 18px 20px 22px !important;
+    gap: 11px !important;
+    background-color: #eef5f2;
+  }
+
+  .dashboard .timelineBubble {
+    max-width: min(72%, 680px) !important;
+    padding: 11px 14px !important;
+    border-radius: 16px !important;
+    box-shadow: 0 2px 9px rgba(16,43,40,.055) !important;
+  }
+
+  .dashboard .timelineRow.agent .timelineBubble {
+    background: #168b7e !important;
+  }
+
+  .dashboard .timelineRow.human .timelineBubble {
+    background: #fff0c7 !important;
+  }
+
+  .dashboard .timelineBubble p {
+    font-size: 14px !important;
+    line-height: 1.52 !important;
+  }
+
+  .dashboard .timelineBubble time {
+    margin-top: 7px !important;
+    font-size: 9px !important;
+    opacity: .82;
+  }
+
+  .dashboard .replyComposer:has(textarea:not(:disabled)) {
+    border-top: 1px solid #dce7e3 !important;
+    background: #fbfdfc !important;
+  }
+}
+
+/* Mid-size tablets: preserve two-pane context without allowing either side to force overflow. */
+@media (min-width: 821px) and (max-width: 1100px) {
+  .dashboard .inboxLayout {
+    grid-template-columns: minmax(250px, .72fr) minmax(0, 1.45fr) !important;
+    height: 780px !important;
+  }
+
+  .dashboard .leadListItem {
+    grid-template-columns: 42px minmax(0,1fr) !important;
+  }
+
+  .dashboard .leadBadges {
+    grid-column: 2;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .dashboard .conversationActions .iconButton {
+    padding-inline: 10px !important;
+    font-size: 10px !important;
+  }
+
+  .dashboard .timelineBubble {
+    max-width: 80% !important;
+  }
+}
+
+/* Mobile chat list: make the inbox the primary screen instead of a squeezed desktop dashboard. */
+@media (max-width: 820px) {
+  body:has(.dashboard:not(.mobileChatOpen)) {
+    background: #edf4f1;
+  }
+
+  .dashboard:not(.mobileChatOpen) .dashboardHeader,
+  .dashboard:not(.mobileChatOpen) .metricGrid,
+  .dashboard:not(.mobileChatOpen) .pipeline {
+    display: none !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .dashboardMain {
+    padding: 8px 8px calc(14px + env(safe-area-inset-bottom)) !important;
+    overflow-x: hidden !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadToolbar {
+    position: sticky;
+    top: 0;
+    z-index: 35;
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
+    gap: 6px !important;
+    margin: 0 0 8px !important;
+    padding: 8px !important;
+    border: 1px solid #dbe6e2;
+    border-radius: 15px;
+    background: rgba(247,251,249,.96);
+    box-shadow: 0 5px 18px rgba(16,43,40,.06);
+    backdrop-filter: blur(12px);
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadToolbar input {
+    grid-column: 1 / -1;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 46px !important;
+    padding: 0 15px !important;
+    border-radius: 23px !important;
+    border-color: #d4e2de !important;
+    font-size: 14px !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadToolbar select {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 39px !important;
+    padding: 6px 9px !important;
+    border-radius: 11px !important;
+    background: #fff !important;
+    font-size: 11px !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadToolbar > .button {
+    display: none !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .inboxLayout {
+    border-radius: 16px !important;
+    border-color: #dbe6e2 !important;
+    overflow: hidden !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadList {
+    max-height: calc(100dvh - 196px) !important;
+    min-height: 310px;
+    border-radius: 16px !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListItem {
+    grid-template-columns: 48px minmax(0,1fr) !important;
+    grid-template-rows: auto auto;
+    min-height: 88px !important;
+    gap: 4px 11px !important;
+    padding: 11px 12px !important;
+    align-items: center !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListItem .clientAvatar {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 46px !important;
+    height: 46px !important;
+    flex: 0 0 46px;
+    border-radius: 50% !important;
+    background: linear-gradient(145deg,#27afa0,#178d82) !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListCopy {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListCopy strong {
+    font-size: 15px !important;
+    letter-spacing: -.01em;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListCopy small {
+    font-size: 11.5px !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListCopy em {
+    font-size: 9.5px !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadBadges {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 5px !important;
+    margin-top: 2px;
+    align-self: start;
+  }
+
+  .dashboard:not(.mobileChatOpen) .priorityPill,
+  .dashboard:not(.mobileChatOpen) .statusPill {
+    padding: 3px 6px !important;
+    border-radius: 999px !important;
+    font-size: 8px !important;
+    line-height: 1.2;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListItem:active {
+    background: #edf7f4 !important;
+  }
+
+  /* Focused conversation: clearer identity/actions and a calmer WhatsApp-like reading surface. */
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationHeader {
+    flex: 0 0 62px !important;
+    min-height: 62px !important;
+    max-height: 62px !important;
+    grid-template-rows: 62px !important;
+    padding: 4px 7px !important;
+    background: #173b57 !important;
+    border-bottom: 1px solid rgba(255,255,255,.09) !important;
+    box-shadow: 0 4px 14px rgba(9,35,52,.18) !important;
+  }
+
+  .dashboard.mobileChatOpen .mobileChatBack,
+  .dashboard.mobileChatOpen .mobileToolsButton,
+  .dashboard.mobileChatOpen .conversationDocumentsButton,
+  .dashboard.mobileChatOpen .conversationActions > a.iconButton[href^="https://wa.me/"] {
+    min-width: 38px !important;
+    width: 38px !important;
+    min-height: 38px !important;
+    height: 38px !important;
+  }
+
+  .dashboard.mobileChatOpen .mobileChatBack {
+    font-size: 25px !important;
+  }
+
+  .dashboard.mobileChatOpen .clientIdentity {
+    gap: 8px !important;
+  }
+
+  .dashboard.mobileChatOpen .clientIdentity .clientAvatar.large {
+    width: 40px !important;
+    height: 40px !important;
+    flex-basis: 40px !important;
+    background: linear-gradient(145deg,#30b7a8,#208f84) !important;
+  }
+
+  .dashboard.mobileChatOpen .clientIdentity strong {
+    font-size: 14.5px !important;
+    letter-spacing: -.01em;
+  }
+
+  .dashboard.mobileChatOpen .clientIdentity > div > span {
+    margin-top: 2px;
+    font-size: 9.5px !important;
+  }
+
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .messageTimeline {
+    padding: 14px 9px calc(102px + env(safe-area-inset-bottom)) !important;
+    scroll-padding-bottom: calc(102px + env(safe-area-inset-bottom)) !important;
+    gap: 10px !important;
+    background-color: #eef5f2 !important;
+    background-size: 18px 18px !important;
+  }
+
+  .dashboard.mobileChatOpen .timelineBubble {
+    max-width: 87% !important;
+    padding: 10px 12px !important;
+    border-radius: 16px !important;
+    box-shadow: 0 2px 8px rgba(16,43,40,.07) !important;
+  }
+
+  .dashboard.mobileChatOpen .timelineRow.client .timelineBubble {
+    background: #fff !important;
+    border-bottom-left-radius: 5px !important;
+  }
+
+  .dashboard.mobileChatOpen .timelineRow.agent .timelineBubble {
+    background: #2aa99b !important;
+    border-bottom-right-radius: 5px !important;
+  }
+
+  .dashboard.mobileChatOpen .timelineRow.human .timelineBubble {
+    background: #fff0c7 !important;
+    border-bottom-right-radius: 5px !important;
+  }
+
+  .dashboard.mobileChatOpen .timelineBubble span {
+    margin-bottom: 5px !important;
+    font-size: 9px !important;
+    letter-spacing: .03em;
+  }
+
+  .dashboard.mobileChatOpen .timelineBubble p {
+    font-size: 14px !important;
+    line-height: 1.46 !important;
+  }
+
+  .dashboard.mobileChatOpen .timelineBubble time {
+    margin-top: 6px !important;
+    font-size: 8.5px !important;
+    opacity: .8;
+  }
+
+  /* Guarantee a readable, full-width takeover action and avoid the old concatenated label. */
+  .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen) > .controlStrip > .takeoverButton {
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 50px !important;
+    bottom: calc(9px + env(safe-area-inset-bottom)) !important;
+    border-radius: 25px !important;
+    background: #239f91 !important;
+    box-shadow: 0 7px 22px rgba(12,71,65,.22) !important;
+    font-size: 0 !important;
+  }
+
+  .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen) > .controlStrip > .takeoverButton::after {
+    content: "Take over chat" !important;
+    font-size: 14px !important;
+    font-weight: 850 !important;
+    letter-spacing: -.01em;
+  }
+
+  .dashboard.mobileChatOpen .replyComposer:has(textarea:not(:disabled)) {
+    padding: 7px 7px calc(7px + env(safe-area-inset-bottom)) !important;
+    background: rgba(240,244,242,.98) !important;
+    border-top: 1px solid rgba(25,74,67,.10) !important;
+  }
+
+  .dashboard.mobileChatOpen .replyComposer:has(textarea:not(:disabled)) .composerInputRow {
+    gap: 6px !important;
+  }
+
+  .dashboard.mobileChatOpen .replyComposer:has(textarea:not(:disabled)) .composerInputRow textarea {
+    min-height: 46px !important;
+    max-height: 112px !important;
+    padding: 12px 14px !important;
+    border-radius: 23px !important;
+    border-color: #d4e0dc !important;
+    font-size: 15px !important;
+    line-height: 1.35 !important;
+  }
+
+  .dashboard.mobileChatOpen .replyComposer:has(textarea:not(:disabled)) .clientDocumentAttachButton,
+  .dashboard.mobileChatOpen .replyComposer:has(textarea:not(:disabled)) .sendReplyButton {
+    flex: 0 0 46px !important;
+    width: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+  }
+
+  .dashboard.mobileChatOpen .replyComposer:has(textarea:not(:disabled)) .clientDocumentAttachButton {
+    border-radius: 50% !important;
+    background: #fff !important;
+    border: 1px solid #d4e0dc !important;
+  }
+
+  .dashboard.mobileChatOpen .replyComposer:has(textarea:not(:disabled)) .sendReplyButton {
+    background: #239f91 !important;
+  }
+
+  .dashboard.mobileChatOpen .conversationError,
+  .dashboard.mobileChatOpen .conversationNotice {
+    left: 12px !important;
+    right: 12px !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  /* Client controls remain an overlay, but feel like one intentional bottom sheet. */
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen > .controlStrip {
+    left: 8px !important;
+    right: 8px !important;
+    border-radius: 18px 18px 0 0 !important;
+    padding: 11px !important;
+  }
+
+  .dashboard.mobileChatOpen .conversationPanel.mobileToolsOpen > .followUpTools {
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    border-radius: 0 0 18px 18px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .dashboard:not(.mobileChatOpen) .leadToolbar {
+    padding: 7px !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadList {
+    max-height: calc(100dvh - 190px) !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListItem {
+    grid-template-columns: 44px minmax(0,1fr) !important;
+    padding-inline: 10px !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListItem .clientAvatar {
+    width: 42px !important;
+    height: 42px !important;
+    flex-basis: 42px !important;
+  }
+
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationHeader {
+    grid-template-columns: 36px minmax(0,1fr) 112px !important;
+    padding-inline: 5px !important;
+  }
+
+  .dashboard.mobileChatOpen .conversationActions {
+    width: 112px !important;
+    gap: 0 !important;
+  }
+
+  .dashboard.mobileChatOpen .mobileChatBack,
+  .dashboard.mobileChatOpen .mobileToolsButton,
+  .dashboard.mobileChatOpen .conversationDocumentsButton,
+  .dashboard.mobileChatOpen .conversationActions > a.iconButton[href^="https://wa.me/"] {
+    min-width: 34px !important;
+    width: 34px !important;
+    min-height: 34px !important;
+    height: 34px !important;
+  }
+
+  .dashboard.mobileChatOpen .clientIdentity .clientAvatar.large {
+    width: 36px !important;
+    height: 36px !important;
+    flex-basis: 36px !important;
+  }
+
+  .dashboard.mobileChatOpen .timelineBubble {
+    max-width: 90% !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard .leadListItem,
+  .dashboard .timelineBubble {
+    transition: none !important;
+  }
+}
