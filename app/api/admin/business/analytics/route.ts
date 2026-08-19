@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildBusinessAnalytics } from "@/lib/business-analytics";
+import { buildBusinessAnalyticsWithInbox } from "@/lib/business-analytics-with-inbox";
 import { getFastBusinessSnapshot } from "@/lib/business-snapshot-fast";
 
 function rangeDays(request: Request) {
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const startedAt = Date.now();
   try {
     const snapshot = await getFastBusinessSnapshot();
-    const analytics = buildBusinessAnalytics(snapshot, rangeDays(request));
+    const analytics = await buildBusinessAnalyticsWithInbox(snapshot, rangeDays(request));
     return NextResponse.json({ ...analytics, loadMs: Date.now() - startedAt });
   } catch (error) {
     console.error("Business analytics failed", { error });
