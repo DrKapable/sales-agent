@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { AdminDocumentsV2 } from "@/components/admin-documents-v2";
 import { AgentIdentityEnhancer } from "@/components/agent-identity-enhancer";
+import { BusinessAnalysisUXEnhancer } from "@/components/business-analysis-ux-enhancer";
 import { ChatDeliveryTicksEnhancer } from "@/components/chat-delivery-ticks-enhancer";
 import { ChatLifecycleReliabilityEnhancer } from "@/components/chat-lifecycle-reliability-enhancer";
 import { ChatRichTextEnhancer } from "@/components/chat-rich-text-enhancer";
@@ -51,5 +52,5 @@ export const metadata: Metadata = {
 // Admin document enhancers are mounted at the root so the active client conversation can render shared files immediately.
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
-  return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><PwaSplash /><MobileAdminEnhancer /><ClientRecordManagementEnhancer /><ChatLifecycleReliabilityEnhancer /><AdminDocumentsV2 /><ConversationDocumentsEnhancer /><ClientAttachmentEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
+  return <html lang="en"><head><meta name="theme-color" content="#203952" /></head><body><PwaSplash /><MobileAdminEnhancer /><BusinessAnalysisUXEnhancer /><ClientRecordManagementEnhancer /><ChatLifecycleReliabilityEnhancer /><AdminDocumentsV2 /><ConversationDocumentsEnhancer /><ClientAttachmentEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
 }
