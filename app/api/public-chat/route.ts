@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
+import { handleResearchSalesFlow } from "@/lib/research-sales-flow";
 import { maybeEscalateResearchService } from "@/lib/research-service-escalation";
 import { addMessage, getConversation, getOrCreateLead, updateLead } from "@/lib/store";
 import { getAiModelCandidates, getSetupState } from "@/lib/env";
@@ -76,6 +77,15 @@ export async function POST(request: Request) {
       console.info("Website new client director alert processed", { phoneSuffix: phone.slice(-4), alerted });
     });
   };
+
+  const researchSales = await handleResearchSalesFlow({ phone, text: parsed.data.message, source: "simulator" }).catch((error) => {
+    console.warn("Website research sales flow could not be applied; continuing safely", { phoneSuffix: phone.slice(-4), error });
+    return null;
+  });
+  if (researchSales) {
+    queueNewClientAlert();
+    return NextResponse.json({ reply: researchSales.reply });
+  }
 
   const researchEscalation = await maybeEscalateResearchService({ phone, text: parsed.data.message, source: "simulator" });
   if (researchEscalation) {

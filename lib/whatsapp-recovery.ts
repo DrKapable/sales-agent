@@ -1,6 +1,7 @@
 import { handleIncomingClientAttachment } from "@/lib/client-attachment-referral";
 import { optimizeInboundLead, shapeMaryReply } from "@/lib/conversation-optimization";
 import { researchCampaignOpening } from "@/lib/research-campaign-conversion";
+import { handleResearchSalesFlow } from "@/lib/research-sales-flow";
 import { maybeEscalateResearchService } from "@/lib/research-service-escalation";
 import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewrite";
 import { addMessage, updateLead } from "@/lib/store";
@@ -32,6 +33,15 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
     });
     return { reply: campaignOpening.reply, referralNotification: null, documentIds: [] };
   }
+
+  // Research support is a sales journey before it is a fulfilment handoff.
+  // Keep Mary in the conversation while she establishes the exact deliverable,
+  // academic level and deadline, then prepare a catalogue-backed quotation when appropriate.
+  const researchSales = await handleResearchSalesFlow({ phone, text, source: "whatsapp" }).catch((error) => {
+    console.warn("Research sales flow could not be applied; continuing safely", { phoneSuffix: phone.slice(-4), error });
+    return null;
+  });
+  if (researchSales) return researchSales;
 
   const researchEscalation = await maybeEscalateResearchService({ phone, text, source: "whatsapp" });
   if (researchEscalation) {

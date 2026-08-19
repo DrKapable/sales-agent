@@ -26,6 +26,7 @@ import "./home-hero-generated.css";
 import "./public-chat-v2.css";
 import "./admin-chat-clean.css";
 import "./pwa-splash.css";
+import "./business-analytics-mobile-fix.css";
 
 export const metadata: Metadata = {
   title: "MedMinds Learning Centre",

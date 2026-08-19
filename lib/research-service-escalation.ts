@@ -15,9 +15,8 @@ const DIRECT_RESEARCH_HELP = /\b(help|assist)\b.{0,55}\b(research topic|topic|pr
 const SPECIALIST_RESEARCH = /\b(advanced|complex|specialist|research design|methodology|protocol|sample size|power calculation|multivariable|multivariate|regression|survival analysis|cox regression|multilevel|mixed effects|systematic review|meta-analysis|publication|journal|statistical model|clinical research)\b/i;
 
 /**
- * Returns true only when the client is asking Mary herself to perform research work.
- * Commercial research enquiries (prices, quotations, invoices, payment, packages or
- * starting a service) deliberately remain with Mary because she is the sales agent.
+ * Classifies requests where Mary is being asked to personally perform substantive research work.
+ * Commercial research enquiries remain with Mary because she is the sales agent.
  */
 export function isResearchServiceRequest(text: string) {
   const clean = text.trim();
@@ -39,13 +38,20 @@ export async function maybeEscalateResearchService(input: {
   if (!isResearchServiceRequest(input.text)) return null;
 
   const currentLead = await getOrCreateLead(input.phone, input.source);
+
+  // Research-service intent is a sales opportunity first. Mary must qualify the
+  // client, establish the exact service, quote from the catalogue and move the
+  // lead through payment/conversion before routine fulfilment is handed over.
+  // Explicit human/specialist requests can still be handled by the agent's
+  // normal human-assistance tool before conversion.
+  if (currentLead.status !== "CONVERTED") return null;
+
   const specialist = specialistRequest(input.text);
   const recipient = specialist ? referralRecipients.mustafa : referralRecipients.monica;
   const reason = specialist
-    ? "Client asked Mary to perform specialist research work. Mary may sell and coordinate research services but must not personally produce the research deliverable."
-    : "Client asked Mary to perform hands-on research work. Mary may sell and coordinate research services but must not personally produce the research deliverable.";
+    ? "Converted client requested specialist research fulfilment."
+    : "Converted client requested hands-on research fulfilment.";
   const summary = `Client request: ${input.text.trim().slice(0, 700)}`;
-  const alreadyAssigned = currentLead.status === "HUMAN ASSISTANCE REQUIRED" && currentLead.assignedTo === recipient.name;
 
   const savedLead = await updateLead(input.phone, {
     serviceInterest: currentLead.serviceInterest || "Research support",
@@ -55,7 +61,7 @@ export async function maybeEscalateResearchService(input: {
     aiPaused: false
   });
 
-  const referralNotification = !alreadyAssigned && recipient.phone
+  const referralNotification = recipient.phone
     ? {
         phone: recipient.phone,
         recipientName: recipient.name,
@@ -64,8 +70,8 @@ export async function maybeEscalateResearchService(input: {
     : null;
 
   const reply = specialist
-    ? `I can help you with the MedMinds service, pricing and arrangements, but I can't personally perform that specialist research work. I've referred the research work to ${recipient.name} for the technical review.`
-    : `I can help you with the MedMinds research service, pricing and arrangements, but I can't personally develop or write the research work. I've referred the research work to ${recipient.name}, our research-support expert.`;
+    ? `Your MedMinds research service is already in the fulfilment stage. I've referred this specialist part to ${recipient.name} for technical review.`
+    : `Your MedMinds research service is already in the fulfilment stage. I've referred this research work to ${recipient.name}, our research-support expert.`;
 
   return { reply, referralNotification, documentIds: [] };
 }
