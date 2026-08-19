@@ -1,6 +1,6 @@
 import { buildBusinessAnalytics, type AnalyticsGap, type AnalyticsSeverity } from "@/lib/business-analytics";
 import { buildInboxConversationIntelligence, type InboxLeadSignals } from "@/lib/inbox-conversation-intelligence";
-import { SERVICE_CATEGORY_ORDER, harmonizeServiceCategory, serviceCategoryForLead, summarizeServiceCategories } from "@/lib/service-categories";
+import { SERVICE_CATEGORY_ORDER, harmonizeServiceCategory, precisePercentage, serviceCategoryForLead, summarizeServiceCategories } from "@/lib/service-categories";
 
 type SnapshotLike = Parameters<typeof buildBusinessAnalytics>[0] & { leads?: any[]; offers?: any[] };
 
@@ -8,10 +8,6 @@ type SignalKey = keyof InboxLeadSignals["signals"];
 
 function activeLead(lead: any) {
   return !["CONVERTED", "LOST LEAD"].includes(String(lead?.status || ""));
-}
-
-function rawServiceForLead(lead: any) {
-  return String(lead?.serviceInterest || lead?.packageName || "").trim() || null;
 }
 
 function severity(count: number, denominator: number, high = 0.15, medium = 0.06): AnalyticsSeverity {
@@ -47,6 +43,11 @@ export async function buildBusinessAnalyticsWithInbox(snapshot: SnapshotLike, da
   const periodEnd = new Date(base.period.end);
   const periodLeads = leads.filter((lead) => dateWithin(lead.createdAt || lead.created_at, periodStart, periodEnd));
   const servicePerformance = summarizeServiceCategories(periodLeads, offers);
+  const currentConverted = leads.filter((lead) => String(lead.status || "") === "CONVERTED").length;
+  const leadTrend = base.leadTrend.map((row) => ({
+    ...row,
+    cohortConversionRate: precisePercentage(Number(row.convertedCohort || 0), Number(row.newLeads || 0))
+  }));
 
   const inbox = await buildInboxConversationIntelligence(leads, 40);
   const active = leads.filter(activeLead);
@@ -138,6 +139,11 @@ export async function buildBusinessAnalyticsWithInbox(snapshot: SnapshotLike, da
 
   return {
     ...base,
+    summary: {
+      ...base.summary,
+      overallConversionRate: precisePercentage(currentConverted, leads.length)
+    },
+    leadTrend,
     serviceCategories: SERVICE_CATEGORY_ORDER,
     servicePerformance,
     inbox: {
@@ -148,6 +154,7 @@ export async function buildBusinessAnalyticsWithInbox(snapshot: SnapshotLike, da
     gaps,
     limitations: [
       ...base.limitations,
+      "Percentages use one-decimal precision. Service lead share is calculated as service leads divided by all leads in the selected period; service conversion is converted leads divided by leads in that service category.",
       "Management service reporting is harmonized into five categories: Research Support Services, Online Courses, Pa Gym Services, Software, AI & Automation, and Others. Exact service names remain available internally for quotations and fulfilment.",
       "Inbox conversation signals are pattern-based screening of recent stored messages. They identify conversations worth reviewing but do not prove the client’s underlying motive or sentiment.",
       "Only recent stored inbox turns are analysed per lead, so very old objections may not appear if they are outside the current analysis window."

@@ -30,6 +30,14 @@ function normalize(value: unknown) {
     .trim();
 }
 
+export function precisePercentage(numerator: number, denominator: number, decimals = 1) {
+  const top = Number(numerator || 0);
+  const bottom = Number(denominator || 0);
+  if (!Number.isFinite(top) || !Number.isFinite(bottom) || bottom <= 0) return 0;
+  const factor = 10 ** Math.max(0, Math.min(3, Math.round(decimals)));
+  return Math.round((top / bottom) * 100 * factor) / factor;
+}
+
 function validCategory(value: unknown): ServiceCategory | null {
   const text = String(value || "");
   return SERVICE_CATEGORY_ORDER.includes(text as ServiceCategory) ? (text as ServiceCategory) : null;
@@ -118,6 +126,7 @@ export function summarizeServiceCategories(leads: LeadLike[], offers: OfferLike[
     if (String(lead.status || "") === "CONVERTED") row.converted += 1;
   }
 
+  const totalLeads = leads.length;
   return SERVICE_CATEGORY_ORDER.map((service) => {
     const values = counts.get(service)!;
     return {
@@ -125,7 +134,8 @@ export function summarizeServiceCategories(leads: LeadLike[], offers: OfferLike[
       category: service,
       leads: values.leads,
       converted: values.converted,
-      conversionRate: values.leads ? Math.round((values.converted / values.leads) * 100) : 0
+      leadShare: precisePercentage(values.leads, totalLeads),
+      conversionRate: precisePercentage(values.converted, values.leads)
     };
   });
 }
