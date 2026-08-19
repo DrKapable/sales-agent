@@ -28,26 +28,38 @@ export function researchSalesHasCommercialIntent(clientTranscript: string) {
   return COMMERCIAL_INTENT.test(clientTranscript);
 }
 
+function classifyResearchService(text: string) {
+  const normalized = text.toLowerCase();
+  if (/\bproposal\b/.test(normalized)) return "Research Proposal";
+  if (/\b(dissertation|thesis)\b/.test(normalized)) return "Dissertation or Thesis";
+  if (/\bmixed[- ]?methods?\b/.test(normalized) && /\banalys/.test(normalized)) return "Mixed-Methods Analysis";
+  if (/\bqualitative\b/.test(normalized) && /\banalys/.test(normalized)) return "Qualitative Analysis";
+  if (/\b(quantitative|statistical|statistics|data analysis)\b/.test(normalized) && !/\bqualitative\b/.test(normalized)) return "Quantitative Analysis";
+  if (/\b(data collection tool|questionnaire|survey tool)\b/.test(normalized)) return "Data Collection Tool";
+  if (/\bdata collection\b/.test(normalized)) return "Data Collection";
+  if (/\b(research topic|topic development)\b/.test(normalized)) return "Research Topic Development";
+  if (/\bsupervisor corrections?\b/.test(normalized)) return "Supervisor Corrections";
+  if (/\bresearch paper editing\b/.test(normalized)) return "Research Paper Editing";
+  if (/\bproofread/.test(normalized)) return "Proofreading";
+  if (/\bacademic editing\b/.test(normalized)) return "Academic Editing";
+  if (/\bplagiarism (?:check|report)\b/.test(normalized)) return "Plagiarism Check Report";
+  if (/\bai (?:detection|check|report)\b/.test(normalized)) return "AI Detection Report";
+  if (/\breduce plagiarism\b/.test(normalized)) return "Reduce Plagiarism";
+  if (/\breduce ai detection\b/.test(normalized)) return "Reduce AI Detection";
+  if (/\bmanuscript\b/.test(normalized)) return "Manuscript Writing";
+  return null;
+}
+
 export function inferResearchCatalogueService(clientTranscript: string, storedService?: string | null) {
-  const text = `${storedService || ""} ${clientTranscript}`.toLowerCase();
-  if (/\bproposal\b/.test(text)) return "Research Proposal";
-  if (/\b(dissertation|thesis)\b/.test(text)) return "Dissertation or Thesis";
-  if (/\bmixed[- ]?methods?\b/.test(text) && /\banalys/.test(text)) return "Mixed-Methods Analysis";
-  if (/\bqualitative\b/.test(text) && /\banalys/.test(text)) return "Qualitative Analysis";
-  if (/\b(quantitative|statistical|statistics|data analysis)\b/.test(text) && !/\bqualitative\b/.test(text)) return "Quantitative Analysis";
-  if (/\b(data collection tool|questionnaire|survey tool)\b/.test(text)) return "Data Collection Tool";
-  if (/\bdata collection\b/.test(text)) return "Data Collection";
-  if (/\b(research topic|topic development)\b/.test(text)) return "Research Topic Development";
-  if (/\bsupervisor corrections?\b/.test(text)) return "Supervisor Corrections";
-  if (/\bresearch paper editing\b/.test(text)) return "Research Paper Editing";
-  if (/\bproofread/.test(text)) return "Proofreading";
-  if (/\bacademic editing\b/.test(text)) return "Academic Editing";
-  if (/\bplagiarism (?:check|report)\b/.test(text)) return "Plagiarism Check Report";
-  if (/\bai (?:detection|check|report)\b/.test(text)) return "AI Detection Report";
-  if (/\breduce plagiarism\b/.test(text)) return "Reduce Plagiarism";
-  if (/\breduce ai detection\b/.test(text)) return "Reduce AI Detection";
-  if (/\bmanuscript\b/.test(text)) return "Manuscript Writing";
+  const messages = clientTranscript.split(/\n+/).map((message) => message.trim()).filter(Boolean);
+  for (const message of [...messages].reverse()) {
+    const inferred = classifyResearchService(message);
+    if (inferred) return inferred;
+  }
+
   const stored = String(storedService || "").trim();
+  const inferredStored = classifyResearchService(stored);
+  if (inferredStored) return inferredStored;
   return stored && !/^research (?:support|enquiry)$/i.test(stored) ? stored : "Research support";
 }
 
@@ -96,9 +108,15 @@ async function repairLegacyPrematureHandoff(phone: string, lead: Awaited<ReturnT
   return updateLead(phone, { status: "QUALIFIED", handoffReason: null, assignedTo: null, aiPaused: false }).catch(() => lead);
 }
 
-function qualificationQuestion(exactService: string, programme: string | null, deadline: string | null) {
+function serviceQuestionLabel(exactService: string) {
+  if (exactService === "Dissertation or Thesis") return "dissertation/thesis";
+  if (exactService === "Research Proposal") return "research proposal";
+  return exactService.toLowerCase();
+}
+
+export function researchQualificationQuestion(exactService: string, programme: string | null, deadline: string | null) {
   if (exactService === "Research support") return "What specific part of the research work do you want MedMinds to handle?";
-  if (!programme) return "To match the right proposal service and fee, what programme or academic level is this for: diploma, bachelor’s, master’s or PhD?";
+  if (!programme) return `To match the right ${serviceQuestionLabel(exactService)} service and fee, what programme or academic level is this for: diploma, bachelor’s, master’s or PhD?`;
   if (!deadline) return "What deadline are you working toward?";
   return null;
 }
@@ -125,10 +143,12 @@ export async function handleResearchSalesFlow(input: {
   const exactService = inferResearchCatalogueService(clientTranscript, lead.serviceInterest || lead.packageName);
   const programme = inferProgramme(clientMessages, lead.programme);
   const deadline = inferResearchDeadline(clientMessages, lead.deadline);
-  const nextQuestion = qualificationQuestion(exactService, programme, deadline);
+  const nextQuestion = researchQualificationQuestion(exactService, programme, deadline);
 
   const patch: Record<string, unknown> = {};
-  if (!lead.serviceInterest || /^research (?:support|enquiry)$/i.test(lead.serviceInterest)) patch.serviceInterest = exactService === "Research support" ? "Research support" : exactService;
+  const currentService = String(lead.serviceInterest || "").trim();
+  if (exactService !== "Research support" && currentService !== exactService) patch.serviceInterest = exactService;
+  else if (!currentService) patch.serviceInterest = exactService;
   if (!lead.programme && programme) patch.programme = programme;
   if (!lead.deadline && deadline) patch.deadline = deadline;
   if (lead.status === "NEW LEAD" && !nextQuestion) patch.status = "QUALIFIED";
