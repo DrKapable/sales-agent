@@ -1,8 +1,10 @@
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
+import { captureConversationAnswer, repairConversationReply } from "@/lib/conversation-continuity";
 import { handleResearchSalesFlow } from "@/lib/research-sales-flow";
 import { maybeEscalateResearchService } from "@/lib/research-service-escalation";
+import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewrite";
 import { addMessage, getConversation, getOrCreateLead, updateLead } from "@/lib/store";
 import { getAiModelCandidates, getSetupState } from "@/lib/env";
 import { verifiedConversationFallback } from "@/lib/recovery-reply";
@@ -69,6 +71,21 @@ export async function POST(request: Request) {
   await updateLead(phone, { name: parsed.data.name });
   await addMessage(phone, "user", parsed.data.message);
 
+  const recentAssistantReplies = (await getConversation(phone, 16).catch(() => []))
+    .filter((message) => message.role === "assistant")
+    .slice(-6)
+    .map((message) => message.content);
+  await captureConversationAnswer(phone, parsed.data.message, "simulator").catch((error) => {
+    console.warn("Website conversation answer memory could not be updated", { phoneSuffix: phone.slice(-4), error });
+  });
+
+  const finalizeSavedResult = async (result: SalesAgentResult) => {
+    const repaired = repairConversationReply(result.reply, parsed.data.message, recentAssistantReplies);
+    if (repaired === result.reply) return result;
+    const rewritten = await rewriteLatestUnsentAssistantMessage({ phone, from: result.reply, to: repaired }).catch(() => false);
+    return rewritten ? { ...result, reply: repaired } : result;
+  };
+
   const queueNewClientAlert = () => {
     if (!firstEverClientMessage) return;
     after(async () => {
@@ -84,25 +101,29 @@ export async function POST(request: Request) {
   });
   if (researchSales) {
     queueNewClientAlert();
-    return NextResponse.json({ reply: researchSales.reply });
+    const finalized = await finalizeSavedResult(researchSales);
+    return NextResponse.json({ reply: finalized.reply });
   }
 
   const researchEscalation = await maybeEscalateResearchService({ phone, text: parsed.data.message, source: "simulator" });
   if (researchEscalation) {
     await addMessage(phone, "assistant", researchEscalation.reply).catch(() => undefined);
-    await sendReferralNotification(researchEscalation);
+    const finalized = await finalizeSavedResult(researchEscalation);
+    await sendReferralNotification(finalized);
     queueNewClientAlert();
-    return NextResponse.json({ reply: researchEscalation.reply });
+    return NextResponse.json({ reply: finalized.reply });
   }
 
   const result = await generateWithFailover(phone, parsed.data.message);
   if (result) {
-    await sendReferralNotification(result);
+    const finalized = await finalizeSavedResult(result);
+    await sendReferralNotification(finalized);
     queueNewClientAlert();
-    return NextResponse.json({ reply: result.reply });
+    return NextResponse.json({ reply: finalized.reply });
   }
 
-  const reply = await verifiedConversationFallback(phone, parsed.data.message).catch(() => "I'm here and I can help. Tell me a little more about what you need and I'll continue from there.");
+  const fallback = await verifiedConversationFallback(phone, parsed.data.message).catch(() => "I'm here and I can help. Tell me a little more about what you need and I'll continue from there.");
+  const reply = repairConversationReply(fallback, parsed.data.message, recentAssistantReplies);
   await addMessage(phone, "assistant", reply).catch(() => undefined);
   queueNewClientAlert();
   return NextResponse.json({ reply, recovered: true });
