@@ -5,8 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 type GapFilter = "all" | "high" | "medium" | "low";
 type InboxPattern = { key: string; label: string; count: number; detail: string; sampleLeads?: Array<{ id: string; name?: string | null; phone: string; excerpt?: string | null; status?: string; service?: string | null }> };
-type ServicePerformanceRow = { service: string; leads: number; converted: number; leadShare?: number; conversionRate: number };
-type AnalyticsPayload = { generatedAt?: string; servicePerformance?: ServicePerformanceRow[]; inbox?: { analysedLeads?: number; analysedMessages?: number; patterns?: InboxPattern[] } };
+type AnalyticsPayload = { generatedAt?: string; inbox?: { analysedLeads?: number; analysedMessages?: number; patterns?: InboxPattern[] } };
 
 function activeDays() {
   const active = document.querySelector<HTMLButtonElement>(".biaRange button.active")?.textContent || "90 days";
@@ -38,11 +37,6 @@ function formattedDate(value?: string) {
   if (!value) return "";
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
-}
-
-function formattedPercent(value: number | undefined) {
-  const number = Number(value || 0);
-  return Number.isFinite(number) ? number.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 }) : "0";
 }
 
 export function BusinessAnalyticsUXEnhancer() {
@@ -104,36 +98,6 @@ export function BusinessAnalyticsUXEnhancer() {
     });
   }, [gapFilter, filterHost, data]);
 
-  useEffect(() => {
-    const shell = visibleAnalyticsShell();
-    const performance = data?.servicePerformance || [];
-    if (!shell || !performance.length) return;
-
-    const rows = Array.from(shell.querySelectorAll<HTMLElement>(".biaServiceRow"));
-    rows.forEach((row) => {
-      const strong = row.querySelector<HTMLElement>(":scope > strong");
-      if (!strong) return;
-      const name = strong.childNodes[0]?.textContent?.trim() || strong.textContent?.trim() || "";
-      const item = performance.find((entry) => entry.service === name);
-      if (!item) return;
-
-      let share = strong.querySelector<HTMLElement>(".biaServiceShare");
-      if (!share) {
-        share = document.createElement("small");
-        share.className = "biaServiceShare";
-        strong.appendChild(share);
-      }
-      share.textContent = `${formattedPercent(item.leadShare)}% of period enquiries`;
-
-      const rate = row.querySelector<HTMLElement>(".biaRate");
-      if (rate) rate.textContent = `${formattedPercent(item.conversionRate)}%`;
-    });
-
-    const serviceCard = rows[0]?.closest<HTMLElement>(".biaCard");
-    const subtitle = serviceCard?.querySelector<HTMLElement>(".biaCardHead p");
-    if (subtitle) subtitle.textContent = "Lead volume, share of period enquiries and current conversion rate for leads acquired in the selected period.";
-  }, [data]);
-
   const patterns = useMemo(() => (data?.inbox?.patterns || []).filter((row) => Number(row.count || 0) > 0).slice(0, 8), [data]);
   const patternCount = (key: string) => patterns.find((row) => row.key === key)?.count || 0;
   const gapCounts = useMemo(() => {
@@ -153,9 +117,9 @@ export function BusinessAnalyticsUXEnhancer() {
   const filterPanel = filterHost ? createPortal(<div className="biaUxGapFilters" role="group" aria-label="Gap severity filter">{(["all", "high", "medium", "low"] as GapFilter[]).map((value) => <button key={value} aria-pressed={gapFilter === value} className={gapFilter === value ? "active" : ""} onClick={() => setGapFilter(value)}>{value.charAt(0).toUpperCase() + value.slice(1)} <span>{gapCounts[value]}</span></button>)}</div>, filterHost) : null;
 
   return <>{inboxPanel}{filterPanel}<style jsx global>{`
-    .biaShell{padding:clamp(10px,2.2vw,28px)}.biaHeader{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:end!important}.biaHeaderActions{justify-content:flex-end}.biaMetrics{grid-template-columns:repeat(6,minmax(0,1fr))}.biaChartWrap{overflow-x:auto!important;overscroll-behavior-inline:contain;scrollbar-width:thin;scrollbar-color:#c5d5d1 transparent}.biaCard{box-shadow:0 9px 26px rgba(18,49,59,.05)!important}.biaGaps{margin-top:14px}.biaUxInbox{margin-bottom:14px}.biaUxInboxStats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:10px}.biaUxInboxStats article{background:#f4f9f7;border:1px solid #deebe7;border-radius:12px;padding:11px}.biaUxInboxStats strong{display:block;font-size:22px}.biaUxInboxStats span{font-size:11px;color:#62756f}.biaUxPatterns{display:grid;gap:7px}.biaUxPattern{border:1px solid #e0e9e6;border-radius:11px;background:#fff;overflow:hidden}.biaUxPattern summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 11px;cursor:pointer;list-style:none}.biaUxPattern summary::-webkit-details-marker{display:none}.biaUxPattern summary strong{font-size:12px}.biaUxPattern summary p{font-size:11px;color:#71827e;margin:2px 0 0}.biaUxPattern summary>span{font-size:22px;font-weight:900}.biaUxSamples{padding:0 10px 10px;display:grid;gap:6px}.biaUxSamples>div{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;padding:8px;background:#f4f8f7;border-radius:8px;font-size:11px}.biaUxSamples span{color:#61736f;overflow-wrap:anywhere}.biaUxEmpty{padding:20px;text-align:center;color:#71827e}.biaUxUpdated{display:block;margin-top:9px;color:#81918d}.biaUxGapFilters{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 12px}.biaUxGapFilters button{min-height:38px;border:1px solid #d6e2df;background:#fff;border-radius:999px;padding:7px 10px;font-weight:800;color:#61736f;cursor:pointer}.biaUxGapFilters button span{opacity:.72}.biaUxGapFilters button.active{background:#123f4d;color:#fff;border-color:#123f4d}.biaUxGapFilters button:focus-visible,.biaUxPattern summary:focus-visible{outline:3px solid rgba(8,125,120,.25);outline-offset:2px}.biaServiceShare{display:block;margin-top:3px;font-size:10px;font-weight:600;color:#7b8d88}
+    .biaShell{padding:clamp(10px,2.2vw,28px)}.biaHeader{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:end!important}.biaHeaderActions{justify-content:flex-end}.biaMetrics{grid-template-columns:repeat(6,minmax(0,1fr))}.biaChartWrap{overflow-x:auto!important;overscroll-behavior-inline:contain;scrollbar-width:thin;scrollbar-color:#c5d5d1 transparent}.biaCard{box-shadow:0 9px 26px rgba(18,49,59,.05)!important}.biaGaps{margin-top:14px}.biaUxInbox{margin-bottom:14px}.biaUxInboxStats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:10px}.biaUxInboxStats article{background:#f4f9f7;border:1px solid #deebe7;border-radius:12px;padding:11px}.biaUxInboxStats strong{display:block;font-size:22px}.biaUxInboxStats span{font-size:11px;color:#62756f}.biaUxPatterns{display:grid;gap:7px}.biaUxPattern{border:1px solid #e0e9e6;border-radius:11px;background:#fff;overflow:hidden}.biaUxPattern summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 11px;cursor:pointer;list-style:none}.biaUxPattern summary::-webkit-details-marker{display:none}.biaUxPattern summary strong{font-size:12px}.biaUxPattern summary p{font-size:11px;color:#71827e;margin:2px 0 0}.biaUxPattern summary>span{font-size:22px;font-weight:900}.biaUxSamples{padding:0 10px 10px;display:grid;gap:6px}.biaUxSamples>div{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;padding:8px;background:#f4f8f7;border-radius:8px;font-size:11px}.biaUxSamples span{color:#61736f;overflow-wrap:anywhere}.biaUxEmpty{padding:20px;text-align:center;color:#71827e}.biaUxUpdated{display:block;margin-top:9px;color:#81918d}.biaUxGapFilters{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 12px}.biaUxGapFilters button{min-height:38px;border:1px solid #d6e2df;background:#fff;border-radius:999px;padding:7px 10px;font-weight:800;color:#61736f;cursor:pointer}.biaUxGapFilters button span{opacity:.72}.biaUxGapFilters button.active{background:#123f4d;color:#fff;border-color:#123f4d}.biaUxGapFilters button:focus-visible,.biaUxPattern summary:focus-visible{outline:3px solid rgba(8,125,120,.25);outline-offset:2px}
     @media(max-width:1100px){.biaMetrics{grid-template-columns:repeat(3,minmax(0,1fr))}.biaUxInboxStats{grid-template-columns:repeat(2,minmax(0,1fr))}}
-    @media(max-width:720px){.biaShell{padding:8px!important}.biaHeader{grid-template-columns:1fr!important;gap:10px}.biaHeaderActions{display:grid!important;grid-template-columns:minmax(0,1fr) auto;width:100%;justify-content:stretch!important}.biaRange{overflow-x:auto;scrollbar-width:none}.biaRange button{white-space:nowrap;min-width:68px;min-height:44px}.biaRefresh{min-height:44px}.biaMetrics{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px;overflow:visible!important;padding-bottom:0!important}.biaMetrics article{flex:auto!important;min-width:0;padding:11px}.biaMetrics strong{font-size:23px}.biaMetrics span{font-size:10px}.biaMetrics small{font-size:10px}.biaCard{padding:13px;border-radius:14px}.biaChartWrap{margin:0 -4px;padding:0 4px 4px}.biaChartSvg{min-width:580px}.biaBars{min-width:560px}.biaServiceHeader{display:none!important}.biaServiceRow{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important;padding:10px 0!important}.biaServiceRow strong{grid-column:1/-1;font-size:12px}.biaServiceRow>span{background:#f4f8f7;border-radius:8px;padding:7px;text-align:left}.biaServiceRow>span:nth-of-type(1)::before{content:'Leads';display:block;font-size:8px;text-transform:uppercase;color:#81918d}.biaServiceRow>span:nth-of-type(2)::before{content:'Converted';display:block;font-size:8px;text-transform:uppercase;color:#81918d}.biaServiceRow>span:nth-of-type(3)::before{content:'Conversion';display:block;font-size:8px;text-transform:uppercase;color:#81918d}.biaUxInboxStats{grid-template-columns:1fr 1fr}.biaUxPattern summary p{display:none}.biaUxSamples>div{grid-template-columns:1fr}.biaAnalysis{font-size:12.5px!important;line-height:1.65!important}.biaAnalysisHead{flex-wrap:wrap}.biaAiIntro button,.biaAskRow button{min-height:44px}.biaGap summary{min-height:70px}}
+    @media(max-width:720px){.biaShell{padding:8px!important}.biaHeader{grid-template-columns:1fr!important;gap:10px}.biaHeaderActions{display:grid!important;grid-template-columns:minmax(0,1fr) auto;width:100%;justify-content:stretch!important}.biaRange{overflow-x:auto;scrollbar-width:none}.biaRange button{white-space:nowrap;min-width:68px;min-height:44px}.biaRefresh{min-height:44px}.biaMetrics{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px;overflow:visible!important;padding-bottom:0!important}.biaMetrics article{flex:auto!important;min-width:0;padding:11px}.biaMetrics strong{font-size:23px}.biaMetrics span{font-size:10px}.biaMetrics small{font-size:10px}.biaCard{padding:13px;border-radius:14px}.biaChartWrap{margin:0 -4px;padding:0 4px 4px}.biaChartSvg{min-width:580px}.biaBars{min-width:560px}.biaServiceHeader{display:none!important}.biaServiceRow{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important;padding:10px 0!important}.biaServiceRow strong{grid-column:1/-1;font-size:12px}.biaServiceRow>span{background:#f4f8f7;border-radius:8px;padding:7px;text-align:left}.biaServiceRow>span:nth-of-type(1)::before{content:'Leads';display:block;font-size:8px;text-transform:uppercase;color:#81918d}.biaServiceRow>span:nth-of-type(2)::before{content:'Converted';display:block;font-size:8px;text-transform:uppercase;color:#81918d}.biaServiceRow>span:nth-of-type(3)::before{content:'Rate';display:block;font-size:8px;text-transform:uppercase;color:#81918d}.biaUxInboxStats{grid-template-columns:1fr 1fr}.biaUxPattern summary p{display:none}.biaUxSamples>div{grid-template-columns:1fr}.biaAnalysis{font-size:12.5px!important;line-height:1.65!important}.biaAnalysisHead{flex-wrap:wrap}.biaAiIntro button,.biaAskRow button{min-height:44px}.biaGap summary{min-height:70px}}
     @media(max-width:390px){.biaHeaderActions{grid-template-columns:1fr!important}.biaRefresh{width:100%}.biaTitleRow h1{font-size:27px!important}.biaMetrics strong{font-size:21px}.biaUxInboxStats strong{font-size:20px}.biaUxGapFilters{display:grid;grid-template-columns:repeat(2,1fr)}.biaUxGapFilters button{width:100%;min-height:42px}}
     @media(prefers-reduced-motion:reduce){.biaShell *{scroll-behavior:auto!important}}
   `}</style></>;

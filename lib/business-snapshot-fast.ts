@@ -1,6 +1,6 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { getConversation, listLeads, listOffers } from "@/lib/store";
-import { managementCategoryForOffer, serviceCategoryForLead, summarizeServiceCategories } from "@/lib/service-categories";
+import { managementCategoryForOffer, precisePercentage, serviceCategoryForLead, summarizeServiceCategories } from "@/lib/service-categories";
 import type { Lead } from "@/lib/types";
 
 let sql: NeonQueryFunction<false, false> | null = null;
@@ -122,7 +122,14 @@ export async function getFastBusinessSnapshot() {
 
   const converted = enriched.filter((lead) => lead.status === "CONVERTED");
   const lost = enriched.filter((lead) => lead.status === "LOST LEAD");
-  const services = summarizeServiceCategories(enriched, offers);
+  // The Business Intelligence service card is an enquiry-mix view. Its badge therefore
+  // shows each service category's share of all enquiries, while the observed conversion
+  // rate is retained separately for analytics and other consumers.
+  const services = summarizeServiceCategories(enriched, offers).map((row) => ({
+    ...row,
+    observedConversionRate: row.conversionRate,
+    conversionRate: row.leadShare
+  }));
 
   const leadMap = new Map(enriched.map((lead) => [lead.id, lead]));
   const attachLead = (row: any) => {
@@ -139,7 +146,7 @@ export async function getFastBusinessSnapshot() {
 
   return {
     generatedAt: new Date().toISOString(),
-    metrics: { totalLeads: enriched.length, converted: converted.length, lost: lost.length, conversionRate: enriched.length ? Math.round((converted.length / enriched.length) * 100) : 0, hotLeads: enriched.filter((lead) => lead.scoreBand === "HOT" && !["CONVERTED", "LOST LEAD"].includes(lead.status)).length, followUpsDue: dueFollowUps.length, paymentPending: pendingPayments.length, paymentPendingLeads: enriched.filter((lead) => lead.status === "PAYMENT PENDING").length, openTasks: openTasks.length, overdueTasks: overdueTasks.length, quotesCreated: quotes.length, staleWarmLeads: staleWarmLeads.length },
+    metrics: { totalLeads: enriched.length, converted: converted.length, lost: lost.length, conversionRate: precisePercentage(converted.length, enriched.length), hotLeads: enriched.filter((lead) => lead.scoreBand === "HOT" && !["CONVERTED", "LOST LEAD"].includes(lead.status)).length, followUpsDue: dueFollowUps.length, paymentPending: pendingPayments.length, paymentPendingLeads: enriched.filter((lead) => lead.status === "PAYMENT PENDING").length, openTasks: openTasks.length, overdueTasks: overdueTasks.length, quotesCreated: quotes.length, staleWarmLeads: staleWarmLeads.length },
     leads: enriched.sort((a, b) => b.leadScore - a.leadScore || new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime()),
     services,
     lostReasons: [...new Set(lost.map((lead) => lead.lostReason || "Reason not established"))].map((reason) => ({ reason, count: lost.filter((lead) => lead.lostReason === reason).length })).sort((a, b) => b.count - a.count),
