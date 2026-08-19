@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferResearchCatalogueService, isExplicitResearchHumanRequest, researchSalesHasCommercialIntent } from "@/lib/research-sales-flow";
+import { inferResearchCatalogueService, inferResearchDeadline, isExplicitResearchHumanRequest, researchSalesHasCommercialIntent } from "@/lib/research-sales-flow";
 
 describe("research sales conversion-first flow", () => {
   it("keeps the screenshot scenario on the research-proposal sales path", () => {
@@ -22,5 +22,12 @@ describe("research sales conversion-first flow", () => {
     expect(isExplicitResearchHumanRequest("Can I speak to Dr Monica about my proposal?" )).toBe(true);
     expect(isExplicitResearchHumanRequest("Please connect me to a research specialist")).toBe(true);
     expect(isExplicitResearchHumanRequest("Help with my actual proposal")).toBe(false);
+  });
+
+  it("accepts month-and-year deadlines instead of repeating the deadline question", () => {
+    expect(inferResearchDeadline(["The deadline is January 2027"])).toBe("January 2027");
+    expect(inferResearchDeadline(["I need it by Jan 2027"])).toBe("Jan 2027");
+    expect(inferResearchDeadline(["Submission is 30 January 2027"])).toBe("30 January 2027");
+    expect(inferResearchDeadline(["The deadline is January 2027"], "15 February 2027")).toBe("15 February 2027");
   });
 });

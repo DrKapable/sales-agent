@@ -1,0 +1,119 @@
+/* Final screenshot-driven chat fixes: non-overlapping AI takeover dock and branded WhatsApp action. */
+@media (max-width: 820px) {
+  /* The WhatsApp action must remain a true circular icon, not inherit flex-grow from older mobile layers. */
+  .dashboard.mobileChatOpen .conversationActions > a.iconButton[href^="https://wa.me/"] {
+    display: grid !important;
+    place-items: center !important;
+    flex: 0 0 38px !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    max-width: 38px !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    background: #25d366 !important;
+    color: #fff !important;
+    box-shadow: none !important;
+    font-size: 0 !important;
+    line-height: 1 !important;
+    overflow: hidden !important;
+  }
+
+  .dashboard.mobileChatOpen .conversationActions > a.iconButton[href^="https://wa.me/"]::before {
+    content: "" !important;
+    display: block !important;
+    width: 21px !important;
+    height: 21px !important;
+    background: center / contain no-repeat url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20fill%3D%22%23fff%22%20d%3D%22M17.472%2014.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94%201.164-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.009-.371-.011-.57-.011-.198%200-.52.074-.792.372-.272.297-1.04%201.016-1.04%202.479s1.065%202.876%201.213%203.074c.149.198%202.095%203.2%205.076%204.487.709.306%201.262.489%201.693.625.712.226%201.36.194%201.872.118.571-.085%201.758-.719%202.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421%207.403h-.004a9.87%209.87%200%200%201-5.031-1.378l-.361-.214-3.741.981.998-3.648-.235-.374a9.86%209.86%200%200%201-1.51-5.26c.001-5.45%204.436-9.884%209.888-9.884%202.64%200%205.122%201.03%206.988%202.898a9.825%209.825%200%200%201%202.893%206.99c-.003%205.45-4.437%209.889-9.885%209.889m8.413-18.297A11.815%2011.815%200%200%200%2012.055%200C5.495%200%20.16%205.335.157%2011.892c0%202.096.547%204.142%201.588%205.945L.057%2024l6.305-1.654a11.882%2011.882%200%200%200%205.689%201.448h.005c6.557%200%2011.892-5.335%2011.895-11.893a11.821%2011.821%200%200%200-3.48-8.413Z%22%2F%3E%3C%2Fsvg%3E") !important;
+  }
+
+  /* In AI mode the takeover control is a real bottom dock in the flex layout.
+     It consumes its own space, so no message can sit underneath it while scrolling. */
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen) > .controlStrip:has(> .takeoverButton) {
+    order: 40 !important;
+    position: relative !important;
+    inset: auto !important;
+    z-index: 84 !important;
+    display: flex !important;
+    flex: 0 0 calc(70px + env(safe-area-inset-bottom)) !important;
+    width: 100% !important;
+    min-height: calc(70px + env(safe-area-inset-bottom)) !important;
+    max-height: calc(70px + env(safe-area-inset-bottom)) !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding: 9px 10px calc(9px + env(safe-area-inset-bottom)) !important;
+    border: 0 !important;
+    border-top: 1px solid rgba(25,74,67,.10) !important;
+    background: #f0f4f2 !important;
+    box-shadow: 0 -5px 18px rgba(16,43,40,.08) !important;
+  }
+
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen) > .controlStrip:has(> .takeoverButton) > label,
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen) > .controlStrip:has(> .takeoverButton) > .resumeButton,
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen) > .controlStrip:has(> .takeoverButton) > div {
+    display: none !important;
+  }
+
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen) > .controlStrip:has(> .takeoverButton) > .takeoverButton {
+    position: static !important;
+    inset: auto !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    min-height: 50px !important;
+    height: 50px !important;
+    margin: 0 !important;
+    padding: 0 18px !important;
+    border: 0 !important;
+    border-radius: 25px !important;
+    background: #239f91 !important;
+    color: #fff !important;
+    box-shadow: 0 5px 15px rgba(12,71,65,.18) !important;
+    font-size: 0 !important;
+  }
+
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationPanel:not(.mobileToolsOpen) > .controlStrip:has(> .takeoverButton) > .takeoverButton::after {
+    content: "Take over chat" !important;
+    font-size: 14px !important;
+    font-weight: 850 !important;
+    letter-spacing: -.01em !important;
+  }
+
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationPanel:has(> .controlStrip > .takeoverButton):not(.mobileToolsOpen) .messageTimeline {
+    order: 20 !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    padding-bottom: 18px !important;
+    scroll-padding-bottom: 18px !important;
+  }
+
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationPanel:has(> .controlStrip > .takeoverButton):not(.mobileToolsOpen) .messageTimeline::after {
+    content: "";
+    display: block;
+    flex: 0 0 8px;
+  }
+}
+
+@media (max-width: 390px) {
+  .dashboard.mobileChatOpen .conversationActions > a.iconButton[href^="https://wa.me/"] {
+    flex-basis: 36px !important;
+    width: 36px !important;
+    min-width: 36px !important;
+    max-width: 36px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+  }
+
+  .dashboard.mobileChatOpen .conversationActions > a.iconButton[href^="https://wa.me/"]::before {
+    width: 20px !important;
+    height: 20px !important;
+  }
+}

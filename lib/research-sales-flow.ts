@@ -18,7 +18,7 @@ const HUMAN_REPLY = /^\[Human: [^\]]+]\s*/;
 const SELF_DIRECTED = /\b(?:do|write|work on|complete|finish)\b.{0,45}\bmyself\b|\bself[- ]?paced\b|\bproposal writing course\b|\bresearch proposal writing course\b/i;
 const HANDS_ON_RESEARCH = /\b(?:help|assist|support)\b.{0,45}\b(?:actual\s+)?(?:proposal|dissertation|thesis|research|methodology|literature review|data analysis|chapter|questionnaire|topic)\b|\b(?:actual\s+proposal|hands[- ]?on|research support|do it for me|complete it for me)\b/i;
 const RESEARCH_CONTEXT = /\b(proposal|dissertation|thesis|research|methodology|literature review|data analysis|statistical analysis|qualitative analysis|mixed methods|questionnaire|data collection|chapter\s*[1-6]|results|discussion|editing|proofread|referencing|research topic|topic development|manuscript|plagiarism|ai detection)\b/i;
-const DEADLINE_PATTERN = /\b(?:asap|urgent|rush|today|tomorrow|this week|next week|next month|within\s+\d+\s*(?:hours?|days?|weeks?)|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?|\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{4})?)\b/i;
+const DEADLINE_PATTERN = /\b(?:asap|urgent|rush|today|tomorrow|this week|next week|next month|within\s+\d+\s*(?:hours?|days?|weeks?)|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?|\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{4})?|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(?:19|20)\d{2})\b/i;
 
 export function isExplicitResearchHumanRequest(text: string) {
   return HUMAN_REQUEST.test(text.trim());
@@ -69,7 +69,7 @@ function inferProgramme(clientMessages: string[], storedProgramme?: string | nul
   return null;
 }
 
-function deadlineFromHistory(clientMessages: string[], storedDeadline?: string | null) {
+export function inferResearchDeadline(clientMessages: string[], storedDeadline?: string | null) {
   if (storedDeadline?.trim()) return storedDeadline.trim();
   for (const message of [...clientMessages].reverse()) {
     const match = message.match(DEADLINE_PATTERN)?.[0];
@@ -124,16 +124,16 @@ export async function handleResearchSalesFlow(input: {
   const clientTranscript = clientMessages.join("\n");
   const exactService = inferResearchCatalogueService(clientTranscript, lead.serviceInterest || lead.packageName);
   const programme = inferProgramme(clientMessages, lead.programme);
-  const deadline = deadlineFromHistory(clientMessages, lead.deadline);
+  const deadline = inferResearchDeadline(clientMessages, lead.deadline);
+  const nextQuestion = qualificationQuestion(exactService, programme, deadline);
 
   const patch: Record<string, unknown> = {};
   if (!lead.serviceInterest || /^research (?:support|enquiry)$/i.test(lead.serviceInterest)) patch.serviceInterest = exactService === "Research support" ? "Research support" : exactService;
   if (!lead.programme && programme) patch.programme = programme;
   if (!lead.deadline && deadline) patch.deadline = deadline;
-  if (lead.status === "NEW LEAD") patch.status = "QUALIFIED";
+  if (lead.status === "NEW LEAD" && !nextQuestion) patch.status = "QUALIFIED";
   if (Object.keys(patch).length) lead = await updateLead(input.phone, patch as any).catch(() => lead);
 
-  const nextQuestion = qualificationQuestion(exactService, programme, deadline);
   if (nextQuestion) {
     await addMessage(input.phone, "assistant", nextQuestion);
     return { reply: nextQuestion, referralNotification: null, documentIds: [] };

@@ -27,6 +27,7 @@ import "./home-hero-generated.css";
 import "./public-chat-v2.css";
 import "./admin-chat-clean.css";
 import "./admin-inbox-ux-v2.css";
+import "./admin-inbox-fixes-v3.css";
 import "./pwa-splash.css";
 import "./business-analytics-mobile-fix.css";
 
