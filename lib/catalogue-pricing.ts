@@ -2,6 +2,7 @@ type CatalogueOffer = {
   slug: string;
   name: string;
   category?: string | null;
+  description?: string | null;
   priceZmw: number | null;
   rushPriceZmw: number | null;
 };
