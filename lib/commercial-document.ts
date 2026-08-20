@@ -7,6 +7,9 @@ export type CommercialRecord = {
   id: string;
   service: string;
   amount_zmw?: number | string | null;
+  total_charged_zmw?: number | string | null;
+  amount_paid_zmw?: number | string | null;
+  balance_zmw?: number | string | null;
   details: string;
   status: string;
   created_at?: string | null;
@@ -24,6 +27,9 @@ export function buildCommercialPdf(lead: Pick<Lead, "name" | "phone">, record: C
     clientName: lead.name || lead.phone,
     service: record.service,
     amountZmw: record.amount_zmw == null ? null : Number(record.amount_zmw),
+    totalChargedZmw: record.total_charged_zmw == null ? undefined : Number(record.total_charged_zmw),
+    amountPaidZmw: record.amount_paid_zmw == null ? undefined : Number(record.amount_paid_zmw),
+    balanceZmw: record.balance_zmw == null ? undefined : Number(record.balance_zmw),
     details: record.details,
     issuedAt: record.created_at || undefined
   });
@@ -39,7 +45,7 @@ export async function sendCommercialPdf(input: { lead: Lead; record: CommercialR
     pdf,
     filename,
     caption: isInvoice
-      ? `MedMinds unpaid invoice ${number}. Please review the attached document.`
+      ? `MedMinds invoice ${number}. Please review the attached balance details.`
       : `MedMinds quotation ${number}. Please review the attached document.`,
     phoneNumberIdOverride: input.phoneNumberIdOverride
   });

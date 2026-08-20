@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BusinessAnalyticsPanel } from "@/components/business-analytics-panel";
 import { BusinessAnalyticsUXEnhancer } from "@/components/business-analytics-ux-enhancer";
 import { BusinessIntelligenceResponsive } from "@/components/business-intelligence-responsive";
+import { BusinessPaymentEnhancer } from "@/components/business-payment-enhancer";
 import { HumanFollowUpPanel } from "@/components/human-follow-up-panel";
 
 type Section = "dashboard" | "analytics" | "followups";
@@ -26,6 +27,7 @@ export function BusinessIntelligenceSuite() {
 
   return <div className="biSuite">
     <BusinessAnalyticsUXEnhancer />
+    <BusinessPaymentEnhancer />
     <div className="biSuiteSwitchWrap"><div className="biSuiteSwitch" role="tablist" aria-label="Business Intelligence section">
       <button role="tab" aria-selected={section === "dashboard"} className={section === "dashboard" ? "active" : ""} onClick={() => changeSection("dashboard")}><span>▦</span><strong>Business dashboard</strong><small>Leads, operations & Ask Intelligence</small></button>
       <button role="tab" aria-selected={section === "analytics"} className={section === "analytics" ? "active" : ""} onClick={() => changeSection("analytics")}><span>⌁</span><strong>Analytics & AI</strong><small>Charts, inbox gaps & recommendations</small></button>
