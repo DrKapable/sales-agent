@@ -1,5 +1,6 @@
 import { handleIncomingClientAttachment } from "@/lib/client-attachment-referral";
 import { captureConversationAnswer, repairConversationReply } from "@/lib/conversation-continuity";
+import { casualConversationFallback, isCasualConversationTurn } from "@/lib/conversation-smalltalk";
 import { optimizeInboundLead, shapeMaryReply } from "@/lib/conversation-optimization";
 import { researchCampaignOpening } from "@/lib/research-campaign-conversion";
 import { handleResearchSalesFlow } from "@/lib/research-sales-flow";
@@ -12,9 +13,33 @@ import { verifiedConversationFallback } from "@/lib/recovery-reply";
 import { humanTextTypingDelayMs, wait } from "@/lib/timing";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 
+async function generateCasualWhatsAppReply(phone: string, text: string): Promise<SalesAgentResult> {
+  const models = getAiModelCandidates();
+  for (let index = 0; index < models.length; index += 1) {
+    const model = models[index];
+    try {
+      // Small talk deliberately bypasses sales qualification/continuity rewriting.
+      // replyToClient still receives the full transcript, so Mary can answer naturally
+      // without forgetting who the client is or losing the commercial journey.
+      return await replyToClient(phone, text, "whatsapp", model);
+    } catch (error) {
+      console.warn("Casual WhatsApp reply generation failed", { phoneSuffix: phone.slice(-4), model, attempt: index + 1, error });
+      if (index < models.length - 1) await wait(250);
+    }
+  }
+
+  const reply = casualConversationFallback(text);
+  await addMessage(phone, "assistant", reply).catch(() => undefined);
+  return { reply, referralNotification: null, documentIds: [] };
+}
+
 export async function generateWhatsAppReplyWithRecovery(phone: string, text: string): Promise<SalesAgentResult> {
   const attachmentResult = await handleIncomingClientAttachment(phone, text);
   if (attachmentResult) return attachmentResult;
+
+  // Social conversation should feel like a normal WhatsApp chat. Do not let an
+  // unfinished sales question turn "How are you?" into a CRM/qualification reply.
+  if (isCasualConversationTurn(text)) return generateCasualWhatsAppReply(phone, text);
 
   const optimization = await optimizeInboundLead(phone, text, "whatsapp").catch((error) => {
     console.warn("Conversation optimization could not be applied; continuing safely", { phoneSuffix: phone.slice(-4), error });

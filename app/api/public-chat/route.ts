@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
 import { captureConversationAnswer, repairConversationReply } from "@/lib/conversation-continuity";
+import { casualConversationFallback, isCasualConversationTurn } from "@/lib/conversation-smalltalk";
 import { handleResearchSalesFlow } from "@/lib/research-sales-flow";
 import { maybeEscalateResearchService } from "@/lib/research-service-escalation";
 import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewrite";
@@ -75,6 +76,31 @@ export async function POST(request: Request) {
     .filter((message) => message.role === "assistant")
     .slice(-6)
     .map((message) => message.content);
+
+  const queueNewClientAlert = () => {
+    if (!firstEverClientMessage) return;
+    after(async () => {
+      const currentLead = await getOrCreateLead(phone, "simulator");
+      const alerted = await notifyDirectorOfNewClient({ lead: currentLead, firstMessage: parsed.data.message, source: "website" });
+      console.info("Website new client director alert processed", { phoneSuffix: phone.slice(-4), alerted });
+    });
+  };
+
+  // Keep genuine social chat out of qualification and continuity repair. The
+  // model still sees the full conversation, so the business thread is preserved
+  // and can resume naturally when the client returns to it.
+  if (isCasualConversationTurn(parsed.data.message)) {
+    const result = await generateWithFailover(phone, parsed.data.message);
+    if (result) {
+      queueNewClientAlert();
+      return NextResponse.json({ reply: result.reply });
+    }
+    const reply = casualConversationFallback(parsed.data.message);
+    await addMessage(phone, "assistant", reply).catch(() => undefined);
+    queueNewClientAlert();
+    return NextResponse.json({ reply, recovered: true });
+  }
+
   await captureConversationAnswer(phone, parsed.data.message, "simulator").catch((error) => {
     console.warn("Website conversation answer memory could not be updated", { phoneSuffix: phone.slice(-4), error });
   });
@@ -84,15 +110,6 @@ export async function POST(request: Request) {
     if (repaired === result.reply) return result;
     const rewritten = await rewriteLatestUnsentAssistantMessage({ phone, from: result.reply, to: repaired }).catch(() => false);
     return rewritten ? { ...result, reply: repaired } : result;
-  };
-
-  const queueNewClientAlert = () => {
-    if (!firstEverClientMessage) return;
-    after(async () => {
-      const currentLead = await getOrCreateLead(phone, "simulator");
-      const alerted = await notifyDirectorOfNewClient({ lead: currentLead, firstMessage: parsed.data.message, source: "website" });
-      console.info("Website new client director alert processed", { phoneSuffix: phone.slice(-4), alerted });
-    });
   };
 
   const researchSales = await handleResearchSalesFlow({ phone, text: parsed.data.message, source: "simulator" }).catch((error) => {

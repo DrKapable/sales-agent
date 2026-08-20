@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { replyToClient } from "@/lib/ai/sales-agent";
 import { captureConversationAnswer, repairConversationReply } from "@/lib/conversation-continuity";
+import { casualConversationFallback, isCasualConversationTurn } from "@/lib/conversation-smalltalk";
 import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewrite";
 import { addMessage, getConversation } from "@/lib/store";
 import { getSetupState } from "@/lib/env";
@@ -16,10 +17,24 @@ export async function POST(request: Request) {
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Please enter a valid message." }, { status: 400 });
   await addMessage(parsed.data.sessionId, "user", parsed.data.message);
+
   const recentAssistantReplies = (await getConversation(parsed.data.sessionId, 16).catch(() => []))
     .filter((message) => message.role === "assistant")
     .slice(-6)
     .map((message) => message.content);
+
+  if (isCasualConversationTurn(parsed.data.message)) {
+    try {
+      const result = await replyToClient(parsed.data.sessionId, parsed.data.message, "simulator");
+      return NextResponse.json({ reply: result.reply });
+    } catch (error) {
+      console.error("Simulator casual reply failed", error);
+      const reply = casualConversationFallback(parsed.data.message);
+      await addMessage(parsed.data.sessionId, "assistant", reply).catch(() => undefined);
+      return NextResponse.json({ reply, recovered: true });
+    }
+  }
+
   await captureConversationAnswer(parsed.data.sessionId, parsed.data.message, "simulator").catch(() => undefined);
   try {
     const result = await replyToClient(parsed.data.sessionId, parsed.data.message, "simulator");
