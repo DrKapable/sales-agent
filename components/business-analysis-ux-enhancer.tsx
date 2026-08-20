@@ -103,7 +103,7 @@ async function downloadManagementBrief(format: "pdf" | "word", body: HTMLElement
     }
     const blob = await response.blob();
     const disposition = response.headers.get("content-disposition") || "";
-    const name = disposition.match(/filename="([^"]+)"/)?.[1] || `MedMinds-Management-Brief.${format === "pdf" ? "pdf" : "doc"}`;
+    const name = disposition.match(/filename="([^"]+)"/)?.[1] || `MedMinds-Management-Brief.${format === "pdf" ? "pdf" : "docx"}`;
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -130,7 +130,7 @@ function addBriefDownloads(analysis: HTMLElement) {
   const word = document.createElement("button");
   word.type = "button";
   word.textContent = "↓ Word";
-  word.setAttribute("aria-label", "Download management brief in Word format");
+  word.setAttribute("aria-label", "Download management brief as Word DOCX");
   word.addEventListener("click", () => void downloadManagementBrief("word", body, word));
   const pdf = document.createElement("button");
   pdf.type = "button";
