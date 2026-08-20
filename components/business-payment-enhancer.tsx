@@ -11,50 +11,102 @@ function paymentModal() {
     .find((card) => card.querySelector("h2")?.textContent?.trim() === "Record payment") || null;
 }
 
+function directLabelText(label: HTMLLabelElement) {
+  return Array.from(label.childNodes)
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent || "")
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findPaidField(card: HTMLElement) {
+  const markedInput = card.querySelector<HTMLInputElement>('input[data-bi-amount-paid="1"]');
+  if (markedInput) {
+    const label = markedInput.closest("label") as HTMLLabelElement | null;
+    return label ? { label, input: markedInput } : null;
+  }
+
+  const labels = Array.from(card.querySelectorAll<HTMLLabelElement>("label"));
+  const label = labels.find((candidate) => /^(Amount paid|Amount received)(\s*\(ZMW\))?$/i.test(directLabelText(candidate)));
+  const input = label?.querySelector<HTMLInputElement>('input[type="number"]') || null;
+  if (!label || !input) return null;
+
+  label.dataset.biAmountPaidField = "1";
+  input.dataset.biAmountPaid = "1";
+  return { label, input };
+}
+
 function refreshBalance(card: HTMLElement) {
   const totalInput = card.querySelector<HTMLInputElement>('input[data-bi-total-charged="1"]');
-  const paidLabel = Array.from(card.querySelectorAll("label")).find((label) => /Amount paid|Amount received/i.test(label.textContent || ""));
-  const paidInput = paidLabel?.querySelector<HTMLInputElement>('input[type="number"]');
+  const paidField = findPaidField(card);
+  const paidInput = paidField?.input || null;
   const summary = card.querySelector<HTMLElement>("[data-bi-payment-balance]");
   if (!paidInput || !summary) return;
+
   const total = Number(totalInput?.value || card.dataset.biTotalChargedValue || 0);
   const paid = Number(paidInput.value || 0);
-  const balance = total - paid;
+  const totalValid = Number.isFinite(total) && total > 0;
+  const paidValid = Number.isFinite(paid) && paid >= 0;
+  const balance = totalValid && paidValid ? total - paid : 0;
+
   summary.replaceChildren();
   const rows = [
-    ["Total charged", money(total)],
-    ["Amount paid", money(paid)],
-    [balance < 0 ? "Overpayment" : "Balance", money(Math.abs(balance))]
+    ["Total charged", totalValid ? money(total) : "—"],
+    ["Amount paid", paidValid && paid > 0 ? money(paid) : "K0.00"],
+    [balance < 0 ? "Overpayment" : "Balance", totalValid && paidValid ? money(Math.abs(balance)) : "—"]
   ];
+
   rows.forEach(([label, value], index) => {
     const row = document.createElement("div");
     if (index === 2) row.className = balance < 0 ? "biFinanceBalance biFinanceBalanceError" : "biFinanceBalance";
-    const left = document.createElement("span"); left.textContent = label;
-    const right = document.createElement("strong"); right.textContent = value;
-    row.append(left, right); summary.appendChild(row);
+    const left = document.createElement("span");
+    left.textContent = label;
+    const right = document.createElement("strong");
+    right.textContent = value;
+    row.append(left, right);
+    summary.appendChild(row);
   });
+
+  if (balance < 0) {
+    summary.setAttribute("aria-label", `Amount paid exceeds total charged by ${money(Math.abs(balance))}.`);
+  } else if (totalValid && paidValid) {
+    summary.setAttribute("aria-label", `Balance remaining ${money(balance)}.`);
+  } else {
+    summary.removeAttribute("aria-label");
+  }
 }
 
 function enhancePaymentModal() {
   const card = paymentModal();
   if (!card) return;
-  const paidLabel = Array.from(card.querySelectorAll("label")).find((label) => /Amount paid|Amount received/i.test(label.textContent || ""));
-  const paidInput = paidLabel?.querySelector<HTMLInputElement>('input[type="number"]');
+
+  const paidField = findPaidField(card);
+  const paidLabel = paidField?.label || null;
+  const paidInput = paidField?.input || null;
   if (!paidLabel || !paidInput) return;
 
   for (const node of Array.from(paidLabel.childNodes)) {
-    if (node.nodeType === Node.TEXT_NODE && /Amount received/i.test(node.textContent || "")) node.textContent = "Amount paid (ZMW)";
+    if (node.nodeType === Node.TEXT_NODE && /^\s*Amount received(?:\s*\(ZMW\))?\s*$/i.test(node.textContent || "")) {
+      node.textContent = "Amount paid (ZMW)";
+    }
   }
+  paidLabel.dataset.biAmountPaidField = "1";
+  paidInput.dataset.biAmountPaid = "1";
+  paidInput.inputMode = "decimal";
 
   let totalInput = card.querySelector<HTMLInputElement>('input[data-bi-total-charged="1"]');
   if (!totalInput) {
     const totalLabel = document.createElement("label");
     totalLabel.className = "biFinanceField";
+    totalLabel.dataset.biTotalChargedField = "1";
     totalLabel.appendChild(document.createTextNode("Total charged (ZMW)"));
+
     totalInput = document.createElement("input");
     totalInput.type = "number";
     totalInput.min = "0.01";
     totalInput.step = "0.01";
+    totalInput.inputMode = "decimal";
     totalInput.placeholder = "Full amount charged to the client";
     totalInput.dataset.biTotalCharged = "1";
     totalInput.className = paidInput.className;
@@ -65,9 +117,10 @@ function enhancePaymentModal() {
       refreshBalance(card);
     });
     totalLabel.appendChild(totalInput);
+
     const hint = document.createElement("small");
     hint.className = "biFinanceHint";
-    hint.textContent = "Enter the full charge and the amount received. The remaining balance is calculated automatically and carried to the invoice/receipt.";
+    hint.textContent = "Enter the full charge and the payment received now. The remaining balance is calculated automatically and carried to the invoice/receipt.";
     totalLabel.appendChild(hint);
     paidLabel.parentElement?.insertBefore(totalLabel, paidLabel);
   }
@@ -77,6 +130,8 @@ function enhancePaymentModal() {
     summary = document.createElement("div");
     summary.className = "biFinanceSummary";
     summary.dataset.biPaymentBalance = "1";
+    summary.setAttribute("role", "status");
+    summary.setAttribute("aria-live", "polite");
     paidLabel.insertAdjacentElement("afterend", summary);
   }
 
@@ -84,6 +139,7 @@ function enhancePaymentModal() {
     paidInput.dataset.biFinancePaidReady = "1";
     paidInput.addEventListener("input", () => refreshBalance(card));
   }
+
   refreshBalance(card);
 }
 
@@ -122,8 +178,9 @@ export function BusinessPaymentEnhancer() {
           if (payload?.action === "payment") {
             const card = paymentModal();
             const totalInput = card?.querySelector<HTMLInputElement>('input[data-bi-total-charged="1"]');
+            const paidInput = card?.querySelector<HTMLInputElement>('input[data-bi-amount-paid="1"]');
             const total = Number(totalInput?.value || card?.dataset.biTotalChargedValue || 0);
-            const paid = Number(payload.amountZmw || 0);
+            const paid = Number(paidInput?.value || payload.amountZmw || 0);
             const next = { ...payload, totalChargedZmw: total, amountPaidZmw: paid };
             return nativeFetch("/api/admin/business/finance", { ...init, body: JSON.stringify(next) });
           }
