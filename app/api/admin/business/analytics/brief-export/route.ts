@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createManagementBriefPdf, createManagementBriefWord } from "@/lib/management-brief-export";
+import { createManagementBriefPdf } from "@/lib/management-brief-export";
+import { createManagementBriefDocx } from "@/lib/management-brief-docx";
 
 const schema = z.object({
   format: z.enum(["pdf", "word"]),
@@ -37,12 +38,12 @@ export async function POST(request: Request) {
     });
   }
 
-  const word = createManagementBriefWord(input);
-  return new NextResponse(word, {
+  const word = createManagementBriefDocx(input);
+  return new NextResponse(new Uint8Array(word), {
     status: 200,
     headers: {
-      "Content-Type": "application/msword; charset=utf-8",
-      "Content-Disposition": `attachment; filename="MedMinds-Management-Brief-${stamp}.doc"`,
+      "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "Content-Disposition": `attachment; filename="MedMinds-Management-Brief-${stamp}.docx"`,
       "Cache-Control": "private, no-store"
     }
   });
