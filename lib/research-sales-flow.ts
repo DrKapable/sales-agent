@@ -13,12 +13,17 @@ export type ResearchSalesFlowResult = {
 
 const HUMAN_REQUEST = /\b(speak|talk|connect|refer|transfer|human|researcher|specialist)\b.{0,60}\b(monika|monica|mustafa|doctor|dr\.?|person|human|researcher|specialist|team)\b|\b(dr\.?\s*(?:monika|monica|mustafa)|human assistance|human agent)\b/i;
 const COMMERCIAL_INTENT = /\b(how much|price|pricing|cost|fee|fees|charge|charges|rate|quotation|quote|proforma|pro-forma|invoice|proceed|go ahead|start the work|start this|ready to proceed|ready to start|book the service)\b/i;
+const CURRENT_PRICE_INTENT = /\b(how much|price|pricing|cost|fee|fees|charge|charges|rate)\b/i;
+const QUOTE_CLARIFICATION = /\b(per\s+(?:phase|chapter|section)|instalments?|installments?|what\s+(?:does|is).*?(?:include|cover)|does\s+(?:it|this).*?(?:include|cover)|full\s+proposal|whole\s+proposal|everything|i don['’]?t understand|i do not understand|can you explain|explain (?:the|this)?\s*(?:price|fee|quote|quotation|scope))\b/i;
+const PAUSE_INTENT = /^\s*(?:wait|hold on|hold up|one moment|give me (?:a )?moment|just a (?:moment|second)|let me (?:check|think)|pause|okay wait|ok wait)\b/i;
+const QUESTION_PREFACE = /^\s*(?:sorry[,\s]*)?(?:can|could|may)\s+i\s+ask\b/i;
 const LEGACY_PREMATURE_HANDOFF = /client asked mary to perform (?:hands-on|specialist) research work/i;
 const HUMAN_REPLY = /^\[Human: [^\]]+]\s*/;
 const SELF_DIRECTED = /\b(?:do|write|work on|complete|finish)\b.{0,45}\bmyself\b|\bself[- ]?paced\b|\bproposal writing course\b|\bresearch proposal writing course\b/i;
 const HANDS_ON_RESEARCH = /\b(?:help|assist|support)\b.{0,45}\b(?:actual\s+)?(?:proposal|dissertation|thesis|research|methodology|literature review|data analysis|chapter|questionnaire|topic)\b|\b(?:actual\s+proposal|hands[- ]?on|research support|do it for me|complete it for me)\b/i;
 const RESEARCH_CONTEXT = /\b(proposal|dissertation|thesis|research|methodology|literature review|data analysis|statistical analysis|qualitative analysis|mixed methods|questionnaire|data collection|chapter\s*[1-6]|results|discussion|editing|proofread|referencing|research topic|topic development|manuscript|plagiarism|ai detection)\b/i;
-const DEADLINE_PATTERN = /\b(?:asap|urgent|rush|today|tomorrow|this week|next week|next month|within\s+\d+\s*(?:hours?|days?|weeks?)|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?|\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{4})?|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(?:19|20)\d{2})\b/i;
+const DEADLINE_PATTERN = /\b(?:asap|urgent|rush|today|tomorrow|this week|next week|next month|within\s+\d+\s*(?:hours?|days?|weeks?)|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?|\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{4})?|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:,?\s+\d{4})?|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(?:19|20)\d{2})\b/i;
+const PROGRAMME_SIGNAL = /\b(phd|doctorate|doctoral|masters?|master['’]?s|msc|mph|ma\b|mmed|postgraduate|post-graduate|undergraduate|bachelor['’]?s|degree|bsc|ba\b|mbchb|diploma)\b/i;
 
 export function isExplicitResearchHumanRequest(text: string) {
   return HUMAN_REQUEST.test(text.trim());
@@ -37,7 +42,7 @@ function classifyResearchService(text: string) {
   if (/\b(quantitative|statistical|statistics|data analysis)\b/.test(normalized) && !/\bqualitative\b/.test(normalized)) return "Quantitative Analysis";
   if (/\b(data collection tool|questionnaire|survey tool)\b/.test(normalized)) return "Data Collection Tool";
   if (/\bdata collection\b/.test(normalized)) return "Data Collection";
-  if (/\b(research topic|topic development)\b/.test(normalized)) return "Research Topic Development";
+  if (/\btopic development\b|\bresearch topic development\b|\b(?:develop|choose|find|formulate|refine)\b.{0,28}\b(?:research )?topic\b|\btopic formulation\b/.test(normalized)) return "Research Topic Development";
   if (/\bsupervisor corrections?\b/.test(normalized)) return "Supervisor Corrections";
   if (/\bresearch paper editing\b/.test(normalized)) return "Research Paper Editing";
   if (/\bproofread/.test(normalized)) return "Proofreading";
@@ -71,9 +76,7 @@ function lastResearchRoute(clientMessages: string[]) {
   return null;
 }
 
-function inferProgramme(clientMessages: string[], storedProgramme?: string | null) {
-  if (storedProgramme?.trim()) return storedProgramme.trim();
-  const text = clientMessages.join(" ");
+function normalizeProgramme(text: string) {
   if (/\b(phd|doctorate|doctoral)\b/i.test(text)) return "PhD/Doctoral";
   if (/\b(masters?|master['’]?s|msc|mph|ma\b|mmed|postgraduate|post-graduate)\b/i.test(text)) return "Master's/Postgraduate";
   if (/\b(undergraduate|bachelor['’]?s|degree|bsc|ba\b|mbchb)\b/i.test(text)) return "Undergraduate/Bachelor's";
@@ -81,13 +84,41 @@ function inferProgramme(clientMessages: string[], storedProgramme?: string | nul
   return null;
 }
 
+function plausibleStoredProgramme(text?: string | null) {
+  const clean = String(text || "").trim();
+  if (!clean || clean.length > 100 || clean.includes("?")) return false;
+  if (PROGRAMME_SIGNAL.test(clean)) return true;
+  const words = clean.split(/\s+/).filter(Boolean);
+  return words.length <= 8 && !/\b(how|what|when|price|cost|charge|fee|quotation|proposal|dissertation|research|everything|help|want|need|work|do)\b/i.test(clean);
+}
+
+export function inferResearchProgramme(clientMessages: string[], storedProgramme?: string | null) {
+  const latest = clientMessages.at(-1) || "";
+  const latestProgramme = normalizeProgramme(latest);
+  if (latestProgramme) return latestProgramme;
+  if (plausibleStoredProgramme(storedProgramme)) return String(storedProgramme).trim();
+  for (const message of [...clientMessages].reverse().slice(1)) {
+    const programme = normalizeProgramme(message);
+    if (programme) return programme;
+  }
+  return null;
+}
+
+function deadlineFromMessage(message: string) {
+  const match = message.match(DEADLINE_PATTERN)?.[0];
+  if (!match) return null;
+  if (/^\d{1,2}\s+[a-z]+$/i.test(match)) return `${match} ${new Date().getFullYear()}`;
+  return match;
+}
+
 export function inferResearchDeadline(clientMessages: string[], storedDeadline?: string | null) {
+  const latest = clientMessages.at(-1) || "";
+  const latestDeadline = deadlineFromMessage(latest);
+  if (latestDeadline) return latestDeadline;
   if (storedDeadline?.trim()) return storedDeadline.trim();
-  for (const message of [...clientMessages].reverse()) {
-    const match = message.match(DEADLINE_PATTERN)?.[0];
-    if (!match) continue;
-    if (/^\d{1,2}\s+[a-z]+$/i.test(match)) return `${match} ${new Date().getFullYear()}`;
-    return match;
+  for (const message of [...clientMessages].reverse().slice(1)) {
+    const deadline = deadlineFromMessage(message);
+    if (deadline) return deadline;
   }
   return null;
 }
@@ -121,6 +152,10 @@ export function researchQualificationQuestion(exactService: string, programme: s
   return null;
 }
 
+function existingQuoteClarification(service: string, amountZmw: number) {
+  return `The K${amountZmw.toLocaleString()} quotation is for ${service} as stated on the quotation. I’m not treating that amount as a per-phase charge unless the quotation specifically says so. If you mean whether the work can be split into phases or payments, tell me which one you mean and I’ll clarify it before you proceed.`;
+}
+
 export async function handleResearchSalesFlow(input: {
   phone: string;
   text: string;
@@ -139,9 +174,21 @@ export async function handleResearchSalesFlow(input: {
   if (!clientMessages.length || clientMessages.at(-1)?.trim() !== input.text.trim()) clientMessages.push(input.text);
   if (!isResearchPreSaleContext(clientMessages, lead.serviceInterest || lead.packageName)) return null;
 
+  if (PAUSE_INTENT.test(input.text)) {
+    const reply = "Of course — take your time. I’ll be here when you’re ready.";
+    await addMessage(input.phone, "assistant", reply);
+    return { reply, referralNotification: null, documentIds: [] };
+  }
+
+  if (QUESTION_PREFACE.test(input.text)) {
+    const reply = "Of course — go ahead. What would you like to ask?";
+    await addMessage(input.phone, "assistant", reply);
+    return { reply, referralNotification: null, documentIds: [] };
+  }
+
   const clientTranscript = clientMessages.join("\n");
   const exactService = inferResearchCatalogueService(clientTranscript, lead.serviceInterest || lead.packageName);
-  const programme = inferProgramme(clientMessages, lead.programme);
+  const programme = inferResearchProgramme(clientMessages, lead.programme);
   const deadline = inferResearchDeadline(clientMessages, lead.deadline);
   const nextQuestion = researchQualificationQuestion(exactService, programme, deadline);
 
@@ -149,8 +196,8 @@ export async function handleResearchSalesFlow(input: {
   const currentService = String(lead.serviceInterest || "").trim();
   if (exactService !== "Research support" && currentService !== exactService) patch.serviceInterest = exactService;
   else if (!currentService) patch.serviceInterest = exactService;
-  if (!lead.programme && programme) patch.programme = programme;
-  if (!lead.deadline && deadline) patch.deadline = deadline;
+  if (programme && lead.programme !== programme) patch.programme = programme;
+  if (deadline && lead.deadline !== deadline) patch.deadline = deadline;
   if (lead.status === "NEW LEAD" && !nextQuestion) patch.status = "QUALIFIED";
   if (Object.keys(patch).length) lead = await updateLead(input.phone, patch as any).catch(() => lead);
 
@@ -190,9 +237,20 @@ export async function handleResearchSalesFlow(input: {
   const existing = await getLatestPreparedQuotation(lead.id).catch(() => null);
   if (existing && existing.service === pricing.offer.name && Number(existing.amount_zmw || 0) === Number(pricing.amountZmw)) {
     await updateLead(input.phone, { serviceInterest: pricing.offer.name, status: "INTERESTED", ...(deadline ? { deadline } : {}) }).catch(() => undefined);
-    const reply = `The approved fee for ${pricing.offer.name} is K${pricing.amountZmw.toLocaleString()}. Your quotation is already prepared. Reply “send my quotation” and I’ll send the PDF here.`;
-    await addMessage(input.phone, "assistant", reply);
-    return { reply, referralNotification: null, documentIds: [] };
+
+    if (QUOTE_CLARIFICATION.test(input.text)) {
+      const reply = existingQuoteClarification(pricing.offer.name, pricing.amountZmw);
+      await addMessage(input.phone, "assistant", reply);
+      return { reply, referralNotification: null, documentIds: [] };
+    }
+
+    if (CURRENT_PRICE_INTENT.test(input.text)) {
+      const reply = `The approved fee for ${pricing.offer.name} is K${pricing.amountZmw.toLocaleString()}. Your quotation is already prepared; if you want the PDF resent, just say “send my quotation”.`;
+      await addMessage(input.phone, "assistant", reply);
+      return { reply, referralNotification: null, documentIds: [] };
+    }
+
+    return null;
   }
 
   const details = [

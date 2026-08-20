@@ -15,6 +15,15 @@ describe("cross-service conversation continuity", () => {
     expect(patch.deadline).toBe("January 2027");
   });
 
+  it("captures a natural month-day deadline answer", () => {
+    const patch = inferConversationAnswerPatch(
+      [assistant("What deadline are you working toward?"), user("November 5")],
+      "November 5",
+      lead
+    );
+    expect(patch.deadline).toBe("November 5");
+  });
+
   it("captures a natural programme answer even when it is not a canned academic-level phrase", () => {
     const patch = inferConversationAnswerPatch(
       [assistant("What programme or academic level is this for?"), user("MBA in Finance")],
@@ -22,6 +31,15 @@ describe("cross-service conversation continuity", () => {
       lead
     );
     expect(patch.programme).toBe("MBA in Finance");
+  });
+
+  it("does not mistake a commercial sentence for a programme", () => {
+    const patch = inferConversationAnswerPatch(
+      [assistant("What programme or academic level is this for?")],
+      "How much is it to do everything for me on my research topic",
+      lead
+    );
+    expect(patch.programme).toBeUndefined();
   });
 
   it("captures a Pa Gym format answer without asking the choice again", () => {
@@ -62,6 +80,17 @@ describe("cross-service conversation continuity", () => {
     expect(reply).not.toMatch(/^What deadline/i);
   });
 
+  it("does not falsely call a programme answer a timeframe", () => {
+    const reply = repairConversationReply(
+      "What deadline are you working toward?",
+      "Bachelors",
+      ["What deadline are you working toward?"]
+    );
+    expect(reply).toMatch(/noted your programme\/level/i);
+    expect(reply).toMatch(/when do you need the work completed or submitted/i);
+    expect(reply).not.toMatch(/noted the timeframe/i);
+  });
+
   it("responds helpfully when the client is unsure instead of looping", () => {
     const reply = repairConversationReply(
       "What deadline are you working toward?",
@@ -78,6 +107,16 @@ describe("cross-service conversation continuity", () => {
       ["What deadline are you working toward?"]
     );
     expect(reply).toMatch(/By deadline/i);
+  });
+
+  it("respects a client pause instead of pushing the active question", () => {
+    const reply = repairConversationReply(
+      "Would you like me to resend the quotation?",
+      "Wait",
+      ["Would you like me to resend the quotation?"]
+    );
+    expect(reply).toMatch(/take your time/i);
+    expect(reply).not.toMatch(/resend the quotation/i);
   });
 
   it("clarifies a repeated software-scope question in plain language", () => {

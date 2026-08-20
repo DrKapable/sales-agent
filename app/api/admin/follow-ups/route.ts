@@ -7,6 +7,8 @@ import {
   sendHumanFollowUpSms,
   syncHumanFollowUpQueue
 } from "@/lib/human-follow-ups";
+import { manualFollowUpOptions } from "@/lib/manual-follow-up-options";
+import { listLeads } from "@/lib/store";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({
@@ -36,8 +38,11 @@ const actionSchema = z.discriminatedUnion("action", [
 export async function GET() {
   try {
     await syncHumanFollowUpQueue({ notifyDue: false });
-    const data = await listHumanFollowUps();
-    return NextResponse.json(data, { headers: { "Cache-Control": "private, no-store" } });
+    const [data, leads] = await Promise.all([listHumanFollowUps(), listLeads()]);
+    return NextResponse.json(
+      { ...data, availableLeads: manualFollowUpOptions(leads) },
+      { headers: { "Cache-Control": "private, no-store" } }
+    );
   } catch (error) {
     console.error("Human follow-up workspace load failed", { error });
     return NextResponse.json({ error: "Unable to load follow-ups right now." }, { status: 500 });
