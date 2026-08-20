@@ -10,7 +10,9 @@ import { createResearchPortalTask } from "@/lib/research-portal";
 import { createQuote } from "@/lib/business-ops";
 import { sendCommercialPdf } from "@/lib/commercial-document";
 import { maybeNotifyHotLead, notifyBusinessEvent } from "@/lib/business-notifications";
-import { assessLeadQualification, buildQualificationReply } from "@/lib/lead-qualification";
+import { assessLeadQualification, type LeadQualification } from "@/lib/lead-qualification";
+import { resolveCataloguePrice } from "@/lib/catalogue-pricing";
+import { getLatestPreparedQuotationForService, preparedQuotationPriceState } from "@/lib/prepared-quotation";
 import { leadStatuses, type LeadPatch } from "@/lib/types";
 
 export type SalesAgentResult = {
@@ -18,6 +20,17 @@ export type SalesAgentResult = {
   referralNotification: { phone: string; recipientName: string; body: string } | null;
   documentIds: string[];
 };
+
+function qualificationGuidance(qualification: LeadQualification) {
+  if (qualification.qualified) return "Enough information is known for the current commercial step.";
+  if (qualification.missing === "programme") return "The client's programme or academic level is still missing. Ask for it naturally only if it is needed for the next decision.";
+  if (qualification.missing === "deadline") return "The client's timing or deadline is still missing. Ask naturally when they need the work, without forcing a specific date format.";
+  if (qualification.missing === "format") return "The required option or format is still missing. Ask naturally which option fits them.";
+  if (qualification.missing === "scope") return "The specific scope or outcome is still unclear. Ask one natural question that helps the client describe what they want done.";
+  if (qualification.missing === "path") return "The client has not yet chosen between self-directed learning and hands-on support. Clarify the route naturally from the conversation.";
+  if (qualification.missing === "need") return "The exact need is still unclear. Ask one simple, context-aware question about what result the client wants.";
+  return "Continue the conversation naturally and clarify only what is genuinely necessary.";
+}
 
 export async function replyToClient(phone: string, text: string, source: "whatsapp" | "simulator", modelOverride?: string): Promise<SalesAgentResult> {
   await restoreChat(phone).catch(() => undefined);
@@ -33,14 +46,8 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
     lead = await updateLead(phone, { status: "QUALIFIED" }).catch(() => lead);
   }
 
-  if (qualification.commercialIntent && !canRevealCommercialTerms) {
-    const reply = buildQualificationReply(qualification);
-    await addMessage(phone, "assistant", reply);
-    return { reply, referralNotification: null, documentIds: [] };
-  }
-
   const updateLeadTool = tool({
-    description: "Save new client details or update the sales status. Never mark a lead converted without verified payment confirmation. Do not mark a lead INTERESTED merely because they asked for price before qualification.",
+    description: "Save client details that are genuinely supported by the conversation or update the sales status. Interpret short answers in the context of the immediately preceding conversation. Never mark a lead converted without verified payment confirmation.",
     inputSchema: z.object({
       name: z.string().min(1).max(120).optional(), email: z.string().email().optional(), institution: z.string().min(1).max(180).optional(),
       programme: z.string().min(1).max(180).optional(), serviceInterest: z.string().min(1).max(180).optional(), deadline: z.string().min(1).max(120).optional(),
@@ -54,7 +61,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const approvedOffersTool = tool({
-    description: "Retrieve active, management-approved MedMinds offers. Pricing and payment instructions are withheld by the runtime until the lead is qualified. Use this to recommend the best-fit offer; quote only when pricingAvailable is true.",
+    description: "Retrieve active, management-approved MedMinds offers. Pricing and payment instructions remain locked until qualification is sufficient. Use the returned qualification state as guidance, not as scripted wording.",
     inputSchema: z.object({ category: z.string().max(80).optional() }),
     execute: async ({ category }) => {
       const offers = (await listOffers(true)).filter((offer) => !category || offer.category.toLowerCase().includes(category.toLowerCase()));
@@ -63,7 +70,8 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
         return {
           available: true,
           pricingAvailable: false,
-          instruction: qualification.nextQuestion || "Finish qualification before quoting price or payment terms.",
+          missing: qualification.missing,
+          instruction: qualificationGuidance(qualification),
           offers: offers.map(({ name, category: offerCategory, description, features }) => ({ name, category: offerCategory, description, features }))
         };
       }
@@ -84,51 +92,80 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const clientDocumentTool = tool({
-    description: "Create a formal MedMinds quotation or UNPAID invoice from an active approved fixed-price offer only after the client is qualified. Never invent or override a price.",
+    description: "Create or reuse a formal MedMinds quotation or UNPAID invoice from the approved catalogue only after qualification. The server, not Mary, decides the exact approved amount from the client's service, programme and deadline. Never guess a price and never create a second conflicting quotation for the same service.",
     inputSchema: z.object({
       documentType: z.enum(["quotation", "invoice"]),
       service: z.string().min(2).max(240),
-      amountZmw: z.number().positive().optional(),
-      details: z.string().min(3).max(1200).optional(),
-      rush: z.boolean().optional()
+      details: z.string().min(3).max(1200).optional()
     }),
-    execute: async ({ documentType, service, amountZmw, details, rush }) => {
-      if (!canRevealCommercialTerms) return { created: false, reason: "The lead must be qualified before a quotation or invoice amount can be created." };
-      const offers = await listOffers(true);
-      const needle = service.trim().toLowerCase();
-      const offer = offers.find((item) => {
-        const name = item.name.toLowerCase();
-        return name === needle || name.includes(needle) || needle.includes(name);
-      });
-      if (!offer) return { created: false, reason: "No active approved fixed-price offer matches that service. Human price confirmation is required." };
-      const approvedAmount = rush && offer.rushPriceZmw != null ? Number(offer.rushPriceZmw) : offer.priceZmw != null ? Number(offer.priceZmw) : null;
-      if (approvedAmount == null || !Number.isFinite(approvedAmount) || approvedAmount <= 0) return { created: false, reason: "This service does not have a verified fixed price. Human price confirmation is required." };
-      if (amountZmw != null && Math.abs(amountZmw - approvedAmount) > 0.01) return { created: false, reason: `The requested amount does not match the approved ${rush ? "rush" : "standard"} price. Use K${approvedAmount.toLocaleString()} or request human confirmation.` };
+    execute: async ({ documentType, service, details }) => {
+      if (!canRevealCommercialTerms) return { created: false, reason: "The lead must be qualified before a quotation or invoice can be created.", missing: qualification.missing };
 
       const currentLead = await getOrCreateLead(phone, source);
+      const offers = await listOffers(true);
+      const pricing = resolveCataloguePrice(offers, {
+        service,
+        programme: currentLead.programme,
+        deadline: currentLead.deadline
+      });
+
+      if (pricing.status === "not_found") return { created: false, reason: pricing.reason, requiresHumanReview: true };
+      if (pricing.status === "ambiguous") return { created: false, reason: pricing.reason, requiresClarification: true, candidates: pricing.candidates.map((item) => item.name) };
+      if (pricing.status === "custom") return { created: false, reason: pricing.reason, requiresHumanReview: true, service: pricing.offer.name };
+
+      const approvedAmount = Number(pricing.amountZmw);
+      const offer = pricing.offer;
+
+      if (documentType === "quotation") {
+        const existing = await getLatestPreparedQuotationForService(currentLead.id, offer.name).catch(() => null);
+        const priceState = preparedQuotationPriceState(existing, approvedAmount);
+        if (existing && priceState === "different") {
+          return {
+            created: false,
+            reused: false,
+            requiresHumanReview: true,
+            service: offer.name,
+            existingQuotationId: existing.id,
+            existingAmountZmw: existing.amount_zmw,
+            approvedAmountZmw: approvedAmount,
+            reason: "An active quotation already exists for this same service at a different amount. Do not issue another quotation automatically. A human must review or revise the existing quotation."
+          };
+        }
+        if (existing && priceState === "same") {
+          await updateLead(phone, { serviceInterest: offer.name, status: "INTERESTED" }).catch(() => undefined);
+          if (source === "whatsapp") {
+            const delivered = await sendCommercialPdf({ lead: currentLead, record: existing });
+            return { created: false, reused: true, delivered: true, documentType, documentNumber: delivered.documentNumber, amountZmw: approvedAmount, service: offer.name, priceType: pricing.priceType };
+          }
+          const base = process.env.NEXT_PUBLIC_APP_URL || "https://sales.medmindslc.online";
+          return { created: false, reused: true, delivered: false, documentType, amountZmw: approvedAmount, service: offer.name, priceType: pricing.priceType, downloadUrl: `${base.replace(/\/$/, "")}/api/documents/${existing.id}` };
+        }
+      }
+
       const record = await createQuote({
         leadId: currentLead.id,
         service: offer.name,
         amountZmw: approvedAmount,
-        details: details?.trim() || offer.description || `Approved MedMinds ${offer.name} service.`,
+        details: details?.trim() || [offer.description, currentLead.programme ? `Programme/level: ${currentLead.programme}` : null, currentLead.deadline ? `Client deadline: ${currentLead.deadline}` : null, `Pricing basis: approved ${pricing.priceType} price`].filter(Boolean).join(" · "),
         status: documentType === "invoice" ? "INVOICE_UNPAID" : "QUOTATION"
       }) as any;
+
       await updateLead(phone, { serviceInterest: offer.name, status: documentType === "invoice" ? "PAYMENT PENDING" : "INTERESTED" }).catch(() => undefined);
       void notifyBusinessEvent({
         type: "quote_created",
         eventKey: `quote_created:${String(record.id)}`,
         title: documentType === "invoice" ? "New unpaid MedMinds invoice" : "New MedMinds quotation",
-        body: `Service: ${offer.name}\nAmount: K${approvedAmount.toLocaleString()}\nRequested directly by the client in chat.`,
+        body: `Service: ${offer.name}\nAmount: K${approvedAmount.toLocaleString()}\nPricing: approved ${pricing.priceType} price.`,
         lead: currentLead
       }).catch(() => undefined);
 
       if (source === "whatsapp") {
         const delivered = await sendCommercialPdf({ lead: currentLead, record });
-        return { created: true, delivered: true, documentType, documentNumber: delivered.documentNumber, amountZmw: approvedAmount, service: offer.name };
+        return { created: true, reused: false, delivered: true, documentType, documentNumber: delivered.documentNumber, amountZmw: approvedAmount, service: offer.name, priceType: pricing.priceType };
       }
 
       const base = process.env.NEXT_PUBLIC_APP_URL || "https://sales.medmindslc.online";
-      return { created: true, delivered: false, documentType, amountZmw: approvedAmount, service: offer.name, downloadUrl: `${base.replace(/\/$/, "")}/api/documents/${record.id}`, instruction: "Give this secure PDF link to the website-chat client." };
+      return { created: true, reused: false, delivered: false, documentType, amountZmw: approvedAmount, service: offer.name, priceType: pricing.priceType, downloadUrl: `${base.replace(/\/$/, "")}/api/documents/${record.id}`, instruction: "Give this secure PDF link to the website-chat client." };
     }
   });
 
@@ -158,7 +195,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const handoffTool = tool({
-    description: "Assign genuine human fulfilment, specialist review or escalations to the most appropriate MedMinds team member. Mary may sell and coordinate research services, but requests for Mary herself to produce research work must be handed to the research team. Preserve any explicitly requested staff member in the reason or summary.",
+    description: "Assign genuine human fulfilment, specialist review or escalation to the most appropriate MedMinds team member. Preserve any explicitly requested staff member in the reason or summary. Routine qualification and ordinary sales questions should remain with Mary.",
     inputSchema: z.object({
       referralType: z.enum(["payment", "discount", "sales", "research", "research_specialist", "operations", "customer_support", "dispute", "legal", "marketing", "administrative", "software", "business_automation", "web_development", "cybersecurity", "general"]),
       reason: z.string().min(3).max(500), summary: z.string().min(10).max(900)
@@ -183,7 +220,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   });
 
   const researchTaskTool = tool({
-    description: "Create an UNASSIGNED research task in the MedMinds Research Portal after the client has clearly agreed to proceed with a concrete research service or an agreed research deliverable needs operational follow-through. This is a sales/coordination action, not research-content creation. Do not use for casual enquiries, price questions or vague interest. The task remains unlinked to a client and unassigned to staff until humans review it.",
+    description: "Create an UNASSIGNED research task in the MedMinds Research Portal after the client has clearly agreed to proceed with a concrete research service or an agreed research deliverable needs operational follow-through. Do not use for casual enquiries, price questions or vague interest.",
     inputSchema: z.object({
       title: z.string().min(3).max(240),
       brief: z.string().min(10).max(2500),
@@ -195,10 +232,19 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
     execute: async (task) => createResearchPortalTask({ ...task, lead })
   });
 
+  const qualificationForModel = {
+    qualified: qualification.qualified,
+    priorPriceContext: qualification.priorPriceContext,
+    kind: qualification.kind,
+    missing: qualification.missing,
+    commercialIntent: qualification.commercialIntent,
+    guidance: qualificationGuidance(qualification)
+  };
+
   const model = modelOverride || getAiModel();
   const agent = new ToolLoopAgent({
     model: gateway(model),
-    instructions: `${SALES_AGENT_PROMPT}\n\nCLIENT COMMERCIAL DOCUMENTS\n- Mary is the MedMinds sales representative.\n- CURRENT QUALIFICATION is authoritative. Do not reveal prices, payment instructions, quotation amounts or invoice amounts while qualified=false unless priorPriceContext=true or the lead is already PAYMENT PENDING/CONVERTED.\n- When a qualified client explicitly asks for a quotation, quote, proforma invoice or unpaid invoice for an active approved service, use createClientCommercialDocument.\n- Never invent, negotiate or manually override a document amount. If there is no verified fixed price, arrange human confirmation.\n- A quotation is not proof of payment. An invoice created here must be clearly UNPAID and must never be described as a receipt.\n- Official receipts may be sent only when payment has been verified by the payment/receipt system. Never issue or claim a receipt merely because a client says they paid.\n- On WhatsApp, the PDF quotation/invoice is sent directly when the tool succeeds. On website chat, give the returned secure PDF link.\n- Do not create repeated documents unless the client asks for another/revised copy.\n\nCLIENT-ASSIGNED DOCUMENTS\n- Administrators can upload documents and assign them to a specific client. These are separate from generated quotations and invoices.\n- If a client asks you to send, resend, share or attach a document that may have been assigned to them, first use listAssignedClientDocuments.\n- You may queue only a document returned for this exact client by listAssignedClientDocuments. Never guess a document ID, file URL or filename and never access another client's documents.\n- If exactly one assigned document clearly matches the client's request, use sendAssignedClientDocument with that document ID. If several documents could match, ask the client which one they need.\n- If no document is assigned, say that you cannot see an assigned copy yet and arrange human assistance if needed. Do not pretend a file was sent.\n- After sendAssignedClientDocument succeeds, keep the accompanying text brief and natural, for example: "I've sent the document here."\n\nRESEARCH SALES VS RESEARCH FULFILMENT\n- Mary MAY explain MedMinds research services, collect requirements, recommend the best-fit approved service, and after qualification retrieve approved research prices, generate quotations/unpaid invoices, explain payment terms and move ready clients into the operational workflow.\n- Mary MAY create an unassigned Research Portal task after the client clearly agrees to proceed with a concrete research service or an agreed deliverable needs follow-through.\n- Mary MUST NOT personally generate the substantive research deliverable. Do not develop a research topic, write proposal/dissertation content, choose or justify methodology, calculate sample size, perform data analysis, draft results/discussion, create questionnaires, or do equivalent research work for the client.\n- When the client asks Mary herself to perform that substantive work, refer routine research fulfilment to Dr. Monica using referralType "research". Refer advanced methodology, specialist research design, complex statistics or director-level research to Dr. Mustafa Juma Phiri using referralType "research_specialist".\n- The sales conversation may continue after a fulfilment referral: Mary can still answer permitted sales and process questions subject to the qualification gate.\n- The AI-Assisted Research Proposal Writing course remains a permitted training product and may be sold normally after fit is established.\n\nRESEARCH PORTAL ASSISTANT-ADMIN CAPABILITY\n- You have a restricted research-portal action: create an unassigned research task using createResearchPortalTask.\n- Use it only after the client has clearly agreed to proceed with a concrete research service or when an agreed research action must enter the work queue. Do not create tasks for ordinary enquiries or price questions.\n- Create the task from requirements the client already supplied; do not invent a research topic, methodology, objectives, sample size or analysis plan just to populate the task.\n- The task MUST remain unlinked to a client and unassigned to operations/marketing. Humans will review, link and assign it later.\n- Never tell a client that a researcher or operations member has been assigned merely because you created the task.\n- After successful creation, you may say the request has been placed in the MedMinds research work queue for team review.\n- Avoid duplicate tasks for the same agreed deliverable in one conversation.\n\nTEAM ROUTING\n- Dr. Mustafa Juma Phiri: Director, specialist research, payments/discounts, software, business automation, web development, cybersecurity and technical escalation.\n- Dr Kanyembo Ng'andwe: Sales Representative, marketing team and preferred closer for sales/lead conversion.\n- Dr. Monica: Operations and routine research support.\n- Mr. Madalitso Masumbu is currently off duty and must not receive new referrals.\n- Dr Zabibu Nandazi: customer support and marketing.\n- Counsel Chisha Chomba: disputes, legal and conflict resolution.\n- Mr Conrad Mununkha Phiri: marketing, advertising, partnerships and secretary/administration.\n- Explicit requests for a named current team member take precedence, except that off-duty staff must not receive new referrals.\n\nHANDOVER CONTINUITY\n- A research fulfilment referral does not remove Mary's sales role. Continue answering permitted commercial and process questions.\n- Do not repeatedly tell a referred client to wait.\n- Do not personally perform the referred research work.\n\nCurrent lead record: ${JSON.stringify(lead)}.\nCURRENT QUALIFICATION: ${JSON.stringify(qualification)}.\nIf CURRENT QUALIFICATION.nextQuestion is not null, it is the preferred next qualification question. Ask no more than one qualification question in the reply. Tool output is authoritative for approved offers, prices, commercial documents, assigned client documents and Research Portal task creation.`,
+    instructions: `${SALES_AGENT_PROMPT}\n\nNATURAL CONVERSATION OVERRIDE\n- These rules override any earlier fixed or example wording. Do not use preset qualification questions or stock CRM-style responses.\n- Speak like a capable human sales representative having one continuous WhatsApp conversation. Use the client's own words and the immediate context.\n- CURRENT QUALIFICATION STATE is a business guardrail, not a script. Its missing field tells you what information is still needed; phrase any question naturally and differently according to the conversation.\n- Never tell the client internal labels such as qualified, missing, lead stage, route, state machine or qualification.\n- Interpret short replies in context. If you just asked when they need the work and they say \"2 weeks\", that is a timeframe. If you asked their academic level and they say \"Diploma\", that is the level.\n- If the client says \"yes please\", \"okay\", \"go ahead\" or similar after you offered a specific action such as preparing a quotation, treat it as acceptance of that action. Do not ask the same action question again.\n- Answer clarification questions directly. Do not force every message back into qualification.\n- Ask at most one useful question at a time, and only when a missing detail is genuinely needed for the next commercial step.\n- Do not repeat a question whose answer is already present in the transcript or lead record.\n- Natural small talk is allowed. Resume the sales journey only when the client returns to it.\n\nCOMMERCIAL GUARDRAILS\n- Do not reveal prices, payment instructions, quotation amounts or invoice amounts while CURRENT QUALIFICATION STATE says qualified=false unless priorPriceContext=true or the lead is already PAYMENT PENDING/CONVERTED.\n- When a qualified client asks for or clearly accepts an offer to prepare a quotation, use createClientCommercialDocument.\n- The createClientCommercialDocument tool is authoritative for price. It calculates the approved catalogue amount from the current service, programme and deadline. Never choose rush/standard pricing yourself and never invent or override the amount.\n- If the tool reports an existing same-service quotation at a different amount, do not create or promise another quotation. Explain briefly that the existing quotation needs human review and use human assistance when appropriate.\n- If the tool reuses an existing quotation, tell the client naturally that the existing quotation has been resent/reused; do not imply a new quotation was created.\n- A quotation is not proof of payment. An invoice created here is UNPAID. Official receipts may be sent only after verified payment.\n- Do not create repeated documents unless a genuine revised document has been approved by a human.\n\nCLIENT-ASSIGNED DOCUMENTS\n- Administrators can upload documents and assign them to a specific client. If a client asks for an assigned file, first use listAssignedClientDocuments, then send only a document returned for this client.\n- If no document is assigned, say so plainly and arrange human assistance if needed.\n\nRESEARCH SALES VS FULFILMENT\n- Mary may explain and sell research services, collect requirements naturally, recommend the best-fit approved service, retrieve approved prices after qualification, prepare quotations/invoices, explain payment terms and coordinate next steps.\n- Mary must not personally produce substantive research work. Routine fulfilment goes to Dr. Monica; advanced methodology/statistics/director-level research goes to Dr. Mustafa Juma Phiri.\n- Do not refer a research client merely because they want hands-on proposal/dissertation support. Complete the sales conversation first unless the client explicitly asks for a human or a specialist-only issue arises.\n- A fulfilment referral does not end Mary's sales role.\n\nTEAM ROUTING\n- Dr. Mustafa Juma Phiri: Director, specialist research, payments/discounts, software, business automation, web development, cybersecurity and technical escalation.\n- Dr Kanyembo Ng'andwe: Sales Representative, marketing and preferred closer for lead conversion.\n- Dr. Monica: Operations and routine research support.\n- Dr Zabibu Nandazi: customer support and marketing.\n- Counsel Chisha Chomba: disputes, legal and conflict resolution.\n- Mr Conrad Mununkha Phiri: marketing, advertising, partnerships and secretary/administration.\n- Mr. Madalitso Masumbu is off duty and must not receive new referrals.\n\nRESEARCH PORTAL\n- Create an unassigned research task only after the client has clearly agreed to proceed with a concrete research service or an agreed deliverable needs operational follow-through. Do not create tasks for ordinary enquiries or price questions.\n- Do not invent research content to populate a task.\n\nCurrent lead record: ${JSON.stringify(lead)}.\nCURRENT QUALIFICATION STATE: ${JSON.stringify(qualificationForModel)}.\nTool output is authoritative for approved offers, prices, commercial documents, assigned documents and Research Portal actions.`,
     tools: {
       getApprovedOffers: approvedOffersTool,
       updateLead: updateLeadTool,
@@ -214,7 +260,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const transcript = [...history, ...(latestStored ? [] : [{ role: "user" as const, content: text }])]
     .map((message) => `${message.role === "user" ? "Client" : "Agent"}: ${message.content}`)
     .join("\n");
-  const result = await agent.generate({ prompt: `Conversation including the client's latest message:\n${transcript}\n\nReply only with the WhatsApp message to send.` });
+  const result = await agent.generate({ prompt: `Conversation including the client's latest message:\n${transcript}\n\nReply only with the natural WhatsApp message to send. Do not expose internal reasoning, qualification labels or tool details.` });
   const reply = (result.text.trim() || "I’ll make sure a MedMinds team member helps with that.").replaceAll("—", ",");
   await addMessage(phone, "assistant", reply);
   void maybeNotifyHotLead(phone).catch((error) => console.error("Hot-lead notification check failed", { phoneSuffix: phone.slice(-4), error }));

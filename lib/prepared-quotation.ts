@@ -16,6 +16,18 @@ export function isPreparedQuotationRequest(text: string) {
   return mentionsQuote && asksForDelivery;
 }
 
+function rowToCommercialRecord(row: Record<string, unknown> | undefined): CommercialRecord | null {
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    service: String(row.service),
+    amount_zmw: row.amount_zmw == null ? null : Number(row.amount_zmw),
+    details: String(row.details),
+    status: String(row.status),
+    created_at: row.created_at ? String(row.created_at) : null
+  };
+}
+
 export async function getLatestPreparedQuotation(leadId: string): Promise<CommercialRecord | null> {
   const database = db();
   if (!database) return null;
@@ -27,16 +39,30 @@ export async function getLatestPreparedQuotation(leadId: string): Promise<Commer
      LIMIT 1`,
     [leadId]
   );
-  const row = rows[0] as Record<string, unknown> | undefined;
-  if (!row) return null;
-  return {
-    id: String(row.id),
-    service: String(row.service),
-    amount_zmw: row.amount_zmw == null ? null : Number(row.amount_zmw),
-    details: String(row.details),
-    status: String(row.status),
-    created_at: row.created_at ? String(row.created_at) : null
-  };
+  return rowToCommercialRecord(rows[0] as Record<string, unknown> | undefined);
+}
+
+export async function getLatestPreparedQuotationForService(leadId: string, service: string): Promise<CommercialRecord | null> {
+  const database = db();
+  if (!database) return null;
+  const rows = await database.query(
+    `SELECT id, service, amount_zmw, details, status, created_at
+     FROM sales_quotes
+     WHERE lead_id=$1
+       AND status IN ('QUOTATION','DRAFT')
+       AND LOWER(TRIM(service))=LOWER(TRIM($2))
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [leadId, service]
+  );
+  return rowToCommercialRecord(rows[0] as Record<string, unknown> | undefined);
+}
+
+export function preparedQuotationPriceState(record: Pick<CommercialRecord, "amount_zmw"> | null, approvedAmount: number) {
+  if (!record) return "none" as const;
+  const existingAmount = record.amount_zmw == null ? null : Number(record.amount_zmw);
+  if (existingAmount != null && Number.isFinite(existingAmount) && Math.abs(existingAmount - approvedAmount) <= 0.01) return "same" as const;
+  return "different" as const;
 }
 
 export function preparedQuotationFallbackText(record: CommercialRecord) {

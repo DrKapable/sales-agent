@@ -1,11 +1,8 @@
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
-import { captureConversationAnswer, repairConversationReply } from "@/lib/conversation-continuity";
+import { captureNaturalConversationFacts } from "@/lib/natural-conversation-memory";
 import { casualConversationFallback, isCasualConversationTurn } from "@/lib/conversation-smalltalk";
-import { handleResearchSalesFlow } from "@/lib/research-sales-flow";
-import { maybeEscalateResearchService } from "@/lib/research-service-escalation";
-import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewrite";
 import { addMessage, getConversation, getOrCreateLead, updateLead } from "@/lib/store";
 import { getAiModelCandidates, getSetupState } from "@/lib/env";
 import { verifiedConversationFallback } from "@/lib/recovery-reply";
@@ -72,11 +69,6 @@ export async function POST(request: Request) {
   await updateLead(phone, { name: parsed.data.name });
   await addMessage(phone, "user", parsed.data.message);
 
-  const recentAssistantReplies = (await getConversation(phone, 16).catch(() => []))
-    .filter((message) => message.role === "assistant")
-    .slice(-6)
-    .map((message) => message.content);
-
   const queueNewClientAlert = () => {
     if (!firstEverClientMessage) return;
     after(async () => {
@@ -86,62 +78,25 @@ export async function POST(request: Request) {
     });
   };
 
-  // Keep genuine social chat out of qualification and continuity repair. The
-  // model still sees the full conversation, so the business thread is preserved
-  // and can resume naturally when the client returns to it.
-  if (isCasualConversationTurn(parsed.data.message)) {
-    const result = await generateWithFailover(phone, parsed.data.message);
-    if (result) {
-      queueNewClientAlert();
-      return NextResponse.json({ reply: result.reply });
-    }
-    const reply = casualConversationFallback(parsed.data.message);
-    await addMessage(phone, "assistant", reply).catch(() => undefined);
-    queueNewClientAlert();
-    return NextResponse.json({ reply, recovered: true });
-  }
-
-  await captureConversationAnswer(phone, parsed.data.message, "simulator").catch((error) => {
-    console.warn("Website conversation answer memory could not be updated", { phoneSuffix: phone.slice(-4), error });
-  });
-
-  const finalizeSavedResult = async (result: SalesAgentResult) => {
-    const repaired = repairConversationReply(result.reply, parsed.data.message, recentAssistantReplies);
-    if (repaired === result.reply) return result;
-    const rewritten = await rewriteLatestUnsentAssistantMessage({ phone, from: result.reply, to: repaired }).catch(() => false);
-    return rewritten ? { ...result, reply: repaired } : result;
-  };
-
-  const researchSales = await handleResearchSalesFlow({ phone, text: parsed.data.message, source: "simulator" }).catch((error) => {
-    console.warn("Website research sales flow could not be applied; continuing safely", { phoneSuffix: phone.slice(-4), error });
-    return null;
-  });
-  if (researchSales) {
-    queueNewClientAlert();
-    const finalized = await finalizeSavedResult(researchSales);
-    return NextResponse.json({ reply: finalized.reply });
-  }
-
-  const researchEscalation = await maybeEscalateResearchService({ phone, text: parsed.data.message, source: "simulator" });
-  if (researchEscalation) {
-    await addMessage(phone, "assistant", researchEscalation.reply).catch(() => undefined);
-    const finalized = await finalizeSavedResult(researchEscalation);
-    await sendReferralNotification(finalized);
-    queueNewClientAlert();
-    return NextResponse.json({ reply: finalized.reply });
+  // Fact capture is silent and should never dictate Mary's wording. Casual chat
+  // bypasses even this step so a social turn remains purely conversational.
+  if (!isCasualConversationTurn(parsed.data.message)) {
+    await captureNaturalConversationFacts(phone, parsed.data.message, "simulator").catch((error) => {
+      console.warn("Website natural conversation memory could not be updated", { phoneSuffix: phone.slice(-4), error });
+    });
   }
 
   const result = await generateWithFailover(phone, parsed.data.message);
   if (result) {
-    const finalized = await finalizeSavedResult(result);
-    await sendReferralNotification(finalized);
+    await sendReferralNotification(result);
     queueNewClientAlert();
-    return NextResponse.json({ reply: finalized.reply });
+    return NextResponse.json({ reply: result.reply });
   }
 
-  const fallback = await verifiedConversationFallback(phone, parsed.data.message).catch(() => "I'm here and I can help. Tell me a little more about what you need and I'll continue from there.");
-  const reply = repairConversationReply(fallback, parsed.data.message, recentAssistantReplies);
-  await addMessage(phone, "assistant", reply).catch(() => undefined);
+  const fallback = isCasualConversationTurn(parsed.data.message)
+    ? casualConversationFallback(parsed.data.message)
+    : await verifiedConversationFallback(phone, parsed.data.message).catch(() => "I'm here and I can help. Tell me what's on your mind and we'll continue from there.");
+  await addMessage(phone, "assistant", fallback).catch(() => undefined);
   queueNewClientAlert();
-  return NextResponse.json({ reply, recovered: true });
+  return NextResponse.json({ reply: fallback, recovered: true });
 }
