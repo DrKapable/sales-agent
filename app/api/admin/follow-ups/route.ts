@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -8,7 +9,9 @@ import {
   syncHumanFollowUpQueue
 } from "@/lib/human-follow-ups";
 import { manualFollowUpOptions } from "@/lib/manual-follow-up-options";
-import { listLeads } from "@/lib/store";
+
+const BACKGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+let lastBackgroundSyncAt = 0;
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({
@@ -35,12 +38,35 @@ const actionSchema = z.discriminatedUnion("action", [
   })
 ]);
 
+function queueBackgroundFollowUpSync() {
+  const now = Date.now();
+  if (now - lastBackgroundSyncAt < BACKGROUND_SYNC_INTERVAL_MS) return;
+  lastBackgroundSyncAt = now;
+
+  after(async () => {
+    try {
+      await syncHumanFollowUpQueue({ notifyDue: false });
+    } catch (error) {
+      lastBackgroundSyncAt = 0;
+      console.error("Background human follow-up sync failed", { error });
+    }
+  });
+}
+
 export async function GET() {
+  const startedAt = Date.now();
   try {
-    await syncHumanFollowUpQueue({ notifyDue: false });
-    const [data, leads] = await Promise.all([listHumanFollowUps(), listLeads()]);
+    // Return the current queue first. The full lead/conversation sync is expensive and
+    // should never block the workspace from rendering.
+    const data = await listHumanFollowUps();
+    queueBackgroundFollowUpSync();
+
     return NextResponse.json(
-      { ...data, availableLeads: manualFollowUpOptions(leads) },
+      {
+        ...data,
+        availableLeads: manualFollowUpOptions(data.availableLeads),
+        loadMs: Date.now() - startedAt
+      },
       { headers: { "Cache-Control": "private, no-store" } }
     );
   } catch (error) {
