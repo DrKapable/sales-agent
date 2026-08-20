@@ -8,10 +8,15 @@ import {
   sendHumanFollowUpSms,
   syncHumanFollowUpQueue
 } from "@/lib/human-follow-ups";
+import { isFollowUpTeamMember } from "@/lib/follow-up-team";
 import { manualFollowUpOptions } from "@/lib/manual-follow-up-options";
 
 const BACKGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 let lastBackgroundSyncAt = 0;
+
+const teamMemberSchema = z.string().trim().min(2).max(120).refine(isFollowUpTeamMember, {
+  message: "Choose a valid follow-up team member."
+});
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({
@@ -19,7 +24,7 @@ const actionSchema = z.discriminatedUnion("action", [
     phone: z.string().trim().min(8).max(40),
     scheduledAt: z.string().min(10).max(80),
     reason: z.string().trim().max(500).optional(),
-    createdBy: z.string().trim().min(2).max(120)
+    createdBy: teamMemberSchema
   }),
   z.object({
     action: z.literal("send_sms"),
@@ -29,7 +34,7 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("complete"),
     taskId: z.string().uuid(),
-    completedBy: z.string().trim().min(2).max(120),
+    completedBy: teamMemberSchema,
     channel: z.enum(["CALL", "WHATSAPP", "SMS"]),
     summary: z.string().trim().min(5).max(1600),
     outcome: z.enum(["REACHED_CONTINUE", "NO_ANSWER", "INTERESTED", "READY_TO_PROCEED", "NOT_INTERESTED", "OTHER"]),
@@ -53,6 +58,15 @@ function queueBackgroundFollowUpSync() {
   });
 }
 
+function manualClientPool(data: Awaited<ReturnType<typeof listHumanFollowUps>>) {
+  const byPhone = new Map<string, any>();
+  for (const lead of data.availableLeads) byPhone.set(lead.phone, lead);
+  for (const task of data.tasks) {
+    if (task.lead) byPhone.set(task.lead.phone, task.lead);
+  }
+  return manualFollowUpOptions([...byPhone.values()] as any);
+}
+
 export async function GET() {
   const startedAt = Date.now();
   try {
@@ -64,7 +78,9 @@ export async function GET() {
     return NextResponse.json(
       {
         ...data,
-        availableLeads: manualFollowUpOptions(data.availableLeads),
+        // Re-include active clients that already have a pending/historical follow-up so
+        // the human team can manually reschedule them without another expensive lead query.
+        availableLeads: manualClientPool(data),
         loadMs: Date.now() - startedAt
       },
       { headers: { "Cache-Control": "private, no-store" } }
@@ -77,9 +93,16 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const parsed = actionSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid follow-up action." }, { status: 400 });
+  if (!parsed.success) {
+    const message = parsed.error.issues[0]?.message || "Invalid follow-up action.";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
   try {
     if (parsed.data.action === "schedule") {
+      const scheduledAt = new Date(parsed.data.scheduledAt);
+      if (!Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) {
+        return NextResponse.json({ error: "Choose a future follow-up date and time." }, { status: 400 });
+      }
       const task = await scheduleManualHumanFollowUp(parsed.data);
       return NextResponse.json({ ok: true, task });
     }
