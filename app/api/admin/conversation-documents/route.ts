@@ -1,9 +1,8 @@
 import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
 import { attachmentDisplayName, parseClientAttachmentChatContent } from "@/lib/client-attachment-content";
-import { commercialDocumentNumber, isInvoiceStatus } from "@/lib/commercial-document";
+import { commercialDocumentNumber } from "@/lib/commercial-document";
 import { listClientDocuments } from "@/lib/client-documents";
-import { ensureFinancialColumns } from "@/lib/payment-finance";
 import { ensureQuoteDeliveryColumns } from "@/lib/quotation-delivery";
 import { getConversation, listLeads } from "@/lib/store";
 
@@ -73,12 +72,12 @@ export async function GET(request: Request) {
 
   const commercial: Array<Record<string, unknown>> = [];
   if (process.env.DATABASE_URL) {
-    await Promise.all([ensureQuoteDeliveryColumns(), ensureFinancialColumns()]);
+    await ensureQuoteDeliveryColumns();
     const db = neon(process.env.DATABASE_URL);
     const rows = await db.query(
-      `SELECT id,service,amount_zmw,total_charged_zmw,amount_paid_zmw,balance_zmw,details,status,created_at,delivery_status,delivery_error,submitted_at,delivered_at
+      `SELECT id,service,amount_zmw,details,status,created_at,delivery_status,delivery_error,submitted_at,delivered_at
        FROM sales_quotes
-       WHERE lead_id=$1 AND status IN ('QUOTATION','INVOICE_UNPAID','INVOICE_PAID')
+       WHERE lead_id=$1 AND status IN ('QUOTATION','INVOICE_UNPAID')
        ORDER BY created_at DESC
        LIMIT 50`,
       [lead.id]
@@ -90,21 +89,15 @@ export async function GET(request: Request) {
         id: String(row.id),
         service: String(row.service || "MedMinds service"),
         amount_zmw: row.amount_zmw == null ? null : Number(row.amount_zmw),
-        total_charged_zmw: row.total_charged_zmw == null ? null : Number(row.total_charged_zmw),
-        amount_paid_zmw: row.amount_paid_zmw == null ? null : Number(row.amount_paid_zmw),
-        balance_zmw: row.balance_zmw == null ? null : Number(row.balance_zmw),
         details: String(row.details || ""),
         status,
         created_at: row.created_at ? String(row.created_at) : null
       };
       const number = commercialDocumentNumber(record);
-      const invoice = isInvoiceStatus(status);
+      const invoice = status === "INVOICE_UNPAID";
       const createdAt = safeIso(row.created_at) || new Date().toISOString();
       const submittedAt = safeIso(row.submitted_at);
       const deliveredAt = safeIso(row.delivered_at);
-      const financialSummary = invoice
-        ? `Charged K${Number(record.total_charged_zmw ?? record.amount_zmw ?? 0).toLocaleString()} · Paid K${Number(record.amount_paid_zmw ?? 0).toLocaleString()} · Balance K${Number(record.balance_zmw ?? 0).toLocaleString()}`
-        : null;
       commercial.push({
         id: record.id,
         kind: invoice ? "invoice" : "quotation",
@@ -113,11 +106,11 @@ export async function GET(request: Request) {
         mimeType: "application/pdf",
         service: record.service,
         amountZmw: record.amount_zmw,
-        details: financialSummary ? `${financialSummary}${record.details ? ` · ${record.details}` : ""}` : record.details,
+        details: record.details,
         documentNumber: number,
         createdAt,
         sharedAt: deliveredAt || submittedAt || createdAt,
-        sharedBy: "MedMinds",
+        sharedBy: "Mary Kaunda",
         deliveryStatus: String(row.delivery_status || "NOT_SENT").toUpperCase(),
         deliveryError: row.delivery_error ? String(row.delivery_error) : null,
         downloadUrl: `/api/documents/${record.id}`
