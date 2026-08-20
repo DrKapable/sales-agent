@@ -50,7 +50,6 @@ export function createCommercialPdf(input: CommercialDocumentInput) {
   const muted = "0.38 0.47 0.54";
   const pale = "0.93 0.97 0.97";
   const title = input.kind === "invoice" ? "INVOICE" : "QUOTATION";
-  const status = input.kind === "invoice" ? "BALANCE DUE" : "VALID QUOTATION";
   const titleX = input.kind === "invoice" ? 472 : 458;
   const pageWidth = 595;
   const detailLines = wrap(input.details || input.service);
@@ -59,6 +58,9 @@ export function createCommercialPdf(input: CommercialDocumentInput) {
   const balance = input.kind === "invoice"
     ? Number(input.balanceZmw ?? Math.max(Number(totalCharged ?? 0) - Number(amountPaid ?? 0), 0))
     : null;
+  const invoiceSettled = input.kind === "invoice" && Number(balance || 0) <= 0;
+  const status = input.kind === "invoice" ? (invoiceSettled ? "PAID IN FULL" : "BALANCE DUE") : "VALID QUOTATION";
+  const statusColor = input.kind === "invoice" && !invoiceSettled ? "0.72 0.38 0.05" : teal;
   const content: string[] = [
     "q",
     "1 1 1 rg 0 730 595 112 re f",
@@ -79,8 +81,8 @@ export function createCommercialPdf(input: CommercialDocumentInput) {
       line("AMOUNT PAID", 223, 588, 8, "F2", muted),
       line(money(amountPaid), 223, 555, 17, "F2", teal),
       line("BALANCE", 386, 588, 8, "F2", muted),
-      line(money(balance), 386, 555, 17, "F2", balance && balance > 0 ? "0.72 0.38 0.05" : teal),
-      line(status, 430, 528, 9, "F2", balance && balance > 0 ? "0.72 0.38 0.05" : teal)
+      line(money(balance), 386, 555, 17, "F2", statusColor),
+      line(status, invoiceSettled ? 438 : 430, 528, 9, "F2", statusColor)
     );
   } else {
     content.push(
@@ -103,7 +105,7 @@ export function createCommercialPdf(input: CommercialDocumentInput) {
   detailLines.forEach((row, index) => content.push(line(row, 210, 380 - index * 17, 10, "F1", navy)));
   content.push(
     `${teal} rg 42 216 511 2 re f`,
-    line(input.kind === "invoice" ? "Balance shown above is the amount remaining against this recorded charge." : "This quotation is based on the approved MedMinds service and price recorded above.", 42, 185, 9.5, "F2", navy),
+    line(input.kind === "invoice" ? "The balance shown above reflects verified payments recorded against this charge." : "This quotation is based on the approved MedMinds service and price recorded above.", 42, 185, 9.5, "F2", navy),
     line("Payment details and any applicable conditions should be confirmed before payment.", 42, 162, 8.5, "F1", muted),
     line(MEDMINDS_BUSINESS_IDENTITY.legalName, 42, 112, 8.2, "F2", navy),
     line(`TPIN: ${MEDMINDS_BUSINESS_IDENTITY.tpin}`, 42, 97, 7.8, "F1", muted),

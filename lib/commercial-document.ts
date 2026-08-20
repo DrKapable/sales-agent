@@ -15,12 +15,16 @@ export type CommercialRecord = {
   created_at?: string | null;
 };
 
+export function isInvoiceStatus(status: string | null | undefined) {
+  return String(status || "").toUpperCase().startsWith("INVOICE_");
+}
+
 export function commercialDocumentNumber(record: CommercialRecord) {
-  return `${record.status === "INVOICE_UNPAID" ? "INV" : "QUO"}-${String(record.id).slice(0, 8).toUpperCase()}`;
+  return `${isInvoiceStatus(record.status) ? "INV" : "QUO"}-${String(record.id).slice(0, 8).toUpperCase()}`;
 }
 
 export function buildCommercialPdf(lead: Pick<Lead, "name" | "phone">, record: CommercialRecord) {
-  const kind = record.status === "INVOICE_UNPAID" ? "invoice" : "quotation";
+  const kind = isInvoiceStatus(record.status) ? "invoice" : "quotation";
   return createCommercialPdf({
     kind,
     documentNumber: commercialDocumentNumber(record),
@@ -37,7 +41,7 @@ export function buildCommercialPdf(lead: Pick<Lead, "name" | "phone">, record: C
 
 export async function sendCommercialPdf(input: { lead: Lead; record: CommercialRecord; phoneNumberIdOverride?: string }) {
   const number = commercialDocumentNumber(input.record);
-  const isInvoice = input.record.status === "INVOICE_UNPAID";
+  const isInvoice = isInvoiceStatus(input.record.status);
   const filename = `MedMinds-${isInvoice ? "Invoice" : "Quotation"}-${number}.pdf`;
   const pdf = buildCommercialPdf(input.lead, input.record);
   const result = await sendWhatsAppPdfDocument({
@@ -45,7 +49,7 @@ export async function sendCommercialPdf(input: { lead: Lead; record: CommercialR
     pdf,
     filename,
     caption: isInvoice
-      ? `MedMinds invoice ${number}. Please review the attached balance details.`
+      ? `MedMinds invoice ${number}. Please review the attached payment and balance details.`
       : `MedMinds quotation ${number}. Please review the attached document.`,
     phoneNumberIdOverride: input.phoneNumberIdOverride
   });

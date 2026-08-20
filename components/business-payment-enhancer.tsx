@@ -2,8 +2,14 @@
 
 import { useEffect } from "react";
 
+let latestBusinessSnapshot: any = null;
+
 function money(value: number) {
   return `K${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function normalizePhone(value: string) {
+  return value.replace(/\D/g, "");
 }
 
 function paymentModal() {
@@ -37,6 +43,17 @@ function findPaidField(card: HTMLElement) {
   return { label, input };
 }
 
+function priorVerifiedPaid(card: HTMLElement) {
+  if (!latestBusinessSnapshot?.leads || !Array.isArray(latestBusinessSnapshot?.payments)) return 0;
+  const headerText = card.textContent || "";
+  const phones = Array.from(String(headerText).matchAll(/(?:\+?260|0)\s*\d(?:[\s-]*\d){8}/g)).map((match) => normalizePhone(match[0]));
+  const lead = latestBusinessSnapshot.leads.find((item: any) => phones.some((phone) => normalizePhone(String(item.phone || "")) === phone));
+  if (!lead) return 0;
+  return latestBusinessSnapshot.payments
+    .filter((payment: any) => payment.lead_id === lead.id && payment.status === "VERIFIED")
+    .reduce((sum: number, payment: any) => sum + Number(payment.amount_paid_zmw ?? payment.amount_zmw ?? 0), 0);
+}
+
 function refreshBalance(card: HTMLElement) {
   const totalInput = card.querySelector<HTMLInputElement>('input[data-bi-total-charged="1"]');
   const paidField = findPaidField(card);
@@ -46,20 +63,25 @@ function refreshBalance(card: HTMLElement) {
 
   const total = Number(totalInput?.value || card.dataset.biTotalChargedValue || 0);
   const paid = Number(paidInput.value || 0);
+  const previous = priorVerifiedPaid(card);
   const totalValid = Number.isFinite(total) && total > 0;
   const paidValid = Number.isFinite(paid) && paid >= 0;
-  const balance = totalValid && paidValid ? total - paid : 0;
+  const projectedCumulative = previous + (paidValid ? paid : 0);
+  const balance = totalValid && paidValid ? total - projectedCumulative : 0;
 
   summary.replaceChildren();
-  const rows = [
-    ["Total charged", totalValid ? money(total) : "—"],
-    ["Amount paid", paidValid && paid > 0 ? money(paid) : "K0.00"],
-    [balance < 0 ? "Overpayment" : "Balance", totalValid && paidValid ? money(Math.abs(balance)) : "—"]
+  const rows: Array<[string, string]> = [
+    ["Total charged", totalValid ? money(total) : "—"]
   ];
+  if (previous > 0) rows.push(["Previously verified", money(previous)]);
+  rows.push(
+    ["This payment", paidValid && paid > 0 ? money(paid) : "K0.00"],
+    [balance < 0 ? "Overpayment" : "Projected balance", totalValid && paidValid ? money(Math.abs(balance)) : "—"]
+  );
 
   rows.forEach(([label, value], index) => {
     const row = document.createElement("div");
-    if (index === 2) row.className = balance < 0 ? "biFinanceBalance biFinanceBalanceError" : "biFinanceBalance";
+    if (index === rows.length - 1) row.className = balance < 0 ? "biFinanceBalance biFinanceBalanceError" : "biFinanceBalance";
     const left = document.createElement("span");
     left.textContent = label;
     const right = document.createElement("strong");
@@ -69,9 +91,9 @@ function refreshBalance(card: HTMLElement) {
   });
 
   if (balance < 0) {
-    summary.setAttribute("aria-label", `Amount paid exceeds total charged by ${money(Math.abs(balance))}.`);
+    summary.setAttribute("aria-label", `This payment would exceed the remaining balance by ${money(Math.abs(balance))}.`);
   } else if (totalValid && paidValid) {
-    summary.setAttribute("aria-label", `Balance remaining ${money(balance)}.`);
+    summary.setAttribute("aria-label", `Projected balance after verification ${money(balance)}.`);
   } else {
     summary.removeAttribute("aria-label");
   }
@@ -120,7 +142,7 @@ function enhancePaymentModal() {
 
     const hint = document.createElement("small");
     hint.className = "biFinanceHint";
-    hint.textContent = "Enter the full charge and the payment received now. The remaining balance is calculated automatically and carried to the invoice/receipt.";
+    hint.textContent = "Enter the full charge and the payment received now. Verified instalments accumulate automatically. The projected balance assumes this payment is verified; the official invoice deducts verified payments only.";
     totalLabel.appendChild(hint);
     paidLabel.parentElement?.insertBefore(totalLabel, paidLabel);
   }
@@ -158,7 +180,7 @@ function enhancePaymentRows(snapshot: any) {
     const balance = Number(payment.balance_zmw ?? Math.max(total - paid, 0));
     const detail = document.createElement("div");
     detail.className = "biFinanceRowDetail";
-    detail.textContent = `Charged ${money(total)} · Paid ${money(paid)} · Balance ${money(balance)}`;
+    detail.textContent = `Charged ${money(total)} · This payment ${money(paid)} · Balance ${money(balance)}`;
     content.appendChild(detail);
     row.dataset.biFinanceRowReady = "1";
   }
@@ -167,7 +189,6 @@ function enhancePaymentRows(snapshot: any) {
 export function BusinessPaymentEnhancer() {
   useEffect(() => {
     const nativeFetch = window.fetch.bind(window);
-    let latestSnapshot: any = null;
 
     const wrappedFetch: typeof window.fetch = async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
@@ -184,6 +205,9 @@ export function BusinessPaymentEnhancer() {
             const next = { ...payload, totalChargedZmw: total, amountPaidZmw: paid };
             return nativeFetch("/api/admin/business/finance", { ...init, body: JSON.stringify(next) });
           }
+          if (payload?.action === "verify_payment") {
+            return nativeFetch("/api/admin/business/finance", { ...init, body: JSON.stringify(payload) });
+          }
         } catch {
           // Fall through to the normal Business Intelligence endpoint.
         }
@@ -191,7 +215,7 @@ export function BusinessPaymentEnhancer() {
       const response = await nativeFetch(input as RequestInfo | URL, init);
       if (url.endsWith("/api/admin/business") && method === "GET") {
         response.clone().json().then((snapshot) => {
-          latestSnapshot = snapshot;
+          latestBusinessSnapshot = snapshot;
           window.setTimeout(() => enhancePaymentRows(snapshot), 0);
         }).catch(() => undefined);
       }
@@ -205,7 +229,7 @@ export function BusinessPaymentEnhancer() {
       frame = window.requestAnimationFrame(() => {
         frame = 0;
         enhancePaymentModal();
-        if (latestSnapshot) enhancePaymentRows(latestSnapshot);
+        if (latestBusinessSnapshot) enhancePaymentRows(latestBusinessSnapshot);
       });
     };
     schedule();
