@@ -7,6 +7,26 @@ import type { Lead } from "@/lib/types";
 
 type ArchivedChat = { lead: Lead; archivedAt: string };
 
+const FLOATING_SALES_CHAT_SELECTOR = 'iframe[title="Chat with Mary Kainda"]';
+
+function setFloatingSalesChatHidden(hidden: boolean) {
+  document.querySelectorAll<HTMLIFrameElement>(FLOATING_SALES_CHAT_SELECTOR).forEach((frame) => {
+    if (hidden) {
+      frame.dataset.medmindsAdminHidden = "true";
+      frame.hidden = true;
+      frame.style.display = "none";
+      frame.setAttribute("aria-hidden", "true");
+      return;
+    }
+
+    if (frame.dataset.medmindsAdminHidden !== "true") return;
+    frame.hidden = false;
+    frame.style.removeProperty("display");
+    frame.removeAttribute("aria-hidden");
+    frame.removeAttribute("data-medminds-admin-hidden");
+  });
+}
+
 export function MobileAdminEnhancer() {
   const [active, setActive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -32,6 +52,7 @@ export function MobileAdminEnhancer() {
   useEffect(() => {
     const syncTargets = () => {
       const dashboard = document.querySelector<HTMLElement>(".dashboard");
+      setFloatingSalesChatHidden(Boolean(dashboard));
       const actions = document.querySelector<HTMLElement>(".conversationPanel .conversationActions");
       const header = document.querySelector<HTMLElement>(".conversationPanel .conversationHeader");
       const controls = document.querySelector<HTMLElement>(".conversationPanel .controlStrip");
@@ -76,6 +97,7 @@ export function MobileAdminEnhancer() {
     return () => {
       observer.disconnect();
       document.removeEventListener("click", handleDashboardClick);
+      setFloatingSalesChatHidden(false);
     };
   }, []);
 
