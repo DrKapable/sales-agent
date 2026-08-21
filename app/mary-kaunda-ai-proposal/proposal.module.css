@@ -302,7 +302,12 @@
   box-shadow: 0 24px 60px rgba(4, 82, 67, 0.16);
 }
 
-.heroImageWrap img {
+.heroImageStage {
+  position: absolute;
+  inset: 0;
+}
+
+.heroImageStage img {
   object-fit: contain;
   object-position: center;
 }
@@ -1257,14 +1262,28 @@
   }
 
   .heroImageWrap {
-    aspect-ratio: 16 / 9;
+    aspect-ratio: auto;
     border-radius: 21px;
+    background: rgba(255, 255, 255, 0.88);
+  }
+
+  .heroImageStage {
+    position: relative;
+    inset: auto;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: 21px 21px 0 0;
   }
 
   .heroBadge {
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    margin: 12px;
+    padding: 15px 16px;
+    background: white;
+    box-shadow: none;
   }
 
   .capacityCallout {

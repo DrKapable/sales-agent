@@ -273,13 +273,15 @@ export default function MaryKaundaProposalPage() {
           </div>
         </div>
         <div className={styles.heroImageWrap}>
-          <Image
-            src="/medminds-hero-mary-kaunda-hq.webp"
-            alt="Mary Kaunda, MedMinds AI customer engagement and sales assistant"
-            fill
-            priority
-            sizes="(max-width: 980px) 100vw, 46vw"
-          />
+          <div className={styles.heroImageStage}>
+            <Image
+              src="/medminds-hero-mary-kaunda-hq.webp"
+              alt="Mary Kaunda, MedMinds AI customer engagement and sales assistant"
+              fill
+              priority
+              sizes="(max-width: 980px) 100vw, 46vw"
+            />
+          </div>
           <div className={styles.heroBadge}>
             <span className={styles.onlineDot} />
             <div><strong>Mary Kaunda</strong><span>AI customer engagement, sales and support assistant</span></div>
