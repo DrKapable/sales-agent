@@ -6,22 +6,82 @@ import styles from "./proposal.module.css";
 export const metadata: Metadata = {
   title: "Mary Kaunda AI Agent | Institutional Proposal",
   description:
-    "A formal proposal for organisations seeking a WhatsApp-based AI customer engagement, sales and support assistant powered by the Mary Kaunda platform from MedMinds Learning Centre.",
+    "A formal proposal for organisations seeking a configurable AI customer engagement, sales, document and support assistant powered by the Mary Kaunda platform from MedMinds Learning Centre.",
 };
 
 const trialUrl =
   "https://wa.me/260762402042?text=Hi%20MedMinds%2C%20I%20would%20like%20to%20start%20the%20free%201-month%20Mary%20Kaunda%20AI%20Agent%20trial%20for%20my%20organisation.";
 
+const actualTasks = [
+  {
+    label: "RESPOND",
+    title: "Answer routine customer enquiries",
+    text: "Mary can respond to approved questions on services, products, requirements, prices, operating hours and next steps at any time of day.",
+  },
+  {
+    label: "REVIEW",
+    title: "Review enquiry details and submitted information",
+    text: "Mary can use information already supplied by a client, including configured document or attachment workflows, to organise the next appropriate action without repeatedly asking the same questions.",
+  },
+  {
+    label: "QUALIFY",
+    title: "Qualify and organise leads",
+    text: "She can identify the customer's need, collect the next relevant detail, assign a lead stage or priority and preserve the conversation for staff follow-up.",
+  },
+  {
+    label: "QUOTE",
+    title: "Prepare and send quotations",
+    text: "Configured commercial workflows can generate a formal PDF quotation and deliver it to the customer through WhatsApp once the required information is available.",
+  },
+  {
+    label: "INVOICE",
+    title: "Generate and send invoices",
+    text: "Mary's platform can produce PDF invoices with the relevant amount and balance information and send them through the customer conversation workflow.",
+  },
+  {
+    label: "RECEIPT",
+    title: "Issue branded payment receipts",
+    text: "After an authorised payment has been verified, the platform can generate and send a branded PDF receipt showing the amount paid and any remaining balance.",
+  },
+  {
+    label: "REMIND",
+    title: "Create reminders and follow-up actions",
+    text: "Mary can schedule follow-up tasks around interested or payment-pending clients and help staff see which conversations are overdue, due today or upcoming.",
+  },
+  {
+    label: "FOLLOW",
+    title: "Continue conversations without restarting",
+    text: "Conversation history and captured lead information allow Mary or staff to continue from the customer's previous stage instead of treating every message as a new enquiry.",
+  },
+  {
+    label: "FILES",
+    title: "Send approved client documents",
+    text: "The platform supports customer documents within the conversation record, including configured quotations, invoices, receipts and other institution-approved documents.",
+  },
+  {
+    label: "PAYMENT",
+    title: "Track payment and balance context",
+    text: "Configured payment records can preserve the total charge, amount paid, remaining balance and verification state for use in the appropriate customer workflow.",
+  },
+  {
+    label: "HANDOVER",
+    title: "Escalate to a human with context",
+    text: "Complaints, disputes, sensitive decisions, exceptions and high-value leads can be handed to authorised staff without losing the conversation history.",
+  },
+  {
+    label: "INSIGHT",
+    title: "Give management a clearer customer pipeline",
+    text: "The admin environment can organise leads, messages, follow-ups, priorities and customer records so management can see where attention is required.",
+  },
+];
+
 const capabilities = [
-  ["24/7", "Always-on customer response", "Mary can answer routine enquiries immediately, reducing missed opportunities outside normal working hours."],
-  ["QUALIFY", "Lead qualification", "She collects the next relevant detail, identifies the customer need and helps move serious enquiries toward the correct service or staff member."],
-  ["CATALOG", "Controlled product and service information", "Approved products, services, prices, requirements and policies can be managed centrally so responses stay aligned with the institution's current information."],
-  ["FOLLOW", "Automated follow-up", "Interested customers who go quiet can be followed up using relevant, low-pressure messages based on the stage of the conversation."],
-  ["HANDOVER", "Human escalation", "Complaints, complex cases, exceptional requests and high-value leads can be transferred to designated staff with the conversation context preserved."],
-  ["INBOX", "Shared customer inbox", "Staff can review conversation history, reply directly, pause AI responses and resume the agent when appropriate."],
-  ["PIPELINE", "Lead and sales pipeline", "Enquiries can be organised by status, priority and assigned staff member, making it easier to see which customers need action."],
-  ["FILES", "Documents and client records", "Configured workflows can support quotations, receipts and client documents while maintaining a traceable customer record."],
-  ["INSIGHT", "Business visibility", "Management can use captured enquiries, lead activity and conversation data to identify common questions, demand patterns and follow-up priorities."],
+  ["24/7", "Always-on first response", "Routine customer questions can receive useful guidance even outside normal working hours."],
+  ["2500", "High-volume capacity target", "The platform can be configured toward a target of up to 2,500 simultaneous client conversations, subject to workflow complexity, messaging-provider limits, integrations and deployment capacity."],
+  ["CONTROL", "Institution-controlled knowledge", "Products, services, prices, requirements, policies and escalation rules can be centrally approved so Mary operates within the institution's defined boundaries."],
+  ["HUMAN", "Human oversight by design", "Mary supports staff rather than replacing authorised judgement. Sensitive or regulated decisions remain with the institution's designated personnel."],
+  ["MEMORY", "Conversation continuity", "Customer history and lead context reduce repetitive questioning and make staff takeover more efficient."],
+  ["DASH", "Operational visibility", "A shared management environment helps teams review conversations, follow-ups, documents, lead status and customer priorities."],
 ];
 
 const industries = [
@@ -33,6 +93,7 @@ const industries = [
       "Pre-qualify enquiries without making the credit decision",
       "Explain repayment options and approved product requirements",
       "Collect applicant contact details and preferred loan type",
+      "Send approved quotations, invoices, reminders or receipts where relevant",
       "Escalate sensitive, disputed or complex cases to loan officers",
       "Provide application-status support when connected to an approved system",
     ],
@@ -45,8 +106,9 @@ const industries = [
       "Capture delivery requests and customer details",
       "Explain service areas, operating hours and approved fees",
       "Support parcel-status queries when integrated with tracking data",
+      "Generate or send approved quotations and invoices",
       "Escalate delayed, damaged or exceptional deliveries",
-      "Follow up on quotations and incomplete booking enquiries",
+      "Follow up on incomplete booking enquiries",
     ],
   },
   {
@@ -58,6 +120,7 @@ const industries = [
       "Answer questions about sizes, colours, prices and promotions",
       "Check stock when connected to an approved inventory source",
       "Capture order interest and customer contact details",
+      "Send payment documents and receipts through configured workflows",
       "Follow up on high-intent enquiries that did not complete a purchase",
     ],
   },
@@ -68,7 +131,8 @@ const industries = [
     bullets: [
       "Qualify buyers and tenants by need and budget",
       "Share approved listing information and viewing requirements",
-      "Capture viewing requests",
+      "Capture viewing requests and reminders",
+      "Send approved quotations or invoices where applicable",
       "Assign serious enquiries to property consultants",
       "Maintain conversation history for follow-up",
     ],
@@ -81,6 +145,7 @@ const industries = [
       "Answer admissions and programme FAQs",
       "Guide applicants through the next required step",
       "Capture prospective student details",
+      "Send approved fee documents, reminders and receipts",
       "Escalate special admission cases to staff",
       "Follow up with applicants who have not completed the process",
     ],
@@ -92,6 +157,7 @@ const industries = [
     bullets: [
       "Answer approved service and operating-hour questions",
       "Capture booking or service enquiries",
+      "Send administrative reminders or approved documents",
       "Route cases to the correct department",
       "Reduce repetitive front-desk messaging",
       "Maintain an auditable record of customer conversations",
@@ -102,32 +168,50 @@ const industries = [
 export default function MaryKaundaProposalPage() {
   return (
     <main className={styles.page}>
+      <div className={styles.ambientLayer} aria-hidden="true">
+        <span className={`${styles.floatChip} ${styles.floatOne}`}>Quotation sent ✓</span>
+        <span className={`${styles.floatChip} ${styles.floatTwo}`}>24/7 response</span>
+        <span className={`${styles.floatChip} ${styles.floatThree}`}>Invoice ready</span>
+        <span className={`${styles.floatChip} ${styles.floatFour}`}>Follow-up due</span>
+        <span className={`${styles.floatChip} ${styles.floatFive}`}>Payment received ✓</span>
+        <span className={`${styles.floatChip} ${styles.floatSix}`}>Human handover</span>
+        <span className={`${styles.floatChip} ${styles.floatSeven}`}>Up to 2,500*</span>
+      </div>
+
       <nav className={`${styles.shell} ${styles.nav}`}>
         <Link href="/" className={styles.brand}>
           <Image src="/medminds-logo.png" alt="MedMinds Learning Centre" width={42} height={42} priority />
           <span>MedMinds Learning Centre</span>
         </Link>
+        <div className={styles.navLinks}>
+          <a href="#tasks">What Mary does</a>
+          <a href="#sectors">Sectors</a>
+          <a href="#pricing">Pricing</a>
+        </div>
         <div className={styles.navActions}>
-          <Link href="/" className={styles.textLink}>Main website</Link>
           <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Request free trial</a>
         </div>
       </nav>
 
       <section className={`${styles.shell} ${styles.hero}`}>
-        <div>
-          <span className={styles.eyebrow}>Formal institutional proposal</span>
-          <h1>Meet Mary Kaunda: an AI customer engagement and sales agent for your organisation.</h1>
+        <div className={styles.heroCopy}>
+          <span className={styles.eyebrow}>Institutional AI customer service proposal</span>
+          <h1>Respond faster. Follow up better. Serve more customers.</h1>
           <p className={styles.heroLead}>
-            Mary Kaunda is a configurable AI assistant designed to help organisations respond to customers, qualify enquiries, explain approved products and services, follow up interested clients and involve human staff when a case requires personal attention.
+            Mary Kaunda is a configurable AI customer engagement agent that can answer enquiries, qualify leads, organise follow-ups, prepare customer documents and involve human staff when a case requires authorised judgement.
           </p>
           <div className={styles.heroActions}>
             <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Start 1-month free trial</a>
-            <a href="#pricing" className={styles.secondaryButton}>View pricing</a>
+            <a href="#tasks" className={styles.secondaryButton}>See what Mary can do</a>
           </div>
           <div className={styles.heroTrust}>
             <span>WhatsApp-ready</span>
             <span>Human handover</span>
             <span>Institution-controlled information</span>
+          </div>
+          <div className={styles.capacityCallout}>
+            <strong>Capacity target: up to 2,500 client conversations at a time*</strong>
+            <span>*Subject to workflow complexity, external integrations, messaging-provider limits and deployment capacity. Load testing should precede any contractual service-level commitment.</span>
           </div>
         </div>
         <div className={styles.heroImageWrap}>
@@ -139,44 +223,65 @@ export default function MaryKaundaProposalPage() {
             sizes="(max-width: 980px) 100vw, 46vw"
           />
           <div className={styles.heroBadge}>
-            <strong>Mary Kaunda</strong>
-            <span>AI customer engagement, sales and support assistant</span>
+            <span className={styles.onlineDot} />
+            <div><strong>Mary Kaunda</strong><span>AI customer engagement, sales and support assistant</span></div>
           </div>
         </div>
       </section>
 
       <div className={`${styles.shell} ${styles.statStrip}`}>
-        <div><strong>24/7 availability</strong><span>Routine enquiries can be handled even when the office is closed.</span></div>
-        <div><strong>One shared inbox</strong><span>AI and staff can work from the same customer conversation history.</span></div>
-        <div><strong>Structured follow-up</strong><span>Interested customers are less likely to disappear without a next action.</span></div>
-        <div><strong>30 days free</strong><span>Institutions can test the workflow before starting the monthly subscription.</span></div>
+        <div><strong>24/7</strong><span>Always-on routine customer engagement.</span></div>
+        <div><strong>Up to 2,500*</strong><span>Configurable high-volume client capacity target.</span></div>
+        <div><strong>Documents</strong><span>Quotations, invoices, receipts and approved client files.</span></div>
+        <div><strong>30 days free</strong><span>Test the workflow before the USD 20 monthly subscription.</span></div>
       </div>
 
       <section className={`${styles.shell} ${styles.section}`}>
         <div className={styles.sectionHeading}>
-          <div><span className={styles.kicker}>1. Background and business need</span><h2>Customers expect fast answers. Most teams cannot be online all the time.</h2></div>
+          <div><span className={styles.kicker}>1. The operational problem</span><h2>Every unanswered message is a customer waiting for a decision.</h2></div>
           <p>
-            Organisations lose potential business when enquiries are answered late, customer questions are repeated across different staff members, promising leads are not followed up, or frontline teams spend too much time responding to routine questions. The challenge is not simply messaging volume. It is maintaining speed, consistency, context and a clear path from enquiry to action.
+            Organisations lose potential business when enquiries are answered late, the same questions consume staff time, customers receive inconsistent information, or promising leads are forgotten after the first conversation. The practical requirement is a system that can respond quickly while preserving context, control and human oversight.
           </p>
         </div>
         <div className={styles.problemGrid}>
-          <article className={styles.card}><span className={styles.cardNumber}>01</span><h3>Missed enquiries</h3><p>Customers who wait too long for a response may contact a competitor before a staff member becomes available.</p></article>
-          <article className={styles.card}><span className={styles.cardNumber}>02</span><h3>Inconsistent answers</h3><p>Different staff members may provide different information on pricing, requirements, availability or process.</p></article>
-          <article className={styles.card}><span className={styles.cardNumber}>03</span><h3>Weak follow-up</h3><p>High-intent customers can be lost because no one remembers to continue the conversation at the right time.</p></article>
+          <article className={styles.card}><span className={styles.cardNumber}>01</span><h3>Missed enquiries</h3><p>Customers who wait too long can leave before a staff member becomes available.</p></article>
+          <article className={styles.card}><span className={styles.cardNumber}>02</span><h3>Administrative repetition</h3><p>Teams repeatedly explain prices, requirements, payment steps, order status and routine policies.</p></article>
+          <article className={styles.card}><span className={styles.cardNumber}>03</span><h3>Broken follow-up</h3><p>Quotes, unpaid balances and high-intent enquiries can be lost when there is no structured next action.</p></article>
         </div>
         <div className={styles.solutionBand}>
           <strong>Proposed solution</strong>
           <p>
-            Deploy Mary Kaunda as the organisation's first-line digital customer assistant. She handles routine communication, records useful lead information, moves the customer toward the next appropriate step and transfers exceptions to a human member of staff. The institution retains control over its approved products, prices, requirements, policies and escalation rules.
+            Deploy Mary Kaunda as the organisation&apos;s first-line digital customer assistant. She handles approved routine communication, records useful lead information, supports commercial-document workflows, schedules follow-up and transfers exceptions to the appropriate human staff member. The institution retains control over products, prices, requirements, policies and decisions that require human authority.
           </p>
+        </div>
+      </section>
+
+      <section id="tasks" className={`${styles.shell} ${styles.section}`}>
+        <div className={styles.sectionHeading}>
+          <div><span className={styles.kicker}>2. Actual tasks Mary can perform</span><h2>Practical work, not just conversational replies.</h2></div>
+          <p>
+            The current platform already contains customer messaging, lead management, document, payment-context, follow-up and human-handover workflows. Institution-specific deployments can enable the functions relevant to that organisation and keep sensitive approvals under authorised human control.
+          </p>
+        </div>
+        <div className={styles.taskGrid}>
+          {actualTasks.map((task) => (
+            <article key={task.title} className={styles.taskCard}>
+              <span className={styles.taskLabel}>{task.label}</span>
+              <h3>{task.title}</h3>
+              <p>{task.text}</p>
+            </article>
+          ))}
+        </div>
+        <div className={styles.workflowLine}>
+          <span>Enquiry</span><b>→</b><span>Qualification</span><b>→</b><span>Quotation / Invoice</span><b>→</b><span>Follow-up</span><b>→</b><span>Verified Receipt</span><b>→</b><span>Human Handover when needed</span>
         </div>
       </section>
 
       <section className={`${styles.shell} ${styles.section}`}>
         <div className={styles.sectionHeading}>
-          <div><span className={styles.kicker}>2. What Mary Kaunda can do</span><h2>More than a chatbot: a managed customer workflow.</h2></div>
+          <div><span className={styles.kicker}>3. Operational capability</span><h2>Built for scale without removing institutional control.</h2></div>
           <p>
-            Mary is designed around the full enquiry cycle: respond, understand, qualify, guide, follow up and hand over. This makes the system useful for institutions where WhatsApp and online enquiries are an important source of customers.
+            Mary can absorb repetitive first-line communication while staff retain authority over sensitive decisions, approvals, disputes and exceptional cases. This makes the system suitable for organisations that want speed without giving an automated agent unrestricted control.
           </p>
         </div>
         <div className={styles.capabilityGrid}>
@@ -192,34 +297,34 @@ export default function MaryKaundaProposalPage() {
 
       <section className={`${styles.shell} ${styles.section} ${styles.demoSection}`}>
         <div className={styles.splitCopy}>
-          <span className={styles.kicker}>3. How the conversation works</span>
-          <h2>Mary does not need to overwhelm a customer with information.</h2>
+          <span className={styles.kicker}>4. How the conversation works</span>
+          <h2>One useful next step at a time.</h2>
           <p>
-            The current Mary Kaunda workflow is designed to identify what the customer wants, ask only the next useful question, provide approved information and use a clear next step. If a customer has already provided information, the conversation can continue without repeatedly asking the same questions.
+            Mary is designed to identify what the customer wants, use information already provided, answer the immediate question and move the conversation toward the next appropriate action. She does not need to overwhelm a client with a long menu of information.
           </p>
           <p>
-            For institutions, the same approach can be adapted to the organisation's own customer journey, such as a loan enquiry, delivery booking, clothing order, property lead or training application.
+            The same logic can be configured around a loan enquiry, delivery booking, retail order, property lead, admission enquiry, invoice follow-up or another customer journey.
           </p>
         </div>
-        <div className={styles.chatMock} aria-label="Illustrative Mary Kaunda customer conversation">
+        <div className={styles.chatMock} aria-label="Illustrative Mary Kaunda commercial conversation">
           <div className={styles.chatHeader}><span className={styles.avatar}>MK</span><div><strong>Mary Kaunda</strong><span>Customer assistant • online</span></div></div>
           <div className={styles.chatBody}>
-            <div className={styles.bubbleClient}>Hi, I want to know about your delivery service.</div>
-            <div className={styles.bubbleMary}>Certainly. Is this a local delivery within your city, or an inter-city delivery?</div>
-            <div className={styles.bubbleClient}>Local. I need a parcel picked up this afternoon.</div>
-            <div className={styles.bubbleMary}>For a local pickup, I can help organise the enquiry. What area should the parcel be collected from?</div>
-            <div className={styles.bubbleClient}>Town centre.</div>
-            <div className={styles.bubbleMary}>Thank you. I have the pickup area. I can now guide you on the approved service option or connect you with the delivery team if the request needs confirmation.</div>
+            <div className={styles.bubbleClient}>Please send me the quotation we discussed.</div>
+            <div className={styles.bubbleMary}>I have your service details. I can prepare the approved quotation for this request now.</div>
+            <div className={styles.systemBubble}>Quotation prepared • PDF document</div>
+            <div className={styles.bubbleMary}>Your quotation is ready and has been sent here. Once the next step is confirmed, I can keep this conversation organised for follow-up.</div>
+            <div className={styles.bubbleClient}>Thank you. Remind me tomorrow.</div>
+            <div className={styles.bubbleMary}>Noted. I&apos;ll keep the follow-up action attached to this enquiry so the team can continue from here.</div>
           </div>
-          <div className={styles.chatFooter}>Illustrative conversation. Actual responses are configured to the institution's approved information and workflow.</div>
+          <div className={styles.chatFooter}>Illustrative workflow. Document, reminder and payment actions remain subject to the institution&apos;s approved configuration and channel rules.</div>
         </div>
       </section>
 
-      <section className={`${styles.shell} ${styles.section}`}>
+      <section id="sectors" className={`${styles.shell} ${styles.section}`}>
         <div className={styles.sectionHeading}>
-          <div><span className={styles.kicker}>4. Sector applications</span><h2>One platform, adapted to different customer journeys.</h2></div>
+          <div><span className={styles.kicker}>5. Sector applications</span><h2>One platform, configured around different customer journeys.</h2></div>
           <p>
-            The agent is most useful where customers repeatedly ask similar questions, where enquiries need qualification before staff involvement, and where a delayed response can mean a lost sale. The examples below show how the same core system can be configured for different organisations.
+            The strongest use cases are organisations with repeated questions, high enquiry volumes, document-heavy customer processes, payment follow-up or cases that need qualification before staff involvement.
           </p>
         </div>
         <div className={styles.industryGrid}>
@@ -236,20 +341,20 @@ export default function MaryKaundaProposalPage() {
 
       <section className={`${styles.shell} ${styles.section}`}>
         <div className={styles.sectionHeading}>
-          <div><span className={styles.kicker}>5. Expected institutional benefits</span><h2>Designed to improve responsiveness without removing human oversight.</h2></div>
+          <div><span className={styles.kicker}>6. Expected institutional benefits</span><h2>More responsive service with a clearer customer pipeline.</h2></div>
           <p>
-            The value is operational as well as commercial. Mary can absorb repetitive first-line communication while staff concentrate on decisions, exceptions, service delivery and high-value customer interactions.
+            The value is operational as well as commercial. Mary can reduce repetitive frontline work while helping the organisation keep customer enquiries, documents, payment context and follow-up activity connected.
           </p>
         </div>
         <div className={styles.benefitGrid}>
-          <article className={styles.benefitCard}><span className={styles.benefitMetric}>SPEED</span><h3>Faster first response</h3><p>Customers can receive immediate acknowledgement and useful guidance instead of waiting for a staff member to become available.</p></article>
+          <article className={styles.benefitCard}><span className={styles.benefitMetric}>SPEED</span><h3>Faster first response</h3><p>Customers can receive useful guidance instead of waiting for a staff member to become available.</p></article>
           <article className={styles.benefitCard}><span className={styles.benefitMetric}>CONSISTENCY</span><h3>Approved information</h3><p>The agent can be restricted to institution-approved products, prices, requirements and escalation rules.</p></article>
-          <article className={styles.benefitCard}><span className={styles.benefitMetric}>CONVERSION</span><h3>Better lead progression</h3><p>Enquiries are moved toward a clear next step rather than ending after a generic answer.</p></article>
-          <article className={styles.benefitCard}><span className={styles.benefitMetric}>EFFICIENCY</span><h3>Reduced repetitive work</h3><p>Frontline teams spend less time repeating routine information and more time on cases that require human judgement.</p></article>
-          <article className={styles.benefitCard}><span className={styles.benefitMetric}>FOLLOW-UP</span><h3>Fewer forgotten leads</h3><p>Structured reminders and follow-up workflows help the organisation return to interested customers at the appropriate stage.</p></article>
-          <article className={styles.benefitCard}><span className={styles.benefitMetric}>CONTEXT</span><h3>Continuous conversations</h3><p>Conversation history is preserved so staff can understand what the customer has already asked and what has already been explained.</p></article>
-          <article className={styles.benefitCard}><span className={styles.benefitMetric}>CONTROL</span><h3>Human takeover</h3><p>Staff can intervene in sensitive, complex or high-value conversations and return control to Mary when appropriate.</p></article>
-          <article className={styles.benefitCard}><span className={styles.benefitMetric}>VISIBILITY</span><h3>Management insight</h3><p>Captured enquiries can help identify recurring customer questions, lead volumes, follow-up needs and service demand.</p></article>
+          <article className={styles.benefitCard}><span className={styles.benefitMetric}>DOCUMENTS</span><h3>Less document friction</h3><p>Configured quotations, invoices, receipts and customer documents stay connected to the relevant conversation.</p></article>
+          <article className={styles.benefitCard}><span className={styles.benefitMetric}>EFFICIENCY</span><h3>Reduced repetitive work</h3><p>Staff spend less time repeating routine information and more time on work requiring human judgement.</p></article>
+          <article className={styles.benefitCard}><span className={styles.benefitMetric}>FOLLOW-UP</span><h3>Fewer forgotten leads</h3><p>Scheduled follow-up tasks make overdue, due-today and upcoming customer actions easier to see.</p></article>
+          <article className={styles.benefitCard}><span className={styles.benefitMetric}>CONTEXT</span><h3>Continuous conversations</h3><p>Conversation history reduces repeated questions and helps staff understand what the customer was already told.</p></article>
+          <article className={styles.benefitCard}><span className={styles.benefitMetric}>CONTROL</span><h3>Human takeover</h3><p>Staff can intervene in sensitive, complex or high-value conversations and resume automation when appropriate.</p></article>
+          <article className={styles.benefitCard}><span className={styles.benefitMetric}>SCALE</span><h3>High-volume design target</h3><p>The architecture can be configured toward a target of up to 2,500 concurrent client conversations, with capacity validated for the institution&apos;s specific workload.</p></article>
         </div>
       </section>
 
@@ -259,13 +364,13 @@ export default function MaryKaundaProposalPage() {
             <Image src="/pwa-screenshot-mobile.png" alt="Mobile view of the current MedMinds Mary Kaunda platform" fill sizes="(max-width: 980px) 100vw, 50vw" />
           </div>
           <div className={styles.screenshotCopy}>
-            <span className={styles.kicker}>6. Existing working implementation</span>
-            <h3>Mary Kaunda is already implemented within the MedMinds customer workflow.</h3>
+            <span className={styles.kicker}>7. Existing working implementation</span>
+            <h3>Mary Kaunda already operates inside the MedMinds customer workflow.</h3>
             <p>
-              The current platform includes a public customer chat experience, WhatsApp integration, lead handling, conversation history, staff takeover, follow-up tools and an administrator environment. This provides a practical base that can be adapted to another institution's brand, services and operating rules.
+              The current platform includes public chat, WhatsApp integration, lead handling, conversation history, staff takeover, customer documents, commercial-document delivery, payment receipts, follow-up tools and an administrator environment. This provides a practical base for deployment under another institution&apos;s brand, products and operating rules.
             </p>
             <div className={styles.screenshotNote}>
-              The image shows the current mobile platform experience. Institution-specific deployments can use the client's own identity, approved content and customer journey.
+              The image shows the current mobile platform experience. Institution-specific deployments can use the client&apos;s own identity, approved content, escalation contacts and customer journey.
             </div>
           </div>
         </div>
@@ -273,29 +378,30 @@ export default function MaryKaundaProposalPage() {
 
       <section className={`${styles.shell} ${styles.section} ${styles.implementation}`}>
         <div className={styles.splitCopy}>
-          <span className={styles.kicker}>7. Proposed implementation</span>
+          <span className={styles.kicker}>8. Proposed implementation</span>
           <h2>A controlled onboarding process before the live trial.</h2>
           <p>
-            The system should not be released with generic answers. Each institution first defines what Mary is allowed to say, which services she supports, what information she should collect and which cases must be referred to staff.
+            The system should not be released with generic answers. Each institution first defines what Mary may say, which tasks she may execute, what information she should collect and which cases must be referred to staff.
           </p>
           <ol className={styles.steps}>
-            <li><div><strong>Business discovery</strong><span>Identify services, common enquiries, customer journey, escalation contacts and prohibited responses.</span></div></li>
-            <li><div><strong>Knowledge configuration</strong><span>Add the institution's approved products, services, prices, requirements, policies and frequently asked questions.</span></div></li>
-            <li><div><strong>Brand and channel setup</strong><span>Configure the institution's name, agent identity, WhatsApp or website channel and staff access.</span></div></li>
-            <li><div><strong>Testing and approval</strong><span>Test common enquiries, edge cases, handover behaviour and customer tone before public use.</span></div></li>
+            <li><div><strong>Business discovery</strong><span>Identify services, recurring enquiries, customer journey, document needs, escalation contacts and prohibited responses.</span></div></li>
+            <li><div><strong>Knowledge and workflow configuration</strong><span>Add approved products, services, prices, requirements, FAQs, document rules and follow-up logic.</span></div></li>
+            <li><div><strong>Brand and channel setup</strong><span>Configure the institution&apos;s identity, WhatsApp or website channel and staff access.</span></div></li>
+            <li><div><strong>Testing and capacity validation</strong><span>Test common enquiries, document delivery, edge cases, human handover and expected message volumes before public use.</span></div></li>
             <li><div><strong>One-month free trial</strong><span>Run the solution in a real operating environment and review customer and staff experience before subscription.</span></div></li>
           </ol>
         </div>
         <aside className={styles.governanceBox}>
-          <h3>Built around controlled automation</h3>
-          <p>Mary is intended to support staff, not silently replace institutional judgement. Important safeguards can include:</p>
+          <h3>Human control remains explicit</h3>
+          <p>Mary supports staff; she should not silently assume authority that belongs to the institution. Safeguards can include:</p>
           <ul className={styles.featureList}>
-            <li>Approved catalogue and policy information rather than unrestricted claims</li>
+            <li>Approved catalogue, pricing and policy information rather than unrestricted claims</li>
+            <li>Verified-payment requirement before an official receipt is issued</li>
             <li>Human escalation for complaints, disputes, exceptions and sensitive decisions</li>
             <li>Conversation records that allow staff to review what the customer was told</li>
             <li>Access-controlled administration for institutional staff</li>
-            <li>Configurable rules on what the agent may or may not handle</li>
-            <li>For loan companies, Mary can support enquiry and pre-qualification while formal credit decisions remain with the institution's authorised process</li>
+            <li>Configurable rules on which documents and actions Mary may execute</li>
+            <li>For loan companies, Mary can support enquiry and pre-qualification while formal credit decisions remain with the institution&apos;s authorised process</li>
           </ul>
         </aside>
       </section>
@@ -303,10 +409,10 @@ export default function MaryKaundaProposalPage() {
       <section id="pricing" className={`${styles.shell} ${styles.section}`}>
         <div className={styles.pricingPanel}>
           <div>
-            <span className={styles.kicker}>8. Commercial proposal</span>
-            <h2>Test Mary for one full month before paying a subscription.</h2>
+            <span className={styles.kicker}>9. Commercial proposal</span>
+            <h2>One month free. Then USD 20 per month.</h2>
             <p>
-              The free trial allows the institution to evaluate response quality, staff workflow, customer acceptance and practical usefulness in its own environment. After the trial, the standard Mary Kaunda subscription is USD 20 per month.
+              The free trial allows the institution to evaluate response quality, document workflows, staff handover, customer acceptance and practical usefulness in its own environment before paying the standard subscription.
             </p>
           </div>
           <div className={styles.priceCard}>
@@ -315,31 +421,38 @@ export default function MaryKaundaProposalPage() {
             <ul>
               <li>Institution-branded Mary Kaunda agent</li>
               <li>Approved service and FAQ configuration</li>
-              <li>Customer conversation handling</li>
-              <li>Lead capture and follow-up workflow</li>
+              <li>Customer conversation and lead handling</li>
+              <li>Quotation, invoice and receipt workflows where configured</li>
+              <li>Follow-up task and reminder workflow</li>
               <li>Human handover and staff inbox</li>
               <li>Ongoing standard platform access</li>
             </ul>
-            <div className={styles.priceFootnote}>Standard subscription pricing shown. Third-party messaging charges or institution-specific external system integrations, where required, may be subject to the relevant provider or a separate agreed scope.</div>
+            <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.priceButton}>Request the free trial</a>
+            <div className={styles.priceFootnote}>Third-party messaging charges, external-system integrations, custom enterprise work and dedicated capacity requirements may be subject to provider costs or a separately agreed scope.</div>
           </div>
         </div>
       </section>
 
       <section className={`${styles.shell} ${styles.finalCta}`}>
         <div>
-          <span className={styles.kicker}>9. Recommendation</span>
-          <h2>Start with one customer-facing workflow and measure the result.</h2>
+          <span className={styles.kicker}>10. Recommendation</span>
+          <h2>Start with one high-volume workflow and prove the value.</h2>
           <p>
-            We recommend beginning with the institution's highest-volume enquiry channel, configuring Mary around a limited set of approved services, and using the one-month trial to evaluate response speed, staff workload, lead progression and customer feedback. Expansion can follow only after the initial workflow is proven useful.
+            Begin with the institution&apos;s busiest customer journey, configure Mary around a controlled set of approved actions, and use the one-month trial to measure response speed, staff workload, follow-up completion, customer experience and conversion. Expand only after the first workflow demonstrates clear operational value.
           </p>
         </div>
-        <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Request free trial</a>
+        <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Start free trial</a>
       </section>
 
       <footer className={`${styles.shell} ${styles.footer}`}>
         <span>Proposal by MedMinds Learning Centre • Mary Kaunda AI Agent</span>
         <a href={trialUrl} target="_blank" rel="noreferrer">Discuss institutional deployment →</a>
       </footer>
+
+      <div className={styles.mobileTrialBar}>
+        <div><strong>1 month free</strong><span>Then $20/month</span></div>
+        <a href={trialUrl} target="_blank" rel="noreferrer">Start trial</a>
+      </div>
     </main>
   );
 }
