@@ -127,6 +127,7 @@
 .navActions {
   display: flex;
   justify-content: flex-end;
+  gap: 9px;
 }
 
 .primaryButton,
@@ -175,8 +176,8 @@
   position: relative;
   overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
-  gap: 54px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(500px, 1.1fr);
+  gap: 42px;
   align-items: center;
   margin-top: 20px;
   padding: 62px;
@@ -293,7 +294,8 @@
 .heroImageWrap {
   position: relative;
   z-index: 1;
-  min-height: 485px;
+  aspect-ratio: 16 / 9;
+  width: 100%;
   border-radius: 28px;
   overflow: hidden;
   background: #dcefe7;
@@ -301,8 +303,8 @@
 }
 
 .heroImageWrap img {
-  object-fit: cover;
-  object-position: 74% center;
+  object-fit: contain;
+  object-position: center;
 }
 
 .heroBadge {
@@ -1085,6 +1087,13 @@
   max-width: 720px;
 }
 
+.finalCtaActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .footer {
   display: flex;
   align-items: center;
@@ -1100,6 +1109,26 @@
   color: var(--greenDeep);
   text-decoration: none;
   font-weight: 800;
+}
+
+.footerCompany,
+.footerActions {
+  display: grid;
+  gap: 7px;
+}
+
+.footerCompany strong {
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.footerCompany span {
+  line-height: 1.6;
+}
+
+.footerActions {
+  justify-items: end;
+  text-align: right;
 }
 
 .mobileTrialBar {
@@ -1128,7 +1157,7 @@
   }
 
   .heroImageWrap {
-    min-height: 440px;
+    aspect-ratio: 16 / 9;
   }
 
   .taskGrid,
@@ -1189,6 +1218,11 @@
     font-size: 0.82rem;
   }
 
+  .brand span,
+  .navActions .secondaryButton {
+    display: none;
+  }
+
   .brand img {
     width: 34px;
     height: 34px;
@@ -1223,7 +1257,7 @@
   }
 
   .heroImageWrap {
-    min-height: 350px;
+    aspect-ratio: 16 / 9;
     border-radius: 21px;
   }
 
@@ -1306,10 +1340,23 @@
     flex-direction: column;
   }
 
+  .finalCtaActions {
+    width: 100%;
+  }
+
+  .finalCtaActions a {
+    width: 100%;
+  }
+
   .footer {
     align-items: flex-start;
     flex-direction: column;
     padding-bottom: 18px;
+  }
+
+  .footerActions {
+    justify-items: start;
+    text-align: left;
   }
 
   .mobileTrialBar {
