@@ -13,7 +13,7 @@ const trialUrl =
   "https://wa.me/260977259132?text=Hi%20MedMinds%2C%20I%20would%20like%20to%20start%20the%20free%201-month%20Mary%20Kaunda%20AI%20Agent%20trial%20for%20my%20organisation.";
 
 const testMaryUrl =
-  "https://wa.me/260977259132?text=Hi%20Mary%2C%20I%20would%20like%20to%20test%20the%20Mary%20Kaunda%20AI%20assistant%20in%20real%20time.";
+  "https://wa.me/260762402042?text=Hi%20Mary%2C%20I%20would%20like%20to%20test%20the%20Mary%20Kaunda%20AI%20assistant%20in%20real%20time.";
 
 const companyWhatsAppUrl = "https://wa.me/260977259132";
 
@@ -549,7 +549,7 @@ export default function MaryKaundaProposalPage() {
           </span>
         </div>
         <div className={styles.footerActions}>
-          <a href={testMaryUrl} target="_blank" rel="noreferrer">Test Mary in real time →</a>
+          <a href={testMaryUrl} target="_blank" rel="noreferrer">Test Mary in real time: +260 762 402 042 →</a>
           <a href={trialUrl} target="_blank" rel="noreferrer">Discuss institutional deployment →</a>
         </div>
       </footer>
