@@ -293,7 +293,7 @@ export default function MaryKaundaProposalPage() {
         <div><strong>24/7</strong><span>Always-on routine customer engagement.</span></div>
         <div><strong>Up to 2,500*</strong><span>Configurable high-volume client capacity target.</span></div>
         <div><strong>Documents</strong><span>Quotations, invoices, receipts and approved client files.</span></div>
-        <div><strong>30 days free</strong><span>Test the workflow before the USD 20 monthly subscription.</span></div>
+        <div><strong>30 days free</strong><span>Test the workflow before the ZMW 380 monthly subscription.</span></div>
       </div>
 
       <section className={`${styles.shell} ${styles.section}`}>
@@ -504,14 +504,14 @@ export default function MaryKaundaProposalPage() {
         <div className={styles.pricingPanel}>
           <div>
             <span className={styles.kicker}>9. Commercial proposal</span>
-            <h2>One month free. Then USD 20 per month.</h2>
+            <h2>One month free. Then ZMW 380 per month.</h2>
             <p>
               The free trial allows the institution to evaluate response quality, document workflows, staff handover, customer acceptance and practical usefulness in its own environment before paying the standard subscription.
             </p>
           </div>
           <div className={styles.priceCard}>
             <span className={styles.trial}>FIRST MONTH FREE</span>
-            <div className={styles.price}>$20 <small>/ month thereafter</small></div>
+            <div className={styles.price}>ZMW 380 <small>/ month thereafter</small></div>
             <ul>
               <li>Institution-branded Mary Kaunda agent</li>
               <li>Approved service and FAQ configuration</li>
@@ -557,7 +557,7 @@ export default function MaryKaundaProposalPage() {
       </footer>
 
       <div className={styles.mobileTrialBar}>
-        <div><strong>1 month free</strong><span>Then $20/month</span></div>
+        <div><strong>1 month free</strong><span>Then ZMW 380/month</span></div>
         <a href={testMaryUrl} target="_blank" rel="noreferrer">Test Mary live</a>
       </div>
     </main>

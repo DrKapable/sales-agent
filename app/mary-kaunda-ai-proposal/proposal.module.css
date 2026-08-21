@@ -986,7 +986,7 @@
 }
 
 .pricingPanel::after {
-  content: "$20";
+  content: "K380";
   position: absolute;
   right: -14px;
   bottom: -46px;
