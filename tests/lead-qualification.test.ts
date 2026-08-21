@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessLeadQualification, buildQualificationReply } from "@/lib/lead-qualification";
+import { assessLeadQualification } from "@/lib/lead-qualification";
 import type { Lead } from "@/lib/types";
 
 function lead(overrides: Partial<Lead> = {}): Lead {
@@ -31,15 +31,15 @@ const user = (content: string) => ({ role: "user" as const, content });
 const assistant = (content: string) => ({ role: "assistant" as const, content });
 
 describe("lead qualification before pricing", () => {
-  it("blocks a price-only opener and asks for the need first", () => {
+  it("blocks a price-only opener without embedding a preset question", () => {
     const result = assessLeadQualification({ lead: lead(), history: [user("How much?")], latestText: "How much?" });
     expect(result.commercialIntent).toBe(true);
     expect(result.qualified).toBe(false);
     expect(result.missing).toBe("need");
-    expect(buildQualificationReply(result)).not.toMatch(/K\s?\d|ZMW\s?\d/i);
+    expect("nextQuestion" in result).toBe(false);
   });
 
-  it("qualifies research sequentially by need, level and deadline", () => {
+  it("qualifies research by need, level and deadline while leaving wording to Mary", () => {
     const incomplete = assessLeadQualification({
       lead: lead({ serviceInterest: "Research support" }),
       history: [user("I need help with my dissertation data analysis"), user("How much?")],
@@ -53,8 +53,7 @@ describe("lead qualification before pricing", () => {
       latestText: "How much?"
     });
     expect(almost.missing).toBe("deadline");
-    expect(buildQualificationReply(almost)).toBe("What deadline are you working toward?");
-    expect(buildQualificationReply(almost)).not.toMatch(/that helps/i);
+    expect("nextQuestion" in almost).toBe(false);
 
     const complete = assessLeadQualification({
       lead: lead({ serviceInterest: "Research support", programme: "MPH", deadline: "30 August 2026" }),

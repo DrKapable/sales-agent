@@ -9,7 +9,6 @@ export type LeadQualification = {
   priorPriceContext: boolean;
   kind: QualificationKind;
   missing: QualificationMissing;
-  nextQuestion: string | null;
 };
 
 const COMMERCIAL_INTENT = /\b(how much|price|pricing|cost|fee|fees|charge|charges|rate|quotation|quote|proforma|pro-forma|invoice|payment details|how (?:do|can) i pay|where (?:do|can) i pay|ready to pay|pay now)\b/i;
@@ -79,22 +78,6 @@ function hasExactNeed(lead: Pick<Lead, "serviceInterest" | "packageName">, trans
   return RESEARCH_SCOPE.test(transcript) || PA_GYM.test(transcript) || DIGITAL.test(transcript) || COURSE.test(transcript);
 }
 
-function questionFor(kind: QualificationKind, missing: QualificationMissing) {
-  if (missing === "need") return "I can give you the correct fee once I match you to the right service. What exactly do you need help with?";
-  if (missing === "path") return "I can price the right option once I know which route fits you. Do you want to learn the proposal-writing process yourself, or do you want hands-on help with your actual work?";
-  if (missing === "programme") {
-    if (kind === "pa_gym") return "Which programme or examination are you preparing for?";
-    return "To match the right level of support, what programme or academic level is this for?";
-  }
-  if (missing === "scope") {
-    if (kind === "digital") return "What would you like the system, website or automation to do for you?";
-    return "What part of the work do you want MedMinds to handle?";
-  }
-  if (missing === "format") return "Do you need theory practice, OSCE preparation, or both?";
-  if (missing === "deadline") return "What deadline are you working toward?";
-  return null;
-}
-
 export function assessLeadQualification(input: {
   lead: Pick<Lead, "status" | "serviceInterest" | "packageName" | "programme" | "deadline">;
   history: Pick<ConversationMessage, "role" | "content">[];
@@ -132,11 +115,6 @@ export function assessLeadQualification(input: {
     qualified: missing === null,
     priorPriceContext,
     kind,
-    missing,
-    nextQuestion: questionFor(kind, missing)
+    missing
   };
-}
-
-export function buildQualificationReply(assessment: LeadQualification) {
-  return assessment.nextQuestion || "Tell me a little more about what you need so I can match you to the right option.";
 }
