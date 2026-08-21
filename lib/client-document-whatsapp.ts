@@ -19,6 +19,7 @@ export async function sendClientWhatsAppDocument(input: {
   phoneNumberIdOverride?: string;
 }) {
   const { token, phoneNumberId, version } = config(input.phoneNumberIdOverride);
+  const messageType = input.mimeType.startsWith("image/") ? "image" : "document";
   const form = new FormData();
   const arrayBuffer = input.bytes.buffer.slice(input.bytes.byteOffset, input.bytes.byteOffset + input.bytes.byteLength) as ArrayBuffer;
   form.set("messaging_product", "whatsapp");
@@ -44,18 +45,23 @@ export async function sendClientWhatsAppDocument(input: {
       messaging_product: "whatsapp",
       recipient_type: "individual",
       to: input.phone,
-      type: "document",
-      document: {
-        id: mediaId,
-        filename: input.filename,
-        ...(input.caption?.trim() ? { caption: normalizeWhatsAppReply(input.caption).slice(0, 1024) } : {})
-      }
+      type: messageType,
+      [messageType]: messageType === "image"
+        ? {
+            id: mediaId,
+            ...(input.caption?.trim() ? { caption: normalizeWhatsAppReply(input.caption).slice(0, 1024) } : {})
+          }
+        : {
+            id: mediaId,
+            filename: input.filename,
+            ...(input.caption?.trim() ? { caption: normalizeWhatsAppReply(input.caption).slice(0, 1024) } : {})
+          }
     })
   });
   const rawBody = await response.text();
-  if (!response.ok) throw new Error(`WhatsApp document API returned ${response.status}: ${JSON.stringify(sanitizeWhatsAppApiError(rawBody))}`);
+  if (!response.ok) throw new Error(`WhatsApp file API returned ${response.status}: ${JSON.stringify(sanitizeWhatsAppApiError(rawBody))}`);
   const parsed = JSON.parse(rawBody) as { messages?: Array<{ id?: string }> };
   const messageId = parsed.messages?.[0]?.id;
-  if (!messageId) throw new Error("WhatsApp accepted the document without returning a message ID.");
+  if (!messageId) throw new Error("WhatsApp accepted the file without returning a message ID.");
   return { messageId, mediaId };
 }

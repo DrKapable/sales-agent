@@ -9,8 +9,7 @@ export const metadata: Metadata = {
     "A formal proposal for organisations seeking a configurable AI customer engagement, sales, document and support assistant from MedMinds General Dealers Limited.",
 };
 
-const trialUrl =
-  "https://wa.me/260977259132?text=Hi%20MedMinds%2C%20I%20would%20like%20to%20start%20the%20free%201-month%20Mary%20Kaunda%20AI%20Agent%20trial%20for%20my%20organisation.";
+const onboardingUrl = "/mary-kaunda-ai-proposal/onboarding";
 
 const testMaryUrl =
   "https://wa.me/260762402042?text=Hi%20Mary%2C%20I%20would%20like%20to%20test%20the%20Mary%20Kaunda%20AI%20assistant%20in%20real%20time.";
@@ -244,9 +243,10 @@ export default function MaryKaundaProposalPage() {
           <a href="#tasks">What Mary does</a>
           <a href="#sectors">Sectors</a>
           <a href="#pricing">Pricing</a>
+          <Link href={onboardingUrl}>Onboarding</Link>
         </div>
         <div className={styles.navActions}>
-          <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.secondaryButton}>Request free trial</a>
+          <Link href={onboardingUrl} className={styles.secondaryButton}>Begin onboarding</Link>
           <a href={testMaryUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Test Mary live</a>
         </div>
       </nav>
@@ -260,7 +260,7 @@ export default function MaryKaundaProposalPage() {
           </p>
           <div className={styles.heroActions}>
             <a href={testMaryUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Test Mary live on WhatsApp</a>
-            <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.secondaryButton}>Start 1-month free trial</a>
+            <Link href={onboardingUrl} className={styles.secondaryButton}>Start organisation onboarding</Link>
           </div>
           <div className={styles.heroTrust}>
             <span>WhatsApp-ready</span>
@@ -521,7 +521,7 @@ export default function MaryKaundaProposalPage() {
               <li>Human handover and staff inbox</li>
               <li>Ongoing standard platform access</li>
             </ul>
-            <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.priceButton}>Request the free trial</a>
+            <Link href={onboardingUrl} className={styles.priceButton}>Start secure onboarding</Link>
             <div className={styles.priceFootnote}>Third-party messaging charges, external-system integrations, custom enterprise work and dedicated capacity requirements may be subject to provider costs or a separately agreed scope.</div>
           </div>
         </div>
@@ -537,7 +537,7 @@ export default function MaryKaundaProposalPage() {
         </div>
         <div className={styles.finalCtaActions}>
           <a href={testMaryUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Test Mary live</a>
-          <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.secondaryButton}>Start free trial</a>
+          <Link href={onboardingUrl} className={styles.secondaryButton}>Start onboarding</Link>
         </div>
       </section>
 
@@ -552,13 +552,13 @@ export default function MaryKaundaProposalPage() {
         </div>
         <div className={styles.footerActions}>
           <a href={testMaryUrl} target="_blank" rel="noreferrer">Test Mary in real time: +260 762 402 042 →</a>
-          <a href={trialUrl} target="_blank" rel="noreferrer">Discuss institutional deployment →</a>
+          <Link href={onboardingUrl}>Submit organisation details →</Link>
         </div>
       </footer>
 
       <div className={styles.mobileTrialBar}>
         <div><strong>1 month free</strong><span>Then ZMW 380/month</span></div>
-        <a href={testMaryUrl} target="_blank" rel="noreferrer">Test Mary live</a>
+        <Link href={onboardingUrl}>Start onboarding</Link>
       </div>
     </main>
   );
