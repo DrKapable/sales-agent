@@ -302,6 +302,7 @@
 
 .heroImageWrap img {
   object-fit: cover;
+  object-position: 74% center;
 }
 
 .heroBadge {
@@ -766,54 +767,131 @@
   letter-spacing: 0.05em;
 }
 
-.screenshotBand {
+.evidenceGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(260px, 0.88fr);
-  gap: 36px;
-  align-items: center;
-  padding: 38px;
-  border: 1px solid var(--line);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 54px rgba(22, 61, 51, 0.055);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
 }
 
-.screenshotFrame {
-  position: relative;
-  min-height: 470px;
+.evidenceCard {
+  overflow: hidden;
+  border: 1px solid var(--line);
   border-radius: 24px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 48px rgba(22, 61, 51, 0.07);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.evidenceCard:hover {
+  transform: translateY(-3px);
+  border-color: #c8ddd4;
+  box-shadow: 0 22px 56px rgba(22, 61, 51, 0.11);
+}
+
+.evidenceCardFeatured {
+  grid-column: 1 / -1;
+}
+
+.evidenceFrame {
   overflow: hidden;
   background: #edf4f1;
-  border: 10px solid #122e28;
-  box-shadow: 0 24px 54px rgba(24, 61, 52, 0.16);
 }
 
-.screenshotFrame img {
-  object-fit: cover;
-  object-position: top center;
+.evidenceBrowserBar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-bottom: 1px solid #dce7e3;
+  background: #f6f9f7;
 }
 
-.screenshotCopy h3 {
-  margin: 10px 0 14px;
-  font-size: clamp(1.7rem, 3vw, 2.45rem);
-  line-height: 1.08;
-  letter-spacing: -0.035em;
+.evidenceBrowserBar span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #bfd0c9;
 }
 
-.screenshotCopy p {
+.evidenceBrowserBar span:first-child {
+  background: #dc8e84;
+}
+
+.evidenceBrowserBar span:nth-child(2) {
+  background: #ddb66d;
+}
+
+.evidenceBrowserBar span:nth-child(3) {
+  background: #7eb99e;
+}
+
+.evidenceBrowserBar b {
+  margin-left: auto;
+  color: #738780;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.evidenceImageLink {
+  display: block;
+  overflow: hidden;
+  background: #eef4f2;
+}
+
+.evidenceImageLink img {
+  display: block;
+  width: 100%;
+  height: auto;
+  transition: transform 260ms ease;
+}
+
+.evidenceImageLink:hover img {
+  transform: scale(1.012);
+}
+
+.evidenceImageLink:focus-visible {
+  outline: 3px solid rgba(8, 116, 95, 0.28);
+  outline-offset: -3px;
+}
+
+.evidenceCopy {
+  padding: 23px 24px 26px;
+}
+
+.evidenceCopy > span {
+  display: inline-flex;
+  margin-bottom: 10px;
+  color: var(--green);
+  font-size: 0.71rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.evidenceCopy h3 {
+  margin: 0 0 9px;
+  font-size: 1.18rem;
+  letter-spacing: -0.025em;
+}
+
+.evidenceCopy p,
+.evidenceNote {
   margin: 0;
   color: var(--muted);
-  line-height: 1.7;
+  font-size: 0.91rem;
+  line-height: 1.66;
 }
 
-.screenshotNote {
+.evidenceNote {
   margin-top: 18px;
-  padding: 16px 18px;
+  padding: 15px 18px;
   border-left: 3px solid var(--green);
+  border-radius: 0 14px 14px 0;
   background: var(--mint);
   color: #395e54;
-  font-size: 0.9rem;
-  line-height: 1.6;
 }
 
 .implementation {
@@ -1040,7 +1118,6 @@
   .hero,
   .sectionHeading,
   .demoSection,
-  .screenshotBand,
   .implementation,
   .pricingPanel {
     grid-template-columns: 1fr;
@@ -1062,10 +1139,6 @@
   .statStrip,
   .benefitGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .screenshotFrame {
-    min-height: 560px;
   }
 
   .governanceBox {
@@ -1169,8 +1242,13 @@
   .taskGrid,
   .capabilityGrid,
   .industryGrid,
-  .benefitGrid {
+  .benefitGrid,
+  .evidenceGrid {
     grid-template-columns: 1fr;
+  }
+
+  .evidenceCardFeatured {
+    grid-column: auto;
   }
 
   .section {
@@ -1203,7 +1281,6 @@
   }
 
   .solutionBand,
-  .screenshotBand,
   .governanceBox,
   .pricingPanel,
   .finalCta {
@@ -1218,10 +1295,6 @@
   .bubbleClient,
   .bubbleMary {
     max-width: 92%;
-  }
-
-  .screenshotFrame {
-    min-height: 500px;
   }
 
   .pricingPanel::after {
@@ -1332,7 +1405,7 @@
   .industryCard,
   .benefitCard,
   .capabilityCard,
-  .screenshotBand,
+  .evidenceCard,
   .governanceBox,
   .pricingPanel,
   .finalCta {

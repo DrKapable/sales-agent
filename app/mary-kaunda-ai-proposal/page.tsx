@@ -84,6 +84,58 @@ const capabilities = [
   ["DASH", "Operational visibility", "A shared management environment helps teams review conversations, follow-ups, documents, lead status and customer priorities."],
 ];
 
+const platformEvidence = [
+  {
+    label: "Lead command centre",
+    title: "Prioritise leads and act from one workspace",
+    text: "The live command centre brings lead scores, pipeline status, payment context, quotations and staff tasks into one operational view.",
+    image: "/proposal/mary-command-centre.png",
+    width: 1355,
+    height: 688,
+    featured: true,
+  },
+  {
+    label: "Live admin chat",
+    title: "Continue conversations with full context",
+    text: "Staff can review the active customer conversation, assign ownership, set priority, schedule the next follow-up and take over when human judgement is required.",
+    image: "/proposal/mary-admin-chat.png",
+    width: 1357,
+    height: 729,
+  },
+  {
+    label: "Business analytics",
+    title: "Measure leads, conversion and revenue",
+    text: "Management can monitor lead volume, conversion, active high-priority leads, verified revenue, quotation value and acquisition cohorts.",
+    image: "/proposal/mary-business-analytics.png",
+    width: 1341,
+    height: 605,
+  },
+  {
+    label: "AI management analysis",
+    title: "Turn operational data into a management brief",
+    text: "Mary analyses pipeline data, charts, inbox messages and conversation gaps together, then produces a structured management brief that can be exported.",
+    image: "/proposal/mary-ai-management-analysis.png",
+    width: 1354,
+    height: 686,
+  },
+  {
+    label: "Recommended actions",
+    title: "Move from reporting to specific next actions",
+    text: "The analysis identifies urgent commercial and service issues, recommends corrective actions and states the indicators management should watch next.",
+    image: "/proposal/mary-ai-recommendations.png",
+    width: 1246,
+    height: 582,
+  },
+  {
+    label: "Human follow-ups",
+    title: "Keep outreach visible and accountable",
+    text: "Mary can prepare and schedule follow-up work while staff retain responsibility for contact, outcomes and the next approved action.",
+    image: "/proposal/mary-human-follow-ups.png",
+    width: 1353,
+    height: 692,
+  },
+];
+
 const industries = [
   {
     label: "Microfinance & loan companies",
@@ -359,21 +411,55 @@ export default function MaryKaundaProposalPage() {
       </section>
 
       <section className={`${styles.shell} ${styles.section}`}>
-        <div className={styles.screenshotBand}>
-          <div className={styles.screenshotFrame}>
-            <Image src="/pwa-screenshot-mobile.png" alt="Mobile view of the current MedMinds Mary Kaunda platform" fill sizes="(max-width: 980px) 100vw, 50vw" />
-          </div>
-          <div className={styles.screenshotCopy}>
+        <div className={styles.sectionHeading}>
+          <div>
             <span className={styles.kicker}>7. Existing working implementation</span>
-            <h3>Mary Kaunda already operates inside the MedMinds customer workflow.</h3>
-            <p>
-              The current platform includes public chat, WhatsApp integration, lead handling, conversation history, staff takeover, customer documents, commercial-document delivery, payment receipts, follow-up tools and an administrator environment. This provides a practical base for deployment under another institution&apos;s brand, products and operating rules.
-            </p>
-            <div className={styles.screenshotNote}>
-              The image shows the current mobile platform experience. Institution-specific deployments can use the client&apos;s own identity, approved content, escalation contacts and customer journey.
-            </div>
+            <h2>Evidence from the live Mary Kaunda platform.</h2>
           </div>
+          <p>
+            Mary Kaunda already operates inside the MedMinds customer workflow. The current implementation connects conversations, lead prioritisation, staff takeover, follow-up, payments, quotations, business analytics and AI-supported management recommendations. Select any image to view it at full resolution.
+          </p>
         </div>
+        <div className={styles.evidenceGrid}>
+          {platformEvidence.map((item) => (
+            <article
+              key={item.title}
+              className={`${styles.evidenceCard} ${item.featured ? styles.evidenceCardFeatured : ""}`}
+            >
+              <div className={styles.evidenceFrame}>
+                <div className={styles.evidenceBrowserBar} aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                  <b>Live platform view</b>
+                </div>
+                <a
+                  href={item.image}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.evidenceImageLink}
+                  aria-label={`Open full-size image: ${item.title}`}
+                >
+                  <Image
+                    src={item.image}
+                    alt={`${item.title} in the Mary Kaunda institutional sales agent platform`}
+                    width={item.width}
+                    height={item.height}
+                    sizes={item.featured ? "(max-width: 700px) 100vw, 1180px" : "(max-width: 900px) 100vw, 50vw"}
+                  />
+                </a>
+              </div>
+              <div className={styles.evidenceCopy}>
+                <span>{item.label}</span>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+        <p className={styles.evidenceNote}>
+          Institution-specific deployments can use the client&apos;s own identity, approved content, service catalogue, escalation contacts and customer journey.
+        </p>
       </section>
 
       <section className={`${styles.shell} ${styles.section} ${styles.implementation}`}>
