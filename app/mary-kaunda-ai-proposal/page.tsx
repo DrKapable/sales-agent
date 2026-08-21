@@ -6,11 +6,16 @@ import styles from "./proposal.module.css";
 export const metadata: Metadata = {
   title: "Mary Kaunda AI Agent | Institutional Proposal",
   description:
-    "A formal proposal for organisations seeking a configurable AI customer engagement, sales, document and support assistant powered by the Mary Kaunda platform from MedMinds Learning Centre.",
+    "A formal proposal for organisations seeking a configurable AI customer engagement, sales, document and support assistant from MedMinds General Dealers Limited.",
 };
 
 const trialUrl =
-  "https://wa.me/260762402042?text=Hi%20MedMinds%2C%20I%20would%20like%20to%20start%20the%20free%201-month%20Mary%20Kaunda%20AI%20Agent%20trial%20for%20my%20organisation.";
+  "https://wa.me/260977259132?text=Hi%20MedMinds%2C%20I%20would%20like%20to%20start%20the%20free%201-month%20Mary%20Kaunda%20AI%20Agent%20trial%20for%20my%20organisation.";
+
+const testMaryUrl =
+  "https://wa.me/260977259132?text=Hi%20Mary%2C%20I%20would%20like%20to%20test%20the%20Mary%20Kaunda%20AI%20assistant%20in%20real%20time.";
+
+const companyWhatsAppUrl = "https://wa.me/260977259132";
 
 const actualTasks = [
   {
@@ -82,6 +87,58 @@ const capabilities = [
   ["HUMAN", "Human oversight by design", "Mary supports staff rather than replacing authorised judgement. Sensitive or regulated decisions remain with the institution's designated personnel."],
   ["MEMORY", "Conversation continuity", "Customer history and lead context reduce repetitive questioning and make staff takeover more efficient."],
   ["DASH", "Operational visibility", "A shared management environment helps teams review conversations, follow-ups, documents, lead status and customer priorities."],
+];
+
+const platformEvidence = [
+  {
+    label: "Lead command centre",
+    title: "Prioritise leads and act from one workspace",
+    text: "The live command centre brings lead scores, pipeline status, payment context, quotations and staff tasks into one operational view.",
+    image: "/proposal/mary-command-centre.png",
+    width: 1760,
+    height: 893,
+    featured: true,
+  },
+  {
+    label: "Live admin chat",
+    title: "Continue conversations with full context",
+    text: "Staff can review the active customer conversation, assign ownership, set priority, schedule the next follow-up and take over when human judgement is required.",
+    image: "/proposal/mary-admin-chat.png",
+    width: 1711,
+    height: 919,
+  },
+  {
+    label: "Business analytics",
+    title: "Measure leads, conversion and revenue",
+    text: "Management can monitor lead volume, conversion, active high-priority leads, verified revenue, quotation value and acquisition cohorts.",
+    image: "/proposal/mary-business-analytics.png",
+    width: 1341,
+    height: 605,
+  },
+  {
+    label: "AI management analysis",
+    title: "Turn operational data into a management brief",
+    text: "Mary analyses pipeline data, charts, inbox messages and conversation gaps together, then produces a structured management brief that can be exported.",
+    image: "/proposal/mary-ai-management-analysis.png",
+    width: 1354,
+    height: 686,
+  },
+  {
+    label: "Recommended actions",
+    title: "Move from reporting to specific next actions",
+    text: "The analysis identifies urgent commercial and service issues, recommends corrective actions and states the indicators management should watch next.",
+    image: "/proposal/mary-ai-recommendations.png",
+    width: 1829,
+    height: 860,
+  },
+  {
+    label: "Human follow-ups",
+    title: "Keep outreach visible and accountable",
+    text: "Mary can prepare and schedule follow-up work while staff retain responsibility for contact, outcomes and the next approved action.",
+    image: "/proposal/mary-human-follow-ups.png",
+    width: 1754,
+    height: 897,
+  },
 ];
 
 const industries = [
@@ -180,8 +237,8 @@ export default function MaryKaundaProposalPage() {
 
       <nav className={`${styles.shell} ${styles.nav}`}>
         <Link href="/" className={styles.brand}>
-          <Image src="/medminds-logo.png" alt="MedMinds Learning Centre" width={42} height={42} priority />
-          <span>MedMinds Learning Centre</span>
+          <Image src="/medminds-logo.png" alt="MedMinds General Dealers Limited" width={42} height={42} priority />
+          <span>MedMinds General Dealers</span>
         </Link>
         <div className={styles.navLinks}>
           <a href="#tasks">What Mary does</a>
@@ -189,7 +246,8 @@ export default function MaryKaundaProposalPage() {
           <a href="#pricing">Pricing</a>
         </div>
         <div className={styles.navActions}>
-          <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Request free trial</a>
+          <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.secondaryButton}>Request free trial</a>
+          <a href={testMaryUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Test Mary live</a>
         </div>
       </nav>
 
@@ -201,8 +259,8 @@ export default function MaryKaundaProposalPage() {
             Mary Kaunda is a configurable AI customer engagement agent that can answer enquiries, qualify leads, organise follow-ups, prepare customer documents and involve human staff when a case requires authorised judgement.
           </p>
           <div className={styles.heroActions}>
-            <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Start 1-month free trial</a>
-            <a href="#tasks" className={styles.secondaryButton}>See what Mary can do</a>
+            <a href={testMaryUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Test Mary live on WhatsApp</a>
+            <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.secondaryButton}>Start 1-month free trial</a>
           </div>
           <div className={styles.heroTrust}>
             <span>WhatsApp-ready</span>
@@ -359,21 +417,55 @@ export default function MaryKaundaProposalPage() {
       </section>
 
       <section className={`${styles.shell} ${styles.section}`}>
-        <div className={styles.screenshotBand}>
-          <div className={styles.screenshotFrame}>
-            <Image src="/pwa-screenshot-mobile.png" alt="Mobile view of the current MedMinds Mary Kaunda platform" fill sizes="(max-width: 980px) 100vw, 50vw" />
-          </div>
-          <div className={styles.screenshotCopy}>
+        <div className={styles.sectionHeading}>
+          <div>
             <span className={styles.kicker}>7. Existing working implementation</span>
-            <h3>Mary Kaunda already operates inside the MedMinds customer workflow.</h3>
-            <p>
-              The current platform includes public chat, WhatsApp integration, lead handling, conversation history, staff takeover, customer documents, commercial-document delivery, payment receipts, follow-up tools and an administrator environment. This provides a practical base for deployment under another institution&apos;s brand, products and operating rules.
-            </p>
-            <div className={styles.screenshotNote}>
-              The image shows the current mobile platform experience. Institution-specific deployments can use the client&apos;s own identity, approved content, escalation contacts and customer journey.
-            </div>
+            <h2>Evidence from the live Mary Kaunda platform.</h2>
           </div>
+          <p>
+            Mary Kaunda already operates inside the MedMinds customer workflow. The current implementation connects conversations, lead prioritisation, staff takeover, follow-up, payments, quotations, business analytics and AI-supported management recommendations. Select any image to view it at full resolution.
+          </p>
         </div>
+        <div className={styles.evidenceGrid}>
+          {platformEvidence.map((item) => (
+            <article
+              key={item.title}
+              className={`${styles.evidenceCard} ${item.featured ? styles.evidenceCardFeatured : ""}`}
+            >
+              <div className={styles.evidenceFrame}>
+                <div className={styles.evidenceBrowserBar} aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                  <b>Live platform view</b>
+                </div>
+                <a
+                  href={item.image}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.evidenceImageLink}
+                  aria-label={`Open full-size image: ${item.title}`}
+                >
+                  <Image
+                    src={item.image}
+                    alt={`${item.title} in the Mary Kaunda institutional sales agent platform`}
+                    width={item.width}
+                    height={item.height}
+                    sizes={item.featured ? "(max-width: 700px) 100vw, 1180px" : "(max-width: 900px) 100vw, 50vw"}
+                  />
+                </a>
+              </div>
+              <div className={styles.evidenceCopy}>
+                <span>{item.label}</span>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+        <p className={styles.evidenceNote}>
+          Institution-specific deployments can use the client&apos;s own identity, approved content, service catalogue, escalation contacts and customer journey.
+        </p>
       </section>
 
       <section className={`${styles.shell} ${styles.section} ${styles.implementation}`}>
@@ -441,17 +533,30 @@ export default function MaryKaundaProposalPage() {
             Begin with the institution&apos;s busiest customer journey, configure Mary around a controlled set of approved actions, and use the one-month trial to measure response speed, staff workload, follow-up completion, customer experience and conversion. Expand only after the first workflow demonstrates clear operational value.
           </p>
         </div>
-        <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Start free trial</a>
+        <div className={styles.finalCtaActions}>
+          <a href={testMaryUrl} target="_blank" rel="noreferrer" className={styles.primaryButton}>Test Mary live</a>
+          <a href={trialUrl} target="_blank" rel="noreferrer" className={styles.secondaryButton}>Start free trial</a>
+        </div>
       </section>
 
       <footer className={`${styles.shell} ${styles.footer}`}>
-        <span>Proposal by MedMinds Learning Centre • Mary Kaunda AI Agent</span>
-        <a href={trialUrl} target="_blank" rel="noreferrer">Discuss institutional deployment →</a>
+        <div className={styles.footerCompany}>
+          <strong>MedMinds General Dealers Limited</strong>
+          <span>
+            <a href="mailto:admin@medmindslc.online">admin@medmindslc.online</a>
+            <span aria-hidden="true"> • </span>
+            <a href={companyWhatsAppUrl} target="_blank" rel="noreferrer">Phone/WhatsApp: 0977259132</a>
+          </span>
+        </div>
+        <div className={styles.footerActions}>
+          <a href={testMaryUrl} target="_blank" rel="noreferrer">Test Mary in real time →</a>
+          <a href={trialUrl} target="_blank" rel="noreferrer">Discuss institutional deployment →</a>
+        </div>
       </footer>
 
       <div className={styles.mobileTrialBar}>
         <div><strong>1 month free</strong><span>Then $20/month</span></div>
-        <a href={trialUrl} target="_blank" rel="noreferrer">Start trial</a>
+        <a href={testMaryUrl} target="_blank" rel="noreferrer">Test Mary live</a>
       </div>
     </main>
   );
