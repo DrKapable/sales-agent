@@ -9,6 +9,7 @@ import { leadPriorities, leadStatuses, type ConversationMessage, type Lead, type
 type Setup = ReturnType<typeof getSetupState>;
 type ConversationState = { lead: Lead; messages: ConversationMessage[]; replyWindow: { open: boolean; expiresAt: string | null }; delivery?: { status: "accepted" | "simulated"; messageId: string | null } };
 type Tab = "leads" | "offers" | "setup";
+type LeadSort = "smart" | "recent" | "oldest" | "name" | "priority";
 const staffMembers = ["Dr. Mustafa Juma Phiri", "Dr Kanyembo Ng'andwe"] as const;
 const CONVERSATION_REFRESH_MS = 5000;
 const INBOX_REFRESH_MS = 10000;
@@ -34,6 +35,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   const [leadQuery, setLeadQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
+  const [leadSort, setLeadSort] = useState<LeadSort>("smart");
   const [offerQuery, setOfferQuery] = useState("");
   const [offerCategory, setOfferCategory] = useState("All categories");
   const conversationRefreshInFlight = useRef(false);
@@ -45,10 +47,20 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   const dueFollowUps = leads.filter((lead) => isFollowUpDue(lead)).length;
   const conversion = leads.length ? Math.round((converted / leads.length) * 100) : 0;
   const counts = useMemo(() => leadStatuses.map((status) => ({ status, count: leads.filter((lead) => lead.status === status).length })), [leads]);
-  const filteredLeads = useMemo(() => leads.filter((lead) => {
-    const text = `${lead.name || ""} ${lead.phone} ${lead.serviceInterest || ""} ${lead.programme || ""}`.toLowerCase();
-    return (statusFilter === "ALL" || lead.status === statusFilter) && (priorityFilter === "ALL" || lead.priority === priorityFilter) && text.includes(leadQuery.trim().toLowerCase());
-  }).sort((a, b) => leadSortScore(b) - leadSortScore(a) || b.updatedAt.localeCompare(a.updatedAt)), [leads, leadQuery, priorityFilter, statusFilter]);
+  const filteredLeads = useMemo(() => {
+    const needle = leadQuery.trim().toLowerCase();
+    const filtered = leads.filter((lead) => {
+      const text = `${lead.name || ""} ${lead.phone} ${lead.serviceInterest || ""} ${lead.programme || ""}`.toLowerCase();
+      return (statusFilter === "ALL" || lead.status === statusFilter) && (priorityFilter === "ALL" || lead.priority === priorityFilter) && text.includes(needle);
+    });
+    return filtered.sort((a, b) => {
+      if (leadSort === "recent") return activityTime(b) - activityTime(a);
+      if (leadSort === "oldest") return activityTime(a) - activityTime(b);
+      if (leadSort === "name") return (a.name || a.phone).localeCompare(b.name || b.phone);
+      if (leadSort === "priority") return priorityRank(b.priority) - priorityRank(a.priority) || activityTime(b) - activityTime(a);
+      return leadSortScore(b) - leadSortScore(a) || activityTime(b) - activityTime(a);
+    });
+  }, [leads, leadQuery, priorityFilter, statusFilter, leadSort]);
   const offerCategories = useMemo(() => ["All categories", ...Array.from(new Set(offers.map((offer) => offer.category))).sort()], [offers]);
   const visibleOffers = useMemo(() => offers.filter((offer) => {
     const text = `${offer.name} ${offer.category} ${offer.description}`.toLowerCase();
@@ -177,8 +189,8 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   }
 
   function exportLeads() {
-    const headings = ["Name", "Phone", "Service", "Programme", "Institution", "Deadline", "Status", "Priority", "Follow-up", "Assigned to", "AI paused", "Updated"];
-    const rows = filteredLeads.map((lead) => [lead.name, lead.phone, lead.serviceInterest, lead.programme, lead.institution, lead.deadline, lead.status, lead.priority, lead.followUpAt, lead.assignedTo, lead.aiPaused ? "Yes" : "No", lead.updatedAt]);
+    const headings = ["Name", "Phone", "Service", "Programme", "Institution", "Deadline", "Status", "Priority", "Follow-up", "Assigned to", "AI paused", "Last message", "Record updated"];
+    const rows = filteredLeads.map((lead) => [lead.name, lead.phone, lead.serviceInterest, lead.programme, lead.institution, lead.deadline, lead.status, lead.priority, lead.followUpAt, lead.assignedTo, lead.aiPaused ? "Yes" : "No", lead.lastMessageAt, lead.updatedAt]);
     const csv = [headings, ...rows].map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a"); anchor.href = url; anchor.download = `medminds-leads-${new Date().toISOString().slice(0, 10)}.csv`; anchor.click(); URL.revokeObjectURL(url);
@@ -202,14 +214,22 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
       {tab === "leads" && <>
         <div className="metricGrid"><div><span>Total leads</span><strong>{leads.length}</strong></div><div><span>Conversion</span><strong>{conversion}%</strong></div><div><span>Needs attention</span><strong>{followUps}</strong></div><div><span>Follow-ups due</span><strong>{dueFollowUps}</strong></div><div><span>Human managed</span><strong>{humanManaged}</strong></div></div>
         <div className="pipeline">{counts.filter((item) => item.count > 0).map((item) => <button key={item.status} onClick={() => setStatusFilter(item.status)}>{item.status}<strong>{item.count}</strong></button>)}</div>
-        <div className="leadToolbar"><input value={leadQuery} onChange={(event) => setLeadQuery(event.target.value)} placeholder="Search name, number, service or programme" /><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{leadStatuses.map((status) => <option key={status}>{status}</option>)}</select><select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option value="ALL">All priorities</option>{leadPriorities.map((priority) => <option key={priority}>{priority}</option>)}</select><button className="button buttonGhost" onClick={exportLeads}>Export CSV</button></div>
+        <div className="leadToolbar">
+          <input value={leadQuery} onChange={(event) => setLeadQuery(event.target.value)} placeholder="Search name, number, service or programme" />
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{leadStatuses.map((status) => <option key={status}>{status}</option>)}</select>
+          <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option value="ALL">All priorities</option>{leadPriorities.map((priority) => <option key={priority}>{priority}</option>)}</select>
+          <select aria-label="Sort conversations" value={leadSort} onChange={(event) => setLeadSort(event.target.value as LeadSort)}><option value="smart">Smart priority</option><option value="recent">Most recent chat</option><option value="oldest">Oldest chat</option><option value="priority">Priority</option><option value="name">Client name</option></select>
+          <button className="button buttonGhost" onClick={exportLeads}>Export CSV</button>
+        </div>
         <div className="inboxLayout">
           <section className="leadList" aria-label="Client conversations">
-            <div className="leadListTop"><strong>{filteredLeads.length} clients</strong><span>Auto-refreshing</span></div>
+            <div className="leadListTop"><strong>{filteredLeads.length} clients</strong><span>Live · message activity</span></div>
             {filteredLeads.map((lead) => <button key={lead.id} className={`leadListItem ${selectedLeadId === lead.id ? "selected" : ""}`} onClick={() => setSelectedLeadId(lead.id)}>
-              <span className="clientAvatar">{initials(lead.name)}</span><span className="leadListCopy"><strong>{lead.name || "Unnamed client"}</strong><small>{lead.serviceInterest || "Service not established"}</small><em>{lead.phone} · {lead.followUpAt ? `${followUpLabel(lead.followUpAt)} · ` : ""}{relativeTime(lead.updatedAt)}</em></span><span className="leadBadges"><span className={`priorityPill ${lead.priority.toLowerCase()}`}>{lead.priority}</span><span className={`statusPill ${lead.aiPaused ? "human" : "ai"}`}>{lead.aiPaused ? "Human" : "AI"}</span></span>
+              <span className="clientAvatar">{initials(lead.name)}</span>
+              <span className="leadListCopy"><strong>{lead.name || "Unnamed client"}</strong><small>{lead.serviceInterest || "Service not established"}</small><em title={activityTitle(lead)}>{lead.phone} · {lead.followUpAt ? `${followUpLabel(lead.followUpAt)} · ` : ""}{lead.lastMessageAt ? `Last message ${relativeTime(lead.lastMessageAt)}` : "No messages yet"}</em></span>
+              <span className="leadBadges"><span className={`priorityPill ${lead.priority.toLowerCase()}`}>{lead.priority}</span><span className={`statusPill ${lead.aiPaused ? "human" : "ai"}`}>{lead.aiPaused ? "Human" : "AI"}</span></span>
             </button>)}
-            {!filteredLeads.length && <div className="emptyState"><strong>No matching clients</strong><p>Adjust the search or status filter.</p></div>}
+            {!filteredLeads.length && <div className="emptyState"><strong>No matching clients</strong><p>Adjust the search or filters.</p></div>}
           </section>
           <ConversationPanel conversation={conversation} loading={conversationLoading} error={conversationError} notice={conversationNotice} sender={sender} note={note} replyText={replyText} saving={saving} onSender={setSender} onNote={setNote} onReply={setReplyText} onPatch={patchLead} onSend={sendHumanReply} />
         </div>
@@ -246,7 +266,7 @@ function ConversationPanel(props: { conversation: ConversationState | null; load
   }
 
   return <section className="conversationPanel">
-    <header className="conversationHeader"><div className="clientIdentity"><span className="clientAvatar large">{initials(lead.name)}</span><div><strong>{lead.name || "Unnamed client"}</strong><span>{lead.phone} · {lead.serviceInterest || "Service not established"}</span></div></div><div className="conversationActions"><button type="button" className="iconButton" onClick={() => navigator.clipboard.writeText(lead.phone)}>Copy number</button><a className="iconButton" href={`https://wa.me/${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">Open WhatsApp</a></div></header>
+    <header className="conversationHeader"><div className="clientIdentity"><span className="clientAvatar large">{initials(lead.name)}</span><div><strong>{lead.name || "Unnamed client"}</strong><span>{lead.phone} · {lead.serviceInterest || "Service not established"}</span><small className="conversationLastActive">{lead.lastMessageAt ? `Last message ${relativeTime(lead.lastMessageAt)} · ${formatExactTime(lead.lastMessageAt)}` : "No messages recorded yet"}</small></div></div><div className="conversationActions"><button type="button" className="iconButton" onClick={() => navigator.clipboard.writeText(lead.phone)}>Copy number</button><a className="iconButton" href={`https://wa.me/${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">Open WhatsApp</a></div></header>
     <div className="controlStrip"><label>Assigned to<select value={lead.assignedTo ?? ""} onChange={(event) => void props.onPatch(lead.id, { assignedTo: event.target.value ? event.target.value as Lead["assignedTo"] : null })}><option value="">Unassigned</option>{staffMembers.map((staff) => <option key={staff}>{staff}</option>)}</select></label><label>Status<select value={lead.status} onChange={(event) => void props.onPatch(lead.id, { status: event.target.value as Lead["status"] })}>{leadStatuses.map((status) => <option key={status}>{status}</option>)}</select></label><label>Priority<select value={lead.priority} onChange={(event) => void props.onPatch(lead.id, { priority: event.target.value as Lead["priority"] })}>{leadPriorities.map((priority) => <option key={priority}>{priority}</option>)}</select></label>{lead.aiPaused ? <button className="button resumeButton" disabled={props.saving} onClick={() => void props.onPatch(lead.id, { aiPaused: false, assignedTo: null, status: "FOLLOW-UP REQUIRED" })}>Resume AI</button> : <button className="button takeoverButton" disabled={props.saving} onClick={() => void props.onPatch(lead.id, { aiPaused: true, assignedTo: props.sender, status: "HUMAN ASSISTANCE REQUIRED" })}>Take over</button>}</div>
     <div className="conversationMeta"><span className={lead.aiPaused ? "humanMode" : "aiMode"}>{lead.aiPaused ? `AI paused${lead.assignedTo ? ` for ${lead.assignedTo}` : ""}` : "AI responding"}</span><span className={canFreeReply ? "windowOpen" : "windowClosed"}>{lead.source !== "whatsapp" ? "Simulator conversation" : conversation.replyWindow.open ? `Reply window open${conversation.replyWindow.expiresAt ? ` until ${new Date(conversation.replyWindow.expiresAt).toLocaleString()}` : ""}` : "24-hour window closed"}</span></div>
     <div className={`followUpTools ${isFollowUpDue(lead) ? "overdue" : ""}`}><label>Next follow-up<input type="datetime-local" value={toLocalDateTimeInput(lead.followUpAt)} onChange={(event) => void props.onPatch(lead.id, { followUpAt: event.target.value ? new Date(event.target.value).toISOString() : null })} /></label><div><button type="button" onClick={() => void props.onPatch(lead.id, { followUpAt: futureIso(24), status: "FOLLOW-UP REQUIRED" })}>Tomorrow</button><button type="button" onClick={() => void props.onPatch(lead.id, { followUpAt: futureIso(72), status: "FOLLOW-UP REQUIRED" })}>In 3 days</button>{lead.followUpAt && <button type="button" onClick={() => void props.onPatch(lead.id, { followUpAt: null })}>Clear</button>}</div><span>{lead.followUpAt ? followUpLabel(lead.followUpAt) : "No follow-up scheduled"}</span></div>
@@ -270,7 +290,7 @@ function MessageBubble({ message }: { message: ConversationMessage }) {
   const humanMatch = message.content.match(/^\[Human: ([^\]]+)]\s*/);
   const content = humanMatch ? message.content.replace(humanMatch[0], "") : message.content;
   const kind = message.role === "user" ? "client" : humanMatch ? "human" : "agent";
-  return <div className={`timelineRow ${kind}`}><div className="timelineBubble"><span>{kind === "client" ? "Client" : humanMatch ? humanMatch[1] : "MedMinds AI"}</span><p>{content}</p><time>{new Date(message.createdAt).toLocaleString()}</time></div></div>;
+  return <div className={`timelineRow ${kind}`}><div className="timelineBubble"><span>{kind === "client" ? "Client" : humanMatch ? humanMatch[1] : "MedMinds AI"}</span><p>{content}</p><time title={formatExactTime(message.createdAt)}>{formatMessageTime(message.createdAt)}</time></div></div>;
 }
 
 function OfferEditor({ offer, onSave }: { offer: Offer; onSave: (offer: Offer) => Promise<void> }) {
@@ -280,8 +300,25 @@ function OfferEditor({ offer, onSave }: { offer: Offer; onSave: (offer: Offer) =
 
 function SetupCard({ title, ready, detail }: { title: string; ready: boolean; detail: string }) { return <article className="setupCard"><span className={ready ? "check ready" : "check"}>{ready ? "✓" : "!"}</span><div><h3>{title}</h3><p>{detail}</p></div></article>; }
 function initials(name: string | null) { return name ? name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() : "?"; }
-function relativeTime(value: string) { const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000)); if (minutes < 1) return "now"; if (minutes < 60) return `${minutes}m`; const hours = Math.round(minutes / 60); if (hours < 24) return `${hours}h`; return `${Math.round(hours / 24)}d`; }
+function relativeTime(value: string) {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return "unknown";
+  const diffMs = Math.max(0, Date.now() - timestamp);
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(value).toLocaleDateString([], { month: "short", day: "numeric", year: new Date(value).getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
+}
+function activityTime(lead: Lead) { return new Date(lead.lastMessageAt ?? lead.createdAt).getTime() || 0; }
+function activityTitle(lead: Lead) { return lead.lastMessageAt ? `Last message: ${formatExactTime(lead.lastMessageAt)}. Record updated: ${formatExactTime(lead.updatedAt)}.` : `No message recorded. Lead created: ${formatExactTime(lead.createdAt)}.`; }
+function formatExactTime(value: string) { const date = new Date(value); return Number.isFinite(date.getTime()) ? date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : value; }
+function formatMessageTime(value: string) { const date = new Date(value); if (!Number.isFinite(date.getTime())) return value; const today = new Date(); const sameDay = date.toDateString() === today.toDateString(); const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1); const dayLabel = sameDay ? "Today" : date.toDateString() === yesterday.toDateString() ? "Yesterday" : date.toLocaleDateString([], { month: "short", day: "numeric" }); return `${dayLabel}, ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`; }
 function isFollowUpDue(lead: Lead) { return Boolean(lead.followUpAt && new Date(lead.followUpAt).getTime() <= Date.now() && !["CONVERTED", "LOST LEAD"].includes(lead.status)); }
+function priorityRank(priority: Lead["priority"]) { return priority === "HOT" ? 3 : priority === "WARM" ? 2 : 1; }
 function leadSortScore(lead: Lead) { return (isFollowUpDue(lead) ? 400 : 0) + (lead.priority === "HOT" ? 200 : lead.priority === "WARM" ? 100 : 0) + (lead.aiPaused ? 25 : 0); }
 function futureIso(hours: number) { return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString(); }
 function toLocalDateTimeInput(value: string | null) { if (!value) return ""; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }

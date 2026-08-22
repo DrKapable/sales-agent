@@ -99,8 +99,14 @@ function mapLead(row: Record<string, unknown>): Lead {
     priority: (row.priority ? String(row.priority) : "STANDARD") as Lead["priority"],
     followUpAt: row.follow_up_at ? new Date(String(row.follow_up_at)).toISOString() : null,
     source: String(row.source) as Lead["source"], createdAt: new Date(String(row.created_at)).toISOString(),
-    updatedAt: new Date(String(row.updated_at)).toISOString()
+    updatedAt: new Date(String(row.updated_at)).toISOString(),
+    lastMessageAt: row.last_message_at ? new Date(String(row.last_message_at)).toISOString() : null
   };
+}
+
+function withMemoryLastMessage(lead: Lead): Lead {
+  const last = [...memory.messages].reverse().find((message) => message.phone === lead.phone);
+  return { ...lead, lastMessageAt: last?.createdAt ?? lead.lastMessageAt ?? null };
 }
 
 function mapOffer(row: Record<string, unknown>): Offer {
@@ -123,12 +129,12 @@ export async function getOrCreateLead(phone: string, source: Lead["source"]): Pr
       if (source === "whatsapp" && existing.source !== "whatsapp") {
         const promoted = { ...existing, source: "whatsapp" as const };
         memory.leads.set(phone, promoted);
-        return promoted;
+        return withMemoryLastMessage(promoted);
       }
-      return existing;
+      return withMemoryLastMessage(existing);
     }
     const now = new Date().toISOString();
-    const lead: Lead = { id: crypto.randomUUID(), phone, name: null, email: null, institution: null, programme: null, serviceInterest: null, deadline: null, packageName: null, status: "NEW LEAD", handoffReason: null, aiPaused: false, assignedTo: null, internalNote: null, priority: "STANDARD", followUpAt: null, source, createdAt: now, updatedAt: now };
+    const lead: Lead = { id: crypto.randomUUID(), phone, name: null, email: null, institution: null, programme: null, serviceInterest: null, deadline: null, packageName: null, status: "NEW LEAD", handoffReason: null, aiPaused: false, assignedTo: null, internalNote: null, priority: "STANDARD", followUpAt: null, source, createdAt: now, updatedAt: now, lastMessageAt: null };
     memory.leads.set(phone, lead);
     return lead;
   }
@@ -136,7 +142,7 @@ export async function getOrCreateLead(phone: string, source: Lead["source"]): Pr
     ON CONFLICT (phone) DO UPDATE SET
       source = CASE WHEN EXCLUDED.source='whatsapp' THEN 'whatsapp' ELSE leads.source END,
       updated_at = leads.updated_at
-    RETURNING *`, [crypto.randomUUID(), phone, source]);
+    RETURNING leads.*, (SELECT MAX(m.created_at) FROM messages m WHERE m.phone=leads.phone) AS last_message_at`, [crypto.randomUUID(), phone, source]);
   return mapLead(rows[0] as Record<string, unknown>);
 }
 
@@ -146,11 +152,12 @@ export async function updateLead(phone: string, patch: LeadPatch): Promise<Lead>
   const db = database();
   if (!db) {
     memory.leads.set(phone, updated);
-    return updated;
+    return withMemoryLastMessage(updated);
   }
   const rows = await db.query(`UPDATE leads SET name=$2,email=$3,institution=$4,programme=$5,service_interest=$6,
     deadline=$7,package_name=$8,status=$9,handoff_reason=$10,ai_paused=$11,assigned_to=$12,internal_note=$13,
-    priority=$14,follow_up_at=$15,updated_at=NOW() WHERE phone=$1 RETURNING *`,
+    priority=$14,follow_up_at=$15,updated_at=NOW() WHERE phone=$1
+    RETURNING leads.*, (SELECT MAX(m.created_at) FROM messages m WHERE m.phone=leads.phone) AS last_message_at`,
     [phone, updated.name, updated.email, updated.institution, updated.programme, updated.serviceInterest, updated.deadline, updated.packageName, updated.status, updated.handoffReason, updated.aiPaused, updated.assignedTo, updated.internalNote, updated.priority, updated.followUpAt]);
   return mapLead(rows[0] as Record<string, unknown>);
 }
@@ -162,6 +169,8 @@ export async function addMessage(phone: string, role: ConversationMessage["role"
   if (!db) {
     if (externalId && memory.messages.some((item) => item.externalId === externalId)) return false;
     memory.messages.push(message);
+    const lead = memory.leads.get(phone);
+    if (lead) memory.leads.set(phone, { ...lead, lastMessageAt: message.createdAt });
     return true;
   }
   const rows = await db.query(`INSERT INTO messages (id, external_id, phone, role, content) VALUES ($1,$2,$3,$4,$5)
@@ -204,7 +213,11 @@ export async function saveOffer(input: Omit<Offer, "id" | "updatedAt">): Promise
 export async function listLeads(): Promise<Lead[]> {
   await ensureDatabase();
   const db = database();
-  if (!db) return [...memory.leads.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const rows = await db.query(`SELECT * FROM leads ORDER BY updated_at DESC LIMIT 200`);
+  if (!db) return [...memory.leads.values()].map(withMemoryLastMessage).sort((a, b) => (b.lastMessageAt ?? b.createdAt).localeCompare(a.lastMessageAt ?? a.createdAt));
+  const rows = await db.query(`SELECT leads.*,
+    (SELECT MAX(m.created_at) FROM messages m WHERE m.phone=leads.phone) AS last_message_at
+    FROM leads
+    ORDER BY COALESCE((SELECT MAX(m2.created_at) FROM messages m2 WHERE m2.phone=leads.phone), leads.created_at) DESC
+    LIMIT 200`);
   return rows.map((row) => mapLead(row as Record<string, unknown>));
 }
