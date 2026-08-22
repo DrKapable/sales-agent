@@ -34,6 +34,7 @@ export type Lead = {
   source: "whatsapp" | "simulator";
   createdAt: string;
   updatedAt: string;
+  lastMessageAt: string | null;
 };
 
 export type ConversationMessage = {
