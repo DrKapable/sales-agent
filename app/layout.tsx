@@ -29,6 +29,7 @@ import "./admin-chat-clean.css";
 import "./admin-inbox-ux-v2.css";
 import "./admin-inbox-fixes-v3.css";
 import "./admin-inbox-composer-fix-v4.css";
+import "./admin-chat-audit-v3.css";
 import "./pwa-splash.css";
 import "./business-analytics-mobile-fix.css";
 
