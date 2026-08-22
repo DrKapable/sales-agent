@@ -1,0 +1,163 @@
+/* Screenshot-driven mobile chat readability pass.
+   Loaded last so it can safely override older mobile layers without changing behaviour. */
+
+.dashboard .leadListCopy,
+.dashboard .leadListCopy > *,
+.dashboard .clientIdentity,
+.dashboard .clientIdentity > div,
+.dashboard .conversationLastActive {
+  min-width: 0;
+}
+
+/* Desktop/tablet: keep activity metadata readable instead of silently clipping it. */
+@media (min-width: 821px) {
+  .dashboard .leadListCopy em {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.35 !important;
+  }
+
+  .dashboard .conversationLastActive {
+    display: block !important;
+    margin-top: 3px !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.35 !important;
+  }
+}
+
+@media (max-width: 820px) {
+  /* Inbox cards: the phone, overdue state and last-message age may use two lines.
+     This prevents the useful activity timestamp being reduced to "Last message 1…". */
+  .dashboard:not(.mobileChatOpen) .leadListItem {
+    min-height: 104px !important;
+    height: auto !important;
+    grid-template-rows: auto auto !important;
+    align-items: center !important;
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListCopy {
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListCopy strong,
+  .dashboard:not(.mobileChatOpen) .leadListCopy small {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListCopy em {
+    display: -webkit-box !important;
+    max-width: 100% !important;
+    margin-top: 4px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: normal !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2 !important;
+    font-size: 10.5px !important;
+    line-height: 1.38 !important;
+    color: #7a8986 !important;
+    font-style: normal !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadBadges {
+    margin-top: 5px !important;
+  }
+
+  /* Focused chat header: older mobile CSS fixed the header at 62px, which clips
+     the new Last message line. Let the identity block grow naturally. */
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationHeader {
+    min-height: 78px !important;
+    height: auto !important;
+    max-height: none !important;
+    grid-template-rows: auto !important;
+    padding-top: 7px !important;
+    padding-bottom: 7px !important;
+    align-items: center !important;
+  }
+
+  .dashboard.mobileChatOpen .clientIdentity {
+    min-width: 0 !important;
+    align-items: center !important;
+  }
+
+  .dashboard.mobileChatOpen .clientIdentity > div {
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+
+  .dashboard.mobileChatOpen .clientIdentity strong {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .dashboard.mobileChatOpen .clientIdentity > div > span {
+    display: block !important;
+    max-width: 100% !important;
+    margin-top: 2px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .dashboard.mobileChatOpen .conversationLastActive {
+    display: block !important;
+    max-width: 100% !important;
+    margin-top: 3px !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    font-size: 9.5px !important;
+    line-height: 1.25 !important;
+    color: rgba(255,255,255,.74) !important;
+  }
+
+  /* Message timestamps should never disappear when a bubble is narrow. */
+  .dashboard.mobileChatOpen .timelineBubble time {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    line-height: 1.25 !important;
+  }
+
+  .dashboard.mobileChatOpen .timelineBubble {
+    min-width: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Slightly improve reading density on narrow phones without shrinking text. */
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .messageTimeline {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .dashboard:not(.mobileChatOpen) .leadListItem {
+    min-height: 110px !important;
+  }
+
+  .dashboard:not(.mobileChatOpen) .leadListCopy em {
+    font-size: 10px !important;
+  }
+
+  body.mobileAdminChatOpen .dashboard.mobileChatOpen .conversationHeader {
+    min-height: 82px !important;
+  }
+
+  .dashboard.mobileChatOpen .conversationLastActive {
+    font-size: 9px !important;
+  }
+}
