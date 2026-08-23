@@ -14,6 +14,9 @@ import { applyQuoteDeliveryReceipt } from "@/lib/quotation-delivery";
 import { applyMessageDeliveryReceipt, recordOutgoingMessageAccepted } from "@/lib/message-delivery";
 import { attachOutgoingMessageId } from "@/lib/outgoing-message-link";
 import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewrite";
+import { buildAttachmentReviewNotification, classifyIncomingAttachmentForReview } from "@/lib/incoming-attachment-review";
+import { forwardAttachmentToReviewers } from "@/lib/team-attachment-forwarding";
+import { referralRecipients } from "@/lib/referrals";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 
@@ -73,7 +76,7 @@ export async function POST(request: NextRequest) {
         await rememberWhatsAppSender({ phone: message.phone, phoneNumberId: message.phoneNumberId, displayPhoneNumber: message.displayPhoneNumber })
           .catch((error) => console.error("Unable to remember WhatsApp sender context", { phoneSuffix: message.phone.slice(-4), error }));
 
-        const previousHistory = await getConversation(message.phone, 1);
+        const previousHistory = await getConversation(message.phone, 12);
         const firstEverClientMessage = previousHistory.length === 0;
         const isNew = await addMessage(message.phone, "user", message.text, message.id);
         if (!isNew) continue;
@@ -81,6 +84,77 @@ export async function POST(request: NextRequest) {
         let lead = message.name
           ? await updateLead(message.phone, { name: message.name })
           : await getOrCreateLead(message.phone, "whatsapp");
+
+        const attachmentReview = classifyIncomingAttachmentForReview({
+          content: message.text,
+          history: previousHistory,
+          lead
+        });
+
+        if (attachmentReview) {
+          await sendWhatsAppTypingIndicator(message.id, message.phoneNumberId ?? undefined)
+            .catch((error) => console.warn("WhatsApp typing indicator failed for attachment acknowledgement", { messageId: message.id, error }));
+
+          const handoffReason = `${HUMAN_TAKEOVER_PREFIX} ${attachmentReview.handoffReason}`;
+          lead = await updateLead(message.phone, {
+            status: attachmentReview.status,
+            priority: "HOT",
+            aiPaused: true,
+            assignedTo: attachmentReview.assignedTo,
+            handoffReason
+          });
+
+          await addMessage(message.phone, "assistant", attachmentReview.acknowledgement);
+          const acknowledgementSent = await sendWhatsAppTextWithRetry(message.phone, attachmentReview.acknowledgement, message.phoneNumberId);
+          await Promise.all([
+            attachOutgoingMessageId({ phone: message.phone, content: attachmentReview.acknowledgement, messageId: acknowledgementSent.messageId }),
+            recordOutgoingMessageAccepted({ messageId: acknowledgementSent.messageId, phone: message.phone })
+          ]).catch((error) => console.warn("Unable to link attachment acknowledgement delivery", { messageId: message.id, error }));
+
+          const primary = attachmentReview.kind === "payment_proof" ? referralRecipients.mustafa : referralRecipients.kanyembo;
+          const secondary = attachmentReview.kind === "payment_proof" ? referralRecipients.kanyembo : referralRecipients.mustafa;
+          const notificationBody = buildAttachmentReviewNotification({ lead, review: attachmentReview });
+          const reviewerCaption = attachmentReview.kind === "payment_proof"
+            ? `Payment proof from ${lead.name || lead.phone}. Verify independently before activation.`
+            : `Client attachment from ${lead.name || lead.phone}. Human review required.`;
+
+          try {
+            await sendTeamCopies({
+              heading: attachmentReview.kind === "payment_proof" ? "Payment proof received" : "Client attachment review",
+              body: notificationBody,
+              primary,
+              cc: [secondary],
+              includeDefaultCc: false,
+              phoneNumberIdOverride: message.phoneNumberId ?? undefined
+            });
+          } catch (error) {
+            console.error("Attachment human-review notification failed", { messageId: message.id, reviewKind: attachmentReview.kind, error });
+          }
+
+          try {
+            const forwarded = await forwardAttachmentToReviewers({
+              attachment: attachmentReview.attachment,
+              recipients: [primary, secondary],
+              caption: reviewerCaption,
+              phoneNumberIdOverride: message.phoneNumberId ?? undefined
+            });
+            console.info("Client attachment forwarded to human reviewers", {
+              messageId: message.id,
+              reviewKind: attachmentReview.kind,
+              sent: forwarded.filter((result) => result.status === "fulfilled" && result.value.sent).length
+            });
+          } catch (error) {
+            console.error("Client attachment media forwarding failed", { messageId: message.id, reviewKind: attachmentReview.kind, error });
+          }
+
+          if (firstEverClientMessage) {
+            await notifyDirectorOfNewClient({ lead, firstMessage: message.text, source: "whatsapp", phoneNumberIdOverride: message.phoneNumberId ?? undefined })
+              .catch((error) => console.error("New attachment client director alert failed", { messageId: message.id, error }));
+          }
+
+          console.info("Attachment routed to human review; normal AI reply skipped", { messageId: message.id, reviewKind: attachmentReview.kind, assignedTo: lead.assignedTo });
+          continue;
+        }
 
         if (lead.aiPaused) {
           const markedHumanTakeover = lead.handoffReason?.startsWith(HUMAN_TAKEOVER_PREFIX) ?? false;
