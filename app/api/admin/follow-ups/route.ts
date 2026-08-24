@@ -8,10 +8,11 @@ import {
   sendHumanFollowUpSms,
   syncHumanFollowUpQueue
 } from "@/lib/human-follow-ups";
+import { runMaryAutomaticFollowUps } from "@/lib/mary-automatic-follow-ups";
 import { isFollowUpTeamMember } from "@/lib/follow-up-team";
 import { manualFollowUpOptions } from "@/lib/manual-follow-up-options";
 
-const BACKGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const BACKGROUND_SYNC_INTERVAL_MS = 60 * 1000;
 let lastBackgroundSyncAt = 0;
 
 const teamMemberSchema = z.string().trim().min(2).max(120).refine(isFollowUpTeamMember, {
@@ -51,9 +52,10 @@ function queueBackgroundFollowUpSync() {
   after(async () => {
     try {
       await syncHumanFollowUpQueue({ notifyDue: false });
+      await runMaryAutomaticFollowUps();
     } catch (error) {
       lastBackgroundSyncAt = 0;
-      console.error("Background human follow-up sync failed", { error });
+      console.error("Background follow-up automation failed", { error });
     }
   });
 }
@@ -70,16 +72,12 @@ function manualClientPool(data: Awaited<ReturnType<typeof listHumanFollowUps>>) 
 export async function GET() {
   const startedAt = Date.now();
   try {
-    // Return the current queue first. The full lead/conversation sync is expensive and
-    // should never block the workspace from rendering.
     const data = await listHumanFollowUps();
     queueBackgroundFollowUpSync();
 
     return NextResponse.json(
       {
         ...data,
-        // Re-include active clients that already have a pending/historical follow-up so
-        // the human team can manually reschedule them without another expensive lead query.
         availableLeads: manualClientPool(data),
         loadMs: Date.now() - startedAt
       },

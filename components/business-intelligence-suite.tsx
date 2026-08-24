@@ -7,6 +7,7 @@ import { BusinessAnalyticsUXEnhancer } from "@/components/business-analytics-ux-
 import { BusinessIntelligenceResponsive } from "@/components/business-intelligence-responsive";
 import { BusinessPaymentEnhancer } from "@/components/business-payment-enhancer";
 import { HumanFollowUpPanel } from "@/components/human-follow-up-panel";
+import { MaryFollowUpAutomationEnhancer } from "@/components/mary-follow-up-automation-enhancer";
 
 type Section = "dashboard" | "analytics" | "followups";
 
@@ -30,10 +31,11 @@ export function BusinessIntelligenceSuite() {
     <BusinessAnalyticsUXEnhancer />
     <BusinessAnalyticsSortEnhancer />
     <BusinessPaymentEnhancer />
+    <MaryFollowUpAutomationEnhancer />
     <div className="biSuiteSwitchWrap"><div className="biSuiteSwitch" role="tablist" aria-label="Business Intelligence section">
       <button role="tab" aria-selected={section === "dashboard"} className={section === "dashboard" ? "active" : ""} onClick={() => changeSection("dashboard")}><span>▦</span><strong>Business dashboard</strong><small>Leads, operations & Ask Intelligence</small></button>
       <button role="tab" aria-selected={section === "analytics"} className={section === "analytics" ? "active" : ""} onClick={() => changeSection("analytics")}><span>⌁</span><strong>Analytics & AI</strong><small>Charts, inbox gaps & recommendations</small></button>
-      <button role="tab" aria-selected={section === "followups"} className={section === "followups" ? "active" : ""} onClick={() => changeSection("followups")}><span>✓</span><strong>Follow-ups</strong><small>Human outreach, outcomes & next actions</small></button>
+      <button role="tab" aria-selected={section === "followups"} className={section === "followups" ? "active" : ""} onClick={() => changeSection("followups")}><span>✓</span><strong>Follow-ups</strong><small>Mary automation, human outreach & outcomes</small></button>
     </div></div>
     {section === "dashboard" ? <BusinessIntelligenceResponsive /> : section === "analytics" ? <BusinessAnalyticsPanel onBack={() => changeSection("dashboard")} /> : <HumanFollowUpPanel onBack={() => changeSection("dashboard")} />}
     <style jsx global>{`
