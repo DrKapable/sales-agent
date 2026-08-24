@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { humanMessageContent } from "@/lib/conversation";
-import { listApprovedMetaTemplates, sendApprovedMetaTemplate } from "@/lib/meta-templates";
+import { getApprovedMetaTemplateInventory, listApprovedMetaTemplates, sendApprovedMetaTemplate } from "@/lib/meta-templates";
 import { recordOutgoingMessageAccepted } from "@/lib/message-delivery";
 import { addMessage, getOrCreateLead, updateLead } from "@/lib/store";
 
@@ -18,8 +18,7 @@ const sendSchema = z.object({
 
 export async function GET() {
   try {
-    const templates = await listApprovedMetaTemplates();
-    return NextResponse.json({ templates });
+    return NextResponse.json(await getApprovedMetaTemplateInventory());
   } catch (error) {
     console.error("Unable to load approved Meta templates", { error });
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load approved Meta templates." }, { status: 502 });
