@@ -16,6 +16,14 @@ export type MetaTemplate = {
   components: MetaTemplateComponent[];
 };
 
+const META_SAMPLE_TEMPLATE_NAMES = new Set([
+  "hello_world",
+  "jaspers_market_image_cta_v1",
+  "jaspers_market_media_carousel_v1",
+  "jaspers_market_order_confirmation_v1",
+  "jaspers_market_plain_text_v1"
+]);
+
 function config() {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const version = process.env.WHATSAPP_GRAPH_VERSION;
@@ -24,6 +32,10 @@ function config() {
   if (!token || !version || !phoneNumberId) throw new Error("WhatsApp Cloud API is not configured.");
   if (!businessAccountId) throw new Error("WHATSAPP_BUSINESS_ACCOUNT_ID is required to load approved Meta templates.");
   return { token, version, phoneNumberId, businessAccountId };
+}
+
+export function isMetaSampleTemplate(name: string) {
+  return META_SAMPLE_TEMPLATE_NAMES.has(name.toLowerCase());
 }
 
 export async function listApprovedMetaTemplates(): Promise<MetaTemplate[]> {
@@ -36,6 +48,20 @@ export async function listApprovedMetaTemplates(): Promise<MetaTemplate[]> {
   if (!response.ok) throw new Error(`Meta template lookup returned ${response.status}: ${JSON.stringify(sanitizeWhatsAppApiError(raw))}`);
   const data = JSON.parse(raw) as { data?: MetaTemplate[] };
   return (data.data || []).filter((template) => template.status === "APPROVED").sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function getApprovedMetaTemplateInventory() {
+  const { businessAccountId } = config();
+  const approved = await listApprovedMetaTemplates();
+  const samples = approved.filter((template) => isMetaSampleTemplate(template.name));
+  const production = approved.filter((template) => !isMetaSampleTemplate(template.name));
+  return {
+    templates: production,
+    approvedCount: approved.length,
+    sampleCount: samples.length,
+    sampleOnly: approved.length > 0 && production.length === 0,
+    wabaSuffix: businessAccountId.slice(-6)
+  };
 }
 
 export async function sendApprovedMetaTemplate(input: {
