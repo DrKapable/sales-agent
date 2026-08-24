@@ -2,14 +2,14 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { MaryOnboardingForm } from "./onboarding/onboarding-form";
 import styles from "./proposal.module.css";
 
-const onboardingUrl = "/mary-kaunda-ai-proposal/onboarding";
 const testMaryUrl =
   "https://wa.me/260762402042?text=Hi%20Mary%2C%20I%20would%20like%20to%20test%20the%20Mary%20Kaunda%20AI%20assistant%20in%20real%20time.";
 
 const slides = [
-  { eyebrow: "15-minute institutional proposal", title: "Mary Kaunda AI Agent", subtitle: "A practical AI customer-service, sales and follow-up assistant for loan companies, delivery companies, clothing businesses, schools, clinics and service organisations.", time: "1 min", visual: "hero", bullets: ["Free 1-month trial", "Then USD 20 per month", "Built for WhatsApp and web-based customer handling"] },
+  { eyebrow: "15-minute institutional proposal", title: "Mary Kaunda AI Agent", subtitle: "A practical AI customer-service, sales and follow-up assistant for loan companies, delivery companies, clothing businesses, schools, clinics and service organisations.", time: "1 min", visual: "hero", bullets: ["Free 1-month trial", "Then ZMW 380 per month", "Built for WhatsApp and web-based customer handling"] },
   { eyebrow: "The business problem", title: "Customers do not wait for slow replies.", subtitle: "Many institutions lose potential customers because enquiries are answered late, follow-ups are missed, and routine questions keep consuming staff time.", time: "1 min", visual: "problem", bullets: ["Delayed replies reduce trust", "Staff repeat the same information daily", "Quotations, payments and reminders are not always connected"] },
   { eyebrow: "Why this matters", title: "The real cost is not software. It is lost opportunity.", subtitle: "A lead that is not answered, qualified and followed up can easily become revenue for another company.", time: "1 min", visual: "cost", bullets: ["Missed customers", "Poor customer experience", "No clear record of who needs attention", "Unverified payments and delayed receipts"] },
   { eyebrow: "The proposed solution", title: "Mary becomes your first-line digital customer assistant.", subtitle: "Mary responds quickly, collects useful information, keeps the conversation organised and involves staff when human judgement is needed.", time: "1 min", visual: "assistant", bullets: ["Answers routine enquiries", "Qualifies leads", "Supports quotations, invoices, receipts and reminders", "Escalates sensitive cases to staff"] },
@@ -20,16 +20,16 @@ const slides = [
   { eyebrow: "Management visibility", title: "The institution sees what needs attention.", subtitle: "Mary's value is also managerial. Leads, payments, reminders, documents and human handovers become easier to supervise.", time: "1 min", visual: "dashboard", bullets: ["Lead pipeline", "Hot and stale conversations", "Quotation and payment follow-up", "Human takeover", "Management intelligence"] },
   { eyebrow: "Scale with control", title: "Designed for high-volume customer engagement.", subtitle: "Mary can be configured toward a target capacity of up to 2,500 client conversations at a time, subject to workflow complexity, integrations, messaging-provider limits and load testing.", time: "1 min", visual: "scale", bullets: ["Up to 2,500 as a capacity target", "24/7 routine engagement", "Human oversight retained", "Institution-controlled responses"] },
   { eyebrow: "Implementation plan", title: "Start controlled. Prove value. Then expand.", subtitle: "The safest deployment starts with one high-volume workflow, then expands after the trial demonstrates value.", time: "1.5 min", visual: "implementation", bullets: ["Business discovery", "Approved knowledge setup", "Brand and WhatsApp configuration", "Testing and staff review", "One-month free trial"] },
-  { eyebrow: "Commercial proposal", title: "One month free. Then USD 20 per month.", subtitle: "This pricing makes the offer easy to test, low-risk for institutions and affordable for small to medium businesses.", time: "1 min", visual: "pricing", bullets: ["No cost for the first month", "USD 20/month after trial", "Customer engagement, follow-ups and admin workflow included", "Custom integrations can be scoped separately"] },
-  { eyebrow: "Closing recommendation", title: "Deploy Mary where customer messages are currently being lost.", subtitle: "The first client should not be asked to believe in AI. They should be asked to test a practical customer-handling system for one month and judge the results.", time: "1 min", visual: "close", bullets: ["Choose one workflow", "Run the free trial", "Measure response speed, follow-up and conversion", "Continue only if the value is clear"] },
+  { eyebrow: "Commercial proposal", title: "One month free. Then ZMW 380 per month.", subtitle: "This pricing makes the offer easy to test, low-risk for institutions and affordable for small to medium businesses.", time: "1 min", visual: "pricing", bullets: ["No cost for the first month", "ZMW 380/month after trial", "Customer engagement, follow-ups and admin workflow included", "Custom integrations can be scoped separately"] },
+  { eyebrow: "Closing recommendation", title: "Deploy Mary where customer messages are currently being lost.", subtitle: "The first client should not be asked to believe in AI. They should be asked to test a practical customer-handling system for one month and judge the results.", time: "1 min", visual: "close", bullets: ["Choose one workflow", "Run the free trial", "Measure response speed, follow-up and conversion", "Complete onboarding on this page when ready"] },
 ];
 
-function Visual({ type }: { type: string }) {
+function Visual({ type, openOnboarding }: { type: string; openOnboarding: () => void }) {
   if (type === "hero") {
     return <div className={styles.heroVisual}><Image src="/medminds-logo.png" alt="MedMinds Learning Centre" width={190} height={90} priority /><div className={styles.heroVisualText}><span>AI employee</span><strong>Mary Kaunda</strong><p>Customer support • sales follow-up • document workflow</p></div></div>;
   }
   if (type === "pricing") {
-    return <div className={styles.priceBox}><span>FREE TRIAL</span><strong>30 days</strong><p>Then USD 20/month</p><a href={onboardingUrl}>Request onboarding</a></div>;
+    return <div className={styles.priceBox}><span>FREE TRIAL</span><strong>30 days</strong><p>Then ZMW 380/month</p><button type="button" onClick={openOnboarding}>Open onboarding form</button></div>;
   }
   if (type === "workflow") {
     return <div className={styles.flowDiagram}>{["Enquiry", "Qualification", "Quotation / Invoice", "Payment review", "Receipt", "Handover"].map((item) => <div key={item}>{item}</div>)}</div>;
@@ -46,11 +46,12 @@ function Visual({ type }: { type: string }) {
   if (type === "implementation") {
     return <ol className={styles.stepList}><li>Discover</li><li>Configure</li><li>Test</li><li>Trial</li><li>Expand</li></ol>;
   }
-  return <div className={styles.symbolVisual}><span>{type === "problem" ? "!" : type === "cost" ? "K" : type === "finance" ? "$" : type === "retail" ? "✓" : "→"}</span></div>;
+  return <div className={styles.symbolVisual}><span>{type === "problem" ? "!" : type === "cost" ? "K" : type === "finance" ? "K" : type === "retail" ? "✓" : "→"}</span></div>;
 }
 
 export default function ProposalSlides() {
   const [index, setIndex] = useState(0);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const current = slides[index];
   const progress = useMemo(() => Math.round(((index + 1) / slides.length) * 100), [index]);
   const next = () => setIndex((value) => Math.min(value + 1, slides.length - 1));
@@ -58,23 +59,46 @@ export default function ProposalSlides() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (showOnboarding) {
+        if (event.key === "Escape") setShowOnboarding(false);
+        return;
+      }
       if (event.key === "ArrowRight" || event.key === " ") next();
       if (event.key === "ArrowLeft") previous();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [showOnboarding]);
 
   return (
     <main className={styles.page}>
       <div className={styles.ambientLayer} aria-hidden="true"><span className={`${styles.floatChip} ${styles.floatOne}`}>Quotation sent ✓</span><span className={`${styles.floatChip} ${styles.floatTwo}`}>24/7 response</span><span className={`${styles.floatChip} ${styles.floatThree}`}>Invoice ready</span><span className={`${styles.floatChip} ${styles.floatFour}`}>Follow-up due</span><span className={`${styles.floatChip} ${styles.floatFive}`}>Payment received ✓</span></div>
       <section className={styles.slideShell} aria-live="polite">
-        <header className={styles.topBar}><div className={styles.brandLockup}><Image src="/medminds-logo.png" alt="MedMinds Learning Centre" width={42} height={42} /><div><strong>Mary Kaunda AI Agent</strong><span>15-minute institutional proposal</span></div></div><div className={styles.timerPill}>{current.time}</div></header>
+        <header className={styles.topBar}>
+          <div className={styles.brandLockup}><Image src="/medminds-logo.png" alt="MedMinds Learning Centre" width={42} height={42} /><div><strong>Mary Kaunda AI Agent</strong><span>15-minute institutional proposal</span></div></div>
+          <div className={styles.topActions}><button type="button" className={styles.onboardingButton} onClick={() => setShowOnboarding(true)}>Onboarding form</button><div className={styles.timerPill}>{current.time}</div></div>
+        </header>
         <div className={styles.progressTrack}><span style={{ width: `${progress}%` }} /></div>
-        <article className={styles.slideCard}><div className={styles.slideCopy}><span className={styles.eyebrow}>{current.eyebrow}</span><h1>{current.title}</h1><p className={styles.subtitle}>{current.subtitle}</p><ul className={styles.bullets}>{current.bullets.map((item) => <li key={item}>{item}</li>)}</ul></div><div className={styles.slideVisual}><Visual type={current.visual} /></div></article>
-        <footer className={styles.controls}><button type="button" onClick={previous} disabled={index === 0}>← Previous</button><div className={styles.slideCounter}><strong>{index + 1}</strong> / {slides.length}<span>{progress}% complete</span></div>{index === slides.length - 1 ? <a href={testMaryUrl} target="_blank" rel="noreferrer" className={styles.ctaButton}>Test Mary on WhatsApp</a> : <button type="button" onClick={next}>Next →</button>}</footer>
+        <article className={styles.slideCard}><div className={styles.slideCopy}><span className={styles.eyebrow}>{current.eyebrow}</span><h1>{current.title}</h1><p className={styles.subtitle}>{current.subtitle}</p><ul className={styles.bullets}>{current.bullets.map((item) => <li key={item}>{item}</li>)}</ul></div><div className={styles.slideVisual}><Visual type={current.visual} openOnboarding={() => setShowOnboarding(true)} /></div></article>
+        <footer className={styles.controls}>
+          <button type="button" onClick={previous} disabled={index === 0}>← Previous</button>
+          <div className={styles.slideCounter}><strong>{index + 1}</strong> / {slides.length}<span>{progress}% complete</span></div>
+          {index === slides.length - 1 ? <div className={styles.finalActions}><button type="button" className={styles.onboardingButton} onClick={() => setShowOnboarding(true)}>Start onboarding</button><a href={testMaryUrl} target="_blank" rel="noreferrer" className={styles.ctaButton}>Test Mary</a></div> : <button type="button" onClick={next}>Next →</button>}
+        </footer>
         <nav className={styles.dots} aria-label="Slide navigation">{slides.map((slide, slideIndex) => <button key={slide.title} type="button" aria-label={`Go to slide ${slideIndex + 1}`} aria-current={slideIndex === index ? "step" : undefined} onClick={() => setIndex(slideIndex)} />)}</nav>
       </section>
+
+      {showOnboarding ? (
+        <div className={styles.onboardingOverlay} role="dialog" aria-modal="true" aria-label="Organisation onboarding form" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowOnboarding(false); }}>
+          <section className={styles.onboardingPanel}>
+            <header className={styles.onboardingHeader}>
+              <div><span>Organisation onboarding</span><h2>Start your Mary Kaunda setup</h2><p>Registered organisations can complete the secure onboarding form here without leaving the proposal.</p></div>
+              <button type="button" onClick={() => setShowOnboarding(false)} aria-label="Close onboarding form">×</button>
+            </header>
+            <div className={styles.onboardingBody}><MaryOnboardingForm /></div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
