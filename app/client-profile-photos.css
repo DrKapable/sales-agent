@@ -1,0 +1,61 @@
+.clientAvatar {
+  position: relative;
+  overflow: hidden;
+}
+
+.clientAvatar img[data-client-profile-photo] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.clientAvatar.hasClientPhoto {
+  color: transparent !important;
+  background: #dce8e4;
+}
+
+.conversationHeader .clientAvatar.large {
+  cursor: pointer;
+  outline: none;
+}
+
+.conversationHeader .clientAvatar.large:focus-visible {
+  box-shadow: 0 0 0 3px rgba(255,255,255,.85), 0 0 0 5px rgba(21,156,135,.7);
+}
+
+.conversationHeader .clientAvatar.large::after {
+  content: "";
+  position: absolute;
+  inset: auto 2px 2px auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(15,91,81,.94);
+  border: 2px solid #fff;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+
+.conversationHeader .clientAvatar.large:hover::after,
+.conversationHeader .clientAvatar.large:focus-visible::after {
+  opacity: 1;
+}
+
+.clientProfilePhotoInput {
+  position: fixed !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 760px) {
+  .conversationHeader .clientAvatar.large::after {
+    opacity: .9;
+    width: 12px;
+    height: 12px;
+  }
+}
