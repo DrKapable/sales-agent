@@ -7,6 +7,7 @@ import { ChatDeliveryTicksEnhancer } from "@/components/chat-delivery-ticks-enha
 import { ChatLifecycleReliabilityEnhancer } from "@/components/chat-lifecycle-reliability-enhancer";
 import { ChatRichTextEnhancer } from "@/components/chat-rich-text-enhancer";
 import { ClientAttachmentEnhancer } from "@/components/client-attachment-enhancer";
+import { ClientProfilePhotoEnhancer } from "@/components/client-profile-photo-enhancer";
 import { ClientRecordManagementEnhancer } from "@/components/client-record-management-enhancer";
 import { ConversationDocumentsEnhancer } from "@/components/conversation-documents-enhancer";
 import { MobileAdminEnhancer } from "@/components/mobile-admin-enhancer";
@@ -35,6 +36,7 @@ import "./admin-chat-readability-v5.css";
 import "./pwa-splash.css";
 import "./business-analytics-mobile-fix.css";
 import "./mobile-chat-header-minimal.css";
+import "./client-profile-photos.css";
 
 export const metadata: Metadata = {
   title: "MedMinds Learning Centre",
@@ -63,5 +65,5 @@ export const viewport: Viewport = {
 // Admin document enhancers are mounted at the root so the active client conversation can render shared files immediately.
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
-  return <html lang="en"><body><PwaSplash /><MobileAdminEnhancer /><MobileChatHeaderMenu /><BusinessAnalysisUXEnhancer /><ClientRecordManagementEnhancer /><ChatLifecycleReliabilityEnhancer /><AdminDocumentsV2 /><ConversationDocumentsEnhancer /><ClientAttachmentEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
+  return <html lang="en"><body><PwaSplash /><MobileAdminEnhancer /><MobileChatHeaderMenu /><BusinessAnalysisUXEnhancer /><ClientRecordManagementEnhancer /><ClientProfilePhotoEnhancer /><ChatLifecycleReliabilityEnhancer /><AdminDocumentsV2 /><ConversationDocumentsEnhancer /><ClientAttachmentEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
 }
