@@ -25,13 +25,18 @@ function phoneForAvatar(avatar: HTMLElement) {
 }
 
 function applyPhotos(photos: PhotoMap) {
-  document.querySelectorAll<HTMLElement>(".clientAvatar").forEach((avatar) => {
+  document.querySelectorAll(".clientAvatar").forEach((node) => {
+    const avatar = node as HTMLElement;
     const phone = phoneForAvatar(avatar);
-    const photo = phone ? photos[phone] : null;
-    const existing = avatar.querySelector<HTMLImageElement>("img[data-client-profile-photo]");
+    const photo = phone ? photos[phone] : undefined;
+    const existing = avatar.querySelector("img[data-client-profile-photo]") as HTMLImageElement | null;
     if (!photo) {
-      existing?.remove();
+      if (existing) existing.remove();
       avatar.classList.remove("hasClientPhoto");
+      return;
+    }
+    if (existing && existing.src === photo) {
+      avatar.classList.add("hasClientPhoto");
       return;
     }
     const image = existing || document.createElement("img");
@@ -47,24 +52,28 @@ async function compressProfilePhoto(file: File) {
   if (!file.type.startsWith("image/")) throw new Error("Please choose an image file.");
   if (file.size > 12 * 1024 * 1024) throw new Error("Please choose an image smaller than 12 MB.");
 
-  const source = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Unable to read this image."));
-    image.src = URL.createObjectURL(file);
-  });
-  const size = 320;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Image processing is unavailable in this browser.");
-  const scale = Math.max(size / source.naturalWidth, size / source.naturalHeight);
-  const width = source.naturalWidth * scale;
-  const height = source.naturalHeight * scale;
-  context.drawImage(source, (size - width) / 2, (size - height) / 2, width, height);
-  URL.revokeObjectURL(source.src);
-  return canvas.toDataURL("image/jpeg", 0.78);
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const source = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Unable to read this image."));
+      image.src = objectUrl;
+    });
+    const size = 320;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Image processing is unavailable in this browser.");
+    const scale = Math.max(size / source.naturalWidth, size / source.naturalHeight);
+    const width = source.naturalWidth * scale;
+    const height = source.naturalHeight * scale;
+    context.drawImage(source, (size - width) / 2, (size - height) / 2, width, height);
+    return canvas.toDataURL("image/jpeg", 0.78);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 export function ClientProfilePhotoEnhancer() {
@@ -79,16 +88,28 @@ export function ClientProfilePhotoEnhancer() {
     input.setAttribute("aria-hidden", "true");
     document.body.appendChild(input);
 
+    const refreshDom = () => {
+      if (stopped) return;
+      applyPhotos(photos);
+      const avatar = document.querySelector(".conversationHeader .clientAvatar.large") as HTMLElement | null;
+      if (avatar) {
+        avatar.tabIndex = 0;
+        avatar.setAttribute("role", "button");
+        avatar.setAttribute("aria-label", "Upload or replace client profile photo");
+        avatar.title = "Tap to add or change client photo";
+      }
+    };
+
     async function loadPhotos() {
       try {
         const response = await fetch("/api/admin/client-profile-photos", { cache: "no-store" });
-        const data = await response.json();
-        if (response.ok && data?.photos && !stopped) {
-          photos = data.photos as PhotoMap;
-          applyPhotos(photos);
+        const data = await response.json() as { photos?: PhotoMap };
+        if (response.ok && data.photos && !stopped) {
+          photos = data.photos;
+          refreshDom();
         }
       } catch {
-        // Keep initials visible when profile-photo loading is temporarily unavailable.
+        // Initials remain visible if photo loading temporarily fails.
       }
     }
 
@@ -99,39 +120,35 @@ export function ClientProfilePhotoEnhancer() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, imageDataUrl })
       });
-      const data = await response.json();
+      const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || "Unable to save the profile photo.");
       photos = { ...photos, [phone]: imageDataUrl };
-      applyPhotos(photos);
+      refreshDom();
     }
 
-    const onClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      const avatar = target?.closest<HTMLElement>(".conversationHeader .clientAvatar.large");
-      if (!avatar) return;
+    const openPicker = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      const avatar = target.closest(".conversationHeader .clientAvatar.large") as HTMLElement | null;
+      if (!avatar) return false;
       const phone = phoneForAvatar(avatar);
-      if (!phone) return;
-      event.preventDefault();
+      if (!phone) return false;
       currentPhone = phone;
       input.value = "";
       input.click();
+      return true;
+    };
+
+    const onClick = (event: MouseEvent) => {
+      if (openPicker(event.target)) event.preventDefault();
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Enter" && event.key !== " ") return;
-      const target = event.target as HTMLElement | null;
-      const avatar = target?.closest<HTMLElement>(".conversationHeader .clientAvatar.large");
-      if (!avatar) return;
-      const phone = phoneForAvatar(avatar);
-      if (!phone) return;
-      event.preventDefault();
-      currentPhone = phone;
-      input.value = "";
-      input.click();
+      if (openPicker(event.target)) event.preventDefault();
     };
 
     const onChange = async () => {
-      const file = input.files?.[0];
+      const file = input.files && input.files[0];
       if (!file || !currentPhone) return;
       try {
         await savePhoto(currentPhone, file);
@@ -140,31 +157,18 @@ export function ClientProfilePhotoEnhancer() {
       }
     };
 
-    const markEditableAvatar = () => {
-      const avatar = document.querySelector<HTMLElement>(".conversationHeader .clientAvatar.large");
-      if (!avatar) return;
-      avatar.tabIndex = 0;
-      avatar.setAttribute("role", "button");
-      avatar.setAttribute("aria-label", "Upload or replace client profile photo");
-      avatar.title = "Tap to add or change client photo";
-    };
-
-    const observer = new MutationObserver(() => {
-      applyPhotos(photos);
-      markEditableAvatar();
-    });
-    observer.observe(document.body, { subtree: true, childList: true });
     document.addEventListener("click", onClick);
     document.addEventListener("keydown", onKeyDown);
     input.addEventListener("change", onChange);
     void loadPhotos();
-    markEditableAvatar();
+    refreshDom();
 
-    const refresh = window.setInterval(() => void loadPhotos(), 30000);
+    const domRefresh = window.setInterval(refreshDom, 1200);
+    const dataRefresh = window.setInterval(() => void loadPhotos(), 30000);
     return () => {
       stopped = true;
-      window.clearInterval(refresh);
-      observer.disconnect();
+      window.clearInterval(domRefresh);
+      window.clearInterval(dataRefresh);
       document.removeEventListener("click", onClick);
       document.removeEventListener("keydown", onKeyDown);
       input.removeEventListener("change", onChange);
