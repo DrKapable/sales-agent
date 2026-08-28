@@ -10,6 +10,7 @@
   height: 100%;
   object-fit: cover;
   border-radius: inherit;
+  background: #dce8e4;
 }
 
 .clientAvatar.hasClientPhoto {
@@ -20,6 +21,12 @@
 .conversationHeader .clientAvatar.large {
   cursor: pointer;
   outline: none;
+  overflow: visible;
+}
+
+.conversationHeader .clientAvatar.large img[data-client-profile-photo] {
+  overflow: hidden;
+  border-radius: 50%;
 }
 
 .conversationHeader .clientAvatar.large:focus-visible {
@@ -27,21 +34,28 @@
 }
 
 .conversationHeader .clientAvatar.large::after {
-  content: "";
+  content: "+";
   position: absolute;
-  inset: auto 2px 2px auto;
-  width: 14px;
-  height: 14px;
+  right: -3px;
+  bottom: -2px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
   border-radius: 50%;
-  background: rgba(15,91,81,.94);
+  background: #0f6f63;
+  color: #fff;
   border: 2px solid #fff;
-  opacity: 0;
-  transition: opacity .15s ease;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0,0,0,.18);
 }
 
 .conversationHeader .clientAvatar.large:hover::after,
 .conversationHeader .clientAvatar.large:focus-visible::after {
-  opacity: 1;
+  background: #0a584f;
+  transform: scale(1.06);
 }
 
 .clientProfilePhotoInput {
@@ -52,10 +66,44 @@
   pointer-events: none !important;
 }
 
+.clientProfilePhotoToast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 10020;
+  max-width: min(88vw, 360px);
+  transform: translate(-50%, 18px);
+  padding: 11px 15px;
+  border-radius: 999px;
+  background: #153f3a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+  box-shadow: 0 10px 28px rgba(0,0,0,.2);
+}
+
+.clientProfilePhotoToast[data-tone="error"] {
+  background: #8e2e2e;
+}
+
+.clientProfilePhotoToast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 @media (max-width: 760px) {
   .conversationHeader .clientAvatar.large::after {
-    opacity: .9;
-    width: 12px;
-    height: 12px;
+    right: -2px;
+    bottom: -1px;
+    width: 17px;
+    height: 17px;
+    font-size: 13px;
+  }
+
+  .clientProfilePhotoToast {
+    bottom: calc(18px + env(safe-area-inset-bottom));
   }
 }

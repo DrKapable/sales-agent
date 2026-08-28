@@ -77,6 +77,7 @@ export function MobileChatHeaderMenu() {
   const available = useMemo(() => {
     void revision;
     return {
+      profilePhoto: Boolean(panel?.querySelector(".conversationHeader .clientAvatar.large")),
       whatsapp: Boolean(panel?.querySelector('a.iconButton[href^="https://wa.me/"]')),
       templates: Boolean(panel?.querySelector('[aria-label="Open approved Meta templates"]')),
       documents: Boolean(panel?.querySelector(".conversationDocumentsButton")),
@@ -106,6 +107,7 @@ export function MobileChatHeaderMenu() {
       <section className="mobileHeaderMenuSheet" role="dialog" aria-modal="true" aria-label="Chat actions">
         <header><div><strong>Chat actions</strong><small>Choose what you want to do</small></div><button type="button" aria-label="Close chat actions" onClick={() => setOpen(false)}>×</button></header>
         <div className="mobileHeaderMenuGrid">
+          {available.profilePhoto && <button type="button" onClick={() => run(".conversationHeader .clientAvatar.large")}><span>◉</span><strong>Profile photo</strong><small>Add or replace client photo</small></button>}
           {available.templates && <button type="button" onClick={() => run('[aria-label="Open approved Meta templates"]')}><span>▣</span><strong>Templates</strong><small>Send approved Meta message</small></button>}
           {available.documents && <button type="button" onClick={() => run(".conversationDocumentsButton")}><span>▤</span><strong>Documents</strong><small>Shared files and quotations</small></button>}
           {available.whatsapp && <button type="button" onClick={() => run('a.iconButton[href^="https://wa.me/"]')}><span>WA</span><strong>WhatsApp</strong><small>Open client in WhatsApp</small></button>}
