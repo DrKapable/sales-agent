@@ -1,30 +1,45 @@
-// @ts-nocheck
 "use client";
 
 import { useEffect } from "react";
 
-function normalisePhone(value) {
-  const digits = String(value || "").replace(/\D/g, "");
+type PhotoEntry = { url: string; updatedAt: string };
+type PhotoIndex = Record<string, PhotoEntry>;
+
+function normalisePhone(value: string) {
+  const digits = value.replace(/\D/g, "");
   return digits.startsWith("0") && digits.length === 10 ? `260${digits.slice(1)}` : digits;
 }
 
-function phoneFromText(text) {
-  const match = String(text || "").match(/(?:\+?260|0)\d{9}/);
+function phoneFromText(text: string) {
+  const match = text.match(/(?:\+?260|0)\d{9}/);
   return match ? normalisePhone(match[0]) : null;
 }
 
-function phoneForAvatar(avatar) {
+function phoneForAvatar(avatar: Element) {
   const container = avatar.closest(".leadListItem") || avatar.closest(".clientIdentity") || avatar.closest(".conversationHeader");
-  return container ? phoneFromText(container.textContent) : null;
+  return container ? phoneFromText(container.textContent || "") : null;
 }
 
-function paintPhotos(photos) {
-  document.querySelectorAll(".clientAvatar").forEach((avatar) => {
+function showToast(message: string, tone: "ok" | "error" = "ok") {
+  let toast = document.querySelector<HTMLElement>(".clientProfilePhotoToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.className = "clientProfilePhotoToast";
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.dataset.tone = tone;
+  toast.classList.add("show");
+  window.setTimeout(() => toast?.classList.remove("show"), 2600);
+}
+
+function paintPhotos(photos: PhotoIndex) {
+  document.querySelectorAll<HTMLElement>(".clientAvatar").forEach((avatar) => {
     const phone = phoneForAvatar(avatar);
-    const photo = phone ? photos[phone] : null;
-    let image = avatar.querySelector("img[data-client-profile-photo]");
-    if (!photo) {
-      if (image) image.remove();
+    const entry = phone ? photos[phone] : undefined;
+    let image = avatar.querySelector<HTMLImageElement>("img[data-client-profile-photo]");
+    if (!entry) {
+      image?.remove();
       avatar.classList.remove("hasClientPhoto");
       return;
     }
@@ -34,25 +49,25 @@ function paintPhotos(photos) {
       image.alt = "";
       avatar.prepend(image);
     }
-    if (image.src !== photo) image.src = photo;
+    if (image.getAttribute("src") !== entry.url) image.src = entry.url;
     avatar.classList.add("hasClientPhoto");
   });
 
-  const activeAvatar = document.querySelector(".conversationHeader .clientAvatar.large");
+  const activeAvatar = document.querySelector<HTMLElement>(".conversationHeader .clientAvatar.large");
   if (activeAvatar) {
     activeAvatar.tabIndex = 0;
     activeAvatar.setAttribute("role", "button");
-    activeAvatar.setAttribute("aria-label", "Upload or replace client profile photo");
-    activeAvatar.title = "Tap to add or change client photo";
+    activeAvatar.setAttribute("aria-label", "Change client profile photo");
+    activeAvatar.title = "Change client profile photo";
   }
 }
 
-async function cropPhoto(file) {
+async function cropPhoto(file: File) {
   if (!file.type.startsWith("image/")) throw new Error("Please choose an image file.");
   if (file.size > 12 * 1024 * 1024) throw new Error("Please choose an image smaller than 12 MB.");
   const objectUrl = URL.createObjectURL(file);
   try {
-    const source = await new Promise((resolve, reject) => {
+    const source = await new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
       image.onload = () => resolve(image);
       image.onerror = () => reject(new Error("Unable to read this image."));
@@ -68,7 +83,7 @@ async function cropPhoto(file) {
     const width = source.naturalWidth * scale;
     const height = source.naturalHeight * scale;
     context.drawImage(source, (size - width) / 2, (size - height) / 2, width, height);
-    return canvas.toDataURL("image/jpeg", 0.76);
+    return canvas.toDataURL("image/jpeg", 0.78);
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
@@ -76,9 +91,10 @@ async function cropPhoto(file) {
 
 export function ClientProfilePhotoEnhancer() {
   useEffect(() => {
-    let photos = {};
-    let selectedPhone = null;
+    let photos: PhotoIndex = {};
+    let selectedPhone: string | null = null;
     let disposed = false;
+    let frame = 0;
     const picker = document.createElement("input");
     picker.type = "file";
     picker.accept = "image/jpeg,image/png,image/webp";
@@ -92,17 +108,19 @@ export function ClientProfilePhotoEnhancer() {
     const load = async () => {
       try {
         const response = await fetch("/api/admin/client-profile-photos", { cache: "no-store" });
-        const data = await response.json();
+        const data = await response.json() as { photos?: PhotoIndex };
         if (response.ok && data.photos && !disposed) {
           photos = data.photos;
           repaint();
         }
-      } catch {}
+      } catch {
+        // Initials remain available when photo metadata is temporarily unavailable.
+      }
     };
 
-    const choosePhoto = (event) => {
-      const element = event.target instanceof Element ? event.target : null;
-      const avatar = element ? element.closest(".conversationHeader .clientAvatar.large") : null;
+    const openPicker = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      const avatar = target.closest<HTMLElement>(".conversationHeader .clientAvatar.large");
       if (!avatar) return false;
       const phone = phoneForAvatar(avatar);
       if (!phone) return false;
@@ -112,45 +130,58 @@ export function ClientProfilePhotoEnhancer() {
       return true;
     };
 
-    const onClick = (event) => {
-      if (choosePhoto(event)) event.preventDefault();
+    const onClick = (event: MouseEvent) => {
+      if (openPicker(event.target)) event.preventDefault();
     };
 
-    const onKey = (event) => {
-      if ((event.key === "Enter" || event.key === " ") && choosePhoto(event)) event.preventDefault();
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.key === "Enter" || event.key === " ") && openPicker(event.target)) event.preventDefault();
     };
 
     const onFile = async () => {
-      const file = picker.files && picker.files[0];
+      const file = picker.files?.[0];
       if (!file || !selectedPhone) return;
+      const phone = selectedPhone;
       try {
+        showToast("Preparing profile photo…");
         const imageDataUrl = await cropPhoto(file);
         const response = await fetch("/api/admin/client-profile-photos", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: selectedPhone, imageDataUrl })
+          body: JSON.stringify({ phone, imageDataUrl })
         });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Unable to save the profile photo.");
-        photos = { ...photos, [selectedPhone]: imageDataUrl };
+        const data = await response.json() as { error?: string; photo?: PhotoEntry };
+        if (!response.ok || !data.photo) throw new Error(data.error || "Unable to save the profile photo.");
+        photos = { ...photos, [phone]: data.photo };
         repaint();
+        showToast("Profile photo updated");
       } catch (error) {
-        window.alert(error instanceof Error ? error.message : "Unable to save the profile photo.");
+        showToast(error instanceof Error ? error.message : "Unable to save the profile photo.", "error");
       }
     };
 
+    const observer = new MutationObserver(() => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        repaint();
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     document.addEventListener("click", onClick);
     document.addEventListener("keydown", onKey);
     picker.addEventListener("change", onFile);
     void load();
     repaint();
-    const domTimer = window.setInterval(repaint, 1200);
-    const dataTimer = window.setInterval(() => void load(), 30000);
+
+    const onFocus = () => void load();
+    window.addEventListener("focus", onFocus);
 
     return () => {
       disposed = true;
-      window.clearInterval(domTimer);
-      window.clearInterval(dataTimer);
+      if (frame) window.cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("focus", onFocus);
       document.removeEventListener("click", onClick);
       document.removeEventListener("keydown", onKey);
       picker.removeEventListener("change", onFile);
