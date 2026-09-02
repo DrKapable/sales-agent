@@ -10,7 +10,7 @@ import { allowRequest } from "@/lib/rate-limit";
 import { wait } from "@/lib/timing";
 import { sendTeamCopies } from "@/lib/team-notifications";
 import { notifyDirectorOfNewClient } from "@/lib/new-client-alert";
-import { handleMaryPaymentFlow } from "@/lib/mary-payment-flow";
+import { handleMaryPaymentFlowV2 } from "@/lib/mary-payment-flow-v2";
 
 const requestSchema = z.object({
   sessionId: z.string().regex(/^web-[a-f0-9-]{36}$/),
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     });
   };
 
-  const paymentResult = await handleMaryPaymentFlow({ phone, text: parsed.data.message, source: "simulator" }).catch((error) => {
+  const paymentResult = await handleMaryPaymentFlowV2({ phone, text: parsed.data.message, source: "simulator" }).catch((error) => {
     console.error("Website Sampay payment flow failed safely", { phoneSuffix: phone.slice(-4), error });
     return null;
   });
@@ -88,8 +88,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ reply: paymentResult.reply, paymentFlow: true });
   }
 
-  // Fact capture is silent and should never dictate Mary's wording. Casual chat
-  // bypasses even this step so a social turn remains purely conversational.
   if (!isCasualConversationTurn(parsed.data.message)) {
     await captureNaturalConversationFacts(phone, parsed.data.message, "simulator").catch((error) => {
       console.warn("Website natural conversation memory could not be updated", { phoneSuffix: phone.slice(-4), error });
