@@ -10,6 +10,7 @@ import { allowRequest } from "@/lib/rate-limit";
 import { wait } from "@/lib/timing";
 import { sendTeamCopies } from "@/lib/team-notifications";
 import { notifyDirectorOfNewClient } from "@/lib/new-client-alert";
+import { handleMaryPaymentFlow } from "@/lib/mary-payment-flow";
 
 const requestSchema = z.object({
   sessionId: z.string().regex(/^web-[a-f0-9-]{36}$/),
@@ -77,6 +78,15 @@ export async function POST(request: Request) {
       console.info("Website new client director alert processed", { phoneSuffix: phone.slice(-4), alerted });
     });
   };
+
+  const paymentResult = await handleMaryPaymentFlow({ phone, text: parsed.data.message, source: "simulator" }).catch((error) => {
+    console.error("Website Sampay payment flow failed safely", { phoneSuffix: phone.slice(-4), error });
+    return null;
+  });
+  if (paymentResult) {
+    queueNewClientAlert();
+    return NextResponse.json({ reply: paymentResult.reply, paymentFlow: true });
+  }
 
   // Fact capture is silent and should never dictate Mary's wording. Casual chat
   // bypasses even this step so a social turn remains purely conversational.
