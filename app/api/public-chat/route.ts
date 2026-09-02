@@ -11,6 +11,8 @@ import { wait } from "@/lib/timing";
 import { sendTeamCopies } from "@/lib/team-notifications";
 import { notifyDirectorOfNewClient } from "@/lib/new-client-alert";
 import { handleMaryPaymentFlowV2 } from "@/lib/mary-payment-flow-v2";
+import { sanitizeMaryPaymentKnowledge } from "@/lib/sampay-knowledge-guard";
+import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewrite";
 
 const requestSchema = z.object({
   sessionId: z.string().regex(/^web-[a-f0-9-]{36}$/),
@@ -96,15 +98,20 @@ export async function POST(request: Request) {
 
   const result = await generateWithFailover(phone, parsed.data.message);
   if (result) {
+    const safeReply = sanitizeMaryPaymentKnowledge(result.reply, parsed.data.message);
+    if (safeReply !== result.reply) {
+      await rewriteLatestUnsentAssistantMessage({ phone, from: result.reply, to: safeReply }).catch(() => false);
+    }
     await sendReferralNotification(result);
     queueNewClientAlert();
-    return NextResponse.json({ reply: result.reply });
+    return NextResponse.json({ reply: safeReply });
   }
 
   const fallback = isCasualConversationTurn(parsed.data.message)
     ? casualConversationFallback(parsed.data.message)
     : await verifiedConversationFallback(phone, parsed.data.message).catch(() => "I'm here and I can help. Tell me what's on your mind and we'll continue from there.");
-  await addMessage(phone, "assistant", fallback).catch(() => undefined);
+  const safeFallback = sanitizeMaryPaymentKnowledge(fallback, parsed.data.message);
+  await addMessage(phone, "assistant", safeFallback).catch(() => undefined);
   queueNewClientAlert();
-  return NextResponse.json({ reply: fallback, recovered: true });
+  return NextResponse.json({ reply: safeFallback, recovered: true });
 }
