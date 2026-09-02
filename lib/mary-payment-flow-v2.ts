@@ -12,11 +12,17 @@ import {
 import type { SalesAgentResult } from "@/lib/ai/sales-agent";
 
 const PAYMENT_TOPIC = /\b(pay|payment|payment link|checkout|sampay|mobile money|momo|bank card|debit card|credit card|card payment|pay by card|pay with card|payment method)\b/i;
-const CREATE_INTENT = /\b(ready to pay|want to pay|make payment|proceed with payment|send (?:me )?(?:the )?(?:payment )?link|create (?:a )?(?:payment )?link|how (?:do|can) i pay|where (?:do|can) i pay)\b/i;
+const CREATE_INTENT = /\b(ready to pay|want to pay|make payment|proceed with payment|send (?:me )?(?:the )?(?:payment )?link|create (?:a )?(?:payment )?link|prepare (?:for me )?(?:a )?(?:payment )?link|how (?:do|can) i pay|where (?:do|can) i pay)\b/i;
 const PAID_INTENT = /\b(i(?:'|’)ve paid|i have paid|paid already|payment (?:is )?(?:done|made|completed|successful)|completed (?:the )?payment|just paid)\b/i;
 const COURSE_CONTEXT = /\b(ai[- ]enhanced research writing|ai[- ]assisted research proposal writing|research writing course|proposal writing course|research course|self[- ]directed|self[- ]paced)\b/i;
 const EMAIL = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const PHONE = /(?:\+?260|0)\d{9}\b/;
+const PAYMENT_CONTINUATION = /\b(secure sampay payment|payment request|payment link|mobile money number|official receipt|approved invoice|calendar date|proposal due)\b/i;
+const RESEARCH_SERVICE = /\b(research proposal|proposal writing|proposal)\b/i;
+const PROGRAMME = /\b(phd|doctorate|doctoral|masters?|master['’]?s|msc|mph|mmed|postgraduate|undergraduate|bachelors?|bachelor['’]?s|degree|bsc|mbchb|diploma)\b/i;
+const INSTITUTION = /\b(UNZA|University of Zambia|UNILUS|University of Lusaka|Cavendish(?: University)?(?: Zambia)?)\b/i;
+const ABSOLUTE_DATE = /\b(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December),?\s+(20\d{2})\b/i;
+const RELATIVE_DEADLINE = /\b(?:within\s+)?\d+\s*(?:days?|weeks?)\b|\b(?:today|tomorrow|this week|next week|asap|urgent|rush)\b/i;
 
 function asResult(reply: string): SalesAgentResult {
   return { reply, referralNotification: null, documentIds: [] };
@@ -31,6 +37,41 @@ function normalizePhone(value: string) {
   return digits.startsWith("0") && digits.length === 10 ? `260${digits.slice(1)}` : digits;
 }
 
+function inferProgramme(text: string) {
+  const match = text.match(PROGRAMME)?.[0]?.toLowerCase() || "";
+  if (/phd|doctor/.test(match)) return "PhD/Doctoral";
+  if (/master|msc|mph|mmed|postgraduate/.test(match)) return "Master's/Postgraduate";
+  if (/bachelor|undergraduate|degree|bsc|mbchb/.test(match)) return "Bachelor's";
+  if (/diploma/.test(match)) return "Diploma";
+  return null;
+}
+
+function inferDeadline(messages: string[]) {
+  for (const message of [...messages].reverse()) {
+    const absolute = message.match(ABSOLUTE_DATE);
+    if (absolute) return `${absolute[1]} ${absolute[2]} ${absolute[3]}`;
+    const relative = message.match(RELATIVE_DEADLINE)?.[0];
+    if (relative) return relative.replace(/^within\s+/i, "").trim();
+  }
+  return null;
+}
+
+function inferResearchService(text: string) {
+  if (RESEARCH_SERVICE.test(text)) return "Research Proposal";
+  return null;
+}
+
+function paymentJourneyIsActive(input: {
+  latest: string;
+  leadStatus: string | null | undefined;
+  recentClientText: string;
+  recentAssistantText: string;
+}) {
+  if (PAYMENT_TOPIC.test(input.latest) || PAID_INTENT.test(input.latest) || CREATE_INTENT.test(input.latest)) return true;
+  if (input.leadStatus === "PAYMENT PENDING") return true;
+  return CREATE_INTENT.test(input.recentClientText) && PAYMENT_CONTINUATION.test(input.recentAssistantText);
+}
+
 async function reply(phone: string, body: string) {
   await addMessage(phone, "assistant", body);
   return asResult(body);
@@ -42,12 +83,17 @@ export async function handleMaryPaymentFlowV2(input: {
   source: "whatsapp" | "simulator";
 }): Promise<SalesAgentResult | null> {
   const latest = input.text.trim();
-  if (!PAYMENT_TOPIC.test(latest) && !PAID_INTENT.test(latest)) return null;
-
   let lead = await getOrCreateLead(input.phone, input.source);
   const history = await getConversation(input.phone, 80).catch(() => []);
+  const recent = history.slice(-14);
+  const recentClientText = recent.filter((m) => m.role === "user").map((m) => m.content).join("\n");
+  const recentAssistantText = recent.filter((m) => m.role === "assistant").map((m) => m.content).join("\n");
+
+  if (!paymentJourneyIsActive({ latest, leadStatus: lead.status, recentClientText, recentAssistantText })) return null;
+
   const clientMessages = history.filter((m) => m.role === "user").map((m) => m.content);
-  const transcript = [...clientMessages, latest].join("\n");
+  if (clientMessages.at(-1)?.trim() !== latest) clientMessages.push(latest);
+  const transcript = clientMessages.join("\n");
   const context = `${lead.serviceInterest || ""} ${lead.packageName || ""} ${transcript}`;
   const course = COURSE_CONTEXT.test(context);
 
@@ -98,26 +144,47 @@ export async function handleMaryPaymentFlowV2(input: {
   }
 
   if (course) {
-    await updateLead(input.phone, { serviceInterest: "AI-Assisted Research Proposal Writing", status: CREATE_INTENT.test(latest) ? "PAYMENT PENDING" : lead.status }).catch(() => undefined);
+    await updateLead(input.phone, { serviceInterest: "AI-Assisted Research Proposal Writing", status: CREATE_INTENT.test(transcript) ? "PAYMENT PENDING" : lead.status }).catch(() => undefined);
     return reply(input.phone, `Yes. MedMinds uses Sampay for secure checkout, and the AI-Enhanced Research Writing course can be paid for using Mobile Money or a supported bank card. The current course fee is ${money(AI_RESEARCH_COURSE_PRICE_ZMW)}.\n\nCourse checkout: ${AI_RESEARCH_COURSE_URL}\n\nYou complete the payment directly on that checkout page; there is no need to send money to a personal number.`);
   }
 
-  if (!CREATE_INTENT.test(latest)) {
+  const email = lead.email || [...clientMessages].reverse().map((v) => v.match(EMAIL)?.[0]).find(Boolean) || null;
+  const statedPhone = [...clientMessages].reverse().map((v) => v.match(PHONE)?.[0]).find(Boolean) || null;
+  const inferredProgramme = lead.programme || inferProgramme(transcript);
+  const inferredDeadline = lead.deadline || inferDeadline(clientMessages);
+  const inferredService = inferResearchService(context) || lead.serviceInterest || lead.packageName || null;
+  const inferredInstitution = lead.institution || transcript.match(INSTITUTION)?.[0] || null;
+
+  const patch: Record<string, unknown> = {};
+  if (email && !lead.email) patch.email = email;
+  if (inferredProgramme && !lead.programme) patch.programme = inferredProgramme;
+  if (inferredDeadline && !lead.deadline) patch.deadline = inferredDeadline;
+  if (inferredService && (!lead.serviceInterest || /^research support$/i.test(lead.serviceInterest))) patch.serviceInterest = inferredService;
+  if (inferredInstitution && !lead.institution) patch.institution = inferredInstitution;
+  if (CREATE_INTENT.test(transcript) && lead.status !== "PAYMENT PENDING") patch.status = "PAYMENT PENDING";
+  if (Object.keys(patch).length) lead = await updateLead(input.phone, patch as any).catch(() => lead);
+
+  if (!CREATE_INTENT.test(transcript) && lead.status !== "PAYMENT PENDING") {
     return reply(input.phone, "For MedMinds research-support services, we use secure Sampay payment links. The checkout supports Mobile Money and supported bank cards. Once the service and approved amount are confirmed, I can create the payment request and send it here on WhatsApp and to your email. I’ll need your full name, email address and Mobile Money number for the request.");
   }
 
-  const email = lead.email || [...clientMessages, latest].reverse().map((v) => v.match(EMAIL)?.[0]).find(Boolean) || null;
-  const statedPhone = [...clientMessages, latest].reverse().map((v) => v.match(PHONE)?.[0]).find(Boolean) || null;
   if (!lead.name?.trim()) return reply(input.phone, "I can create the secure Sampay payment request. What full name should I put on it?");
   if (!email) return reply(input.phone, "What email address should I use for the payment request and official receipt?");
   if (!statedPhone) return reply(input.phone, "Please send the Mobile Money number you want linked to the payment request. I’ll use it with your name and email to create the secure checkout link.");
+  if (!inferredService) return reply(input.phone, "I have your payment details. Which research service should I put on the Sampay payment request?");
+  if (/research proposal/i.test(inferredService) && !inferredProgramme) return reply(input.phone, "I have your payment details. What academic level is the research proposal for: diploma, bachelor’s, master’s or PhD?");
+  if (/research proposal/i.test(inferredService) && !inferredDeadline) return reply(input.phone, "I have your payment details. What deadline are you working toward for the proposal?");
 
   const quote = await getLatestPreparedQuotation(lead.id).catch(() => null);
-  let service = quote?.service || lead.serviceInterest || lead.packageName || "Research support";
+  let service = quote?.service || inferredService;
   let amount = quote?.amount_zmw == null ? null : Number(quote.amount_zmw);
 
   if (!(amount && Number.isFinite(amount) && amount > 0)) {
-    const pricing = resolveCataloguePrice(await listOffers(true), { service, programme: lead.programme, deadline: lead.deadline });
+    const pricing = resolveCataloguePrice(await listOffers(true), {
+      service,
+      programme: inferredProgramme,
+      deadline: inferredDeadline,
+    });
     if (pricing.status !== "matched") {
       return reply(input.phone, "I have your payment details, but the final approved amount for this service is not yet available. I won’t create a payment request using a guessed fee. The quotation or approved amount needs to be confirmed first.");
     }
