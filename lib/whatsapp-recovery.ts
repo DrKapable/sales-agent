@@ -8,6 +8,7 @@ import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
 import { getAiModelCandidates } from "@/lib/env";
 import { verifiedConversationFallback } from "@/lib/recovery-reply";
 import { handleMaryPaymentFlowV2 } from "@/lib/mary-payment-flow-v2";
+import { sanitizeMaryPaymentKnowledge } from "@/lib/sampay-knowledge-guard";
 import { humanTextTypingDelayMs, wait } from "@/lib/timing";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 
@@ -32,18 +33,12 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
   const attachmentResult = await handleIncomingClientAttachment(phone, text);
   if (attachmentResult) return attachmentResult;
 
-  // Explicit payment turns are handled by the verified Sampay/Research Portal
-  // workflow before the general AI. This prevents Mary from falling back to
-  // legacy personal-number instructions or treating screenshots as confirmation.
   const paymentResult = await handleMaryPaymentFlowV2({ phone, text, source: "whatsapp" }).catch((error) => {
     console.error("Mary payment workflow failed safely", { phoneSuffix: phone.slice(-4), error });
     return null;
   });
   if (paymentResult) return paymentResult;
 
-  // Keep ordinary social turns conversational. The model still sees the full
-  // transcript, so an unfinished sales journey is remembered without hijacking
-  // greetings, thanks or normal small talk.
   if (isCasualConversationTurn(text)) return generateCasualWhatsAppReply(phone, text);
 
   const optimization = await optimizeInboundLead(phone, text, "whatsapp").catch((error) => {
@@ -51,8 +46,6 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
     return null;
   });
 
-  // Memory capture is deliberately non-verbal. It may save a natural short fact
-  // such as Diploma or 2 weeks, but it never generates the client's reply.
   await captureNaturalConversationFacts(phone, text, "whatsapp").catch((error) => {
     console.warn("Natural conversation memory could not be updated; continuing safely", { phoneSuffix: phone.slice(-4), error });
   });
@@ -63,13 +56,14 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
     const model = models[index];
     try {
       const result = await replyToClient(phone, text, "whatsapp", model);
-      if (!optimization) return result;
+      const shaped = optimization
+        ? shapeMaryReply(result.reply, text, optimization.analysis, recentAssistantReplies)
+        : result.reply;
+      const safeReply = sanitizeMaryPaymentKnowledge(shaped, text);
+      if (safeReply === result.reply) return result;
 
-      const shaped = shapeMaryReply(result.reply, text, optimization.analysis, recentAssistantReplies);
-      if (shaped === result.reply) return result;
-
-      const rewritten = await rewriteLatestUnsentAssistantMessage({ phone, from: result.reply, to: shaped }).catch(() => false);
-      return rewritten ? { ...result, reply: shaped } : result;
+      const rewritten = await rewriteLatestUnsentAssistantMessage({ phone, from: result.reply, to: safeReply }).catch(() => false);
+      return rewritten ? { ...result, reply: safeReply } : { ...result, reply: safeReply };
     } catch (error) {
       console.warn("WhatsApp AI generation failed", { phoneSuffix: phone.slice(-4), model, attempt: index + 1, error });
       if (index < models.length - 1) await wait(250);
@@ -77,9 +71,10 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
   }
 
   const fallback = await verifiedConversationFallback(phone, text).catch(() => "I’m here and I can help. Tell me what’s on your mind and we’ll continue from there.");
-  const reply = optimization
+  const shapedFallback = optimization
     ? shapeMaryReply(fallback, text, optimization.analysis, recentAssistantReplies)
     : fallback;
+  const reply = sanitizeMaryPaymentKnowledge(shapedFallback, text);
   await addMessage(phone, "assistant", reply).catch((error) => {
     console.error("WhatsApp fallback could not be saved", { phoneSuffix: phone.slice(-4), error });
   });
