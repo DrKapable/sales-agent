@@ -7,7 +7,7 @@ import { addMessage } from "@/lib/store";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
 import { getAiModelCandidates } from "@/lib/env";
 import { verifiedConversationFallback } from "@/lib/recovery-reply";
-import { handleMaryPaymentFlow } from "@/lib/mary-payment-flow";
+import { handleMaryPaymentFlowV2 } from "@/lib/mary-payment-flow-v2";
 import { humanTextTypingDelayMs, wait } from "@/lib/timing";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 
@@ -35,7 +35,7 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
   // Explicit payment turns are handled by the verified Sampay/Research Portal
   // workflow before the general AI. This prevents Mary from falling back to
   // legacy personal-number instructions or treating screenshots as confirmation.
-  const paymentResult = await handleMaryPaymentFlow({ phone, text, source: "whatsapp" }).catch((error) => {
+  const paymentResult = await handleMaryPaymentFlowV2({ phone, text, source: "whatsapp" }).catch((error) => {
     console.error("Mary payment workflow failed safely", { phoneSuffix: phone.slice(-4), error });
     return null;
   });
@@ -65,8 +65,6 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
       const result = await replyToClient(phone, text, "whatsapp", model);
       if (!optimization) return result;
 
-      // Keep only lightweight presentation safeguards here. Do not rewrite the
-      // meaning of Mary's response with canned qualification sentences.
       const shaped = shapeMaryReply(result.reply, text, optimization.analysis, recentAssistantReplies);
       if (shaped === result.reply) return result;
 
