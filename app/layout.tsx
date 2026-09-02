@@ -13,6 +13,7 @@ import { ConversationDocumentsEnhancer } from "@/components/conversation-documen
 import { MobileAdminEnhancer } from "@/components/mobile-admin-enhancer";
 import { MobileChatHeaderMenu } from "@/components/mobile-chat-header-menu";
 import { PwaSplash } from "@/components/pwa-splash";
+import { SampayPaymentEnhancer } from "@/components/sampay-payment-enhancer";
 import "./globals.css";
 import "./admin-mobile.css";
 import "./admin-mobile-v4.css";
@@ -65,5 +66,5 @@ export const viewport: Viewport = {
 // Admin document enhancers are mounted at the root so the active client conversation can render shared files immediately.
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   await connection();
-  return <html lang="en"><body><PwaSplash /><MobileAdminEnhancer /><MobileChatHeaderMenu /><BusinessAnalysisUXEnhancer /><ClientRecordManagementEnhancer /><ClientProfilePhotoEnhancer /><ChatLifecycleReliabilityEnhancer /><AdminDocumentsV2 /><ConversationDocumentsEnhancer /><ClientAttachmentEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
+  return <html lang="en"><body><PwaSplash /><MobileAdminEnhancer /><MobileChatHeaderMenu /><SampayPaymentEnhancer /><BusinessAnalysisUXEnhancer /><ClientRecordManagementEnhancer /><ClientProfilePhotoEnhancer /><ChatLifecycleReliabilityEnhancer /><AdminDocumentsV2 /><ConversationDocumentsEnhancer /><ClientAttachmentEnhancer /><ChatRichTextEnhancer /><ChatDeliveryTicksEnhancer /><AgentIdentityEnhancer />{children}</body></html>;
 }
