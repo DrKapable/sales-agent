@@ -40,7 +40,10 @@ function normalizeBlocks(value: string) {
   const raw = value.replace(/\r\n?/g, "\n").trim();
   if (!raw) return [];
   const lines = raw.split("\n").map(tidyLine).filter(Boolean);
-  if (lines.length === 1 && lines[0].length > 180) return splitFlatCaption(lines[0]);
+  if (lines.length === 1) {
+    const sentences = lines[0].split(/(?<=[.!?])\s+/).filter(Boolean);
+    if (sentences.length >= 3 || lines[0].length > 180) return splitFlatCaption(lines[0]);
+  }
   return lines;
 }
 
@@ -97,7 +100,6 @@ export function formatPremiumCaption(value: string, input: CaptionStyleInput = {
     lines[firstIndex] = `${captionLeadEmoji(input)} ${lines[firstIndex]}`;
   }
 
-  // If the model returned plain dash bullets, upgrade them to a clean Facebook-friendly check style.
   lines = lines.map((line, index) => {
     if (index === firstIndex) return line;
     if (/^[-•]\s+/.test(line)) return `✅ ${line.replace(/^[-•]\s+/, "")}`;
