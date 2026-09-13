@@ -35,4 +35,14 @@ describe("MedMinds brand rules", () => {
     expect(quality.blockers.some((item) => item.includes("outdated MedMinds link"))).toBe(true);
     expect(quality.blockers.some((item) => item.includes("2-day free trial"))).toBe(true);
   });
+
+  it("blocks em dashes and obvious AI-marketing phrases before approval", () => {
+    const quality = assessMedMindsContent({
+      title: "Revision support",
+      body: "Elevate your revision — unlock your potential with focused practice and clear feedback."
+    });
+    expect(quality.blockers.some((item) => item.includes("em dashes"))).toBe(true);
+    expect(quality.blockers.some((item) => item.includes("AI-like marketing wording"))).toBe(true);
+    expect(quality.checks.find((check) => check.label === "Natural, non-formulaic wording")?.ok).toBe(false);
+  });
 });
