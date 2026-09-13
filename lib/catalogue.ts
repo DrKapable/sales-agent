@@ -119,7 +119,7 @@ const medMindsPrepOffers: OfferSeed[] = [
     features: ["Internal Medicine", "Paediatrics", "Obstetrics and Gynaecology", "Surgery", "2-day free trial", `Current medical-student landing page: ${PREP_MEDICAL}`],
     priceZmw: 100,
     rushPriceZmw: 100,
-    paymentInstructions: `Start with the current medical-student landing page at ${PREP_MEDICAL}. The landing page shows the current plan options after the 2-day free trial.`,
+    paymentInstructions: `Start with the current medical-student landing page at ${PREP_MEDICAL}. The landing page shows the current plan options after the 2-day free trial. ${PAYMENT_DETAILS}.`,
     active: true
   },
   {
@@ -130,7 +130,7 @@ const medMindsPrepOffers: OfferSeed[] = [
     features: ["Undergraduate medical students", "OSCE Clinical Skills", "2-day free trial", `Current medical-student landing page: ${PREP_MEDICAL}`],
     priceZmw: 100,
     rushPriceZmw: 100,
-    paymentInstructions: `Start at ${PREP_MEDICAL}. The landing page includes the current medical-student plan options after the 2-day free trial.`,
+    paymentInstructions: `Start at ${PREP_MEDICAL}. The landing page includes the current medical-student plan options after the 2-day free trial. ${PAYMENT_DETAILS}.`,
     active: true
   },
   {
@@ -141,7 +141,7 @@ const medMindsPrepOffers: OfferSeed[] = [
     features: ["QBank", "Past Papers Theory", "OSCE Clinical Skills", "2-day free trial", `Current medical-student landing page: ${PREP_MEDICAL}`],
     priceZmw: 200,
     rushPriceZmw: 200,
-    paymentInstructions: `Start at ${PREP_MEDICAL}. Use the plan information shown on the current landing page after the 2-day free trial.`,
+    paymentInstructions: `Start at ${PREP_MEDICAL}. Use the plan information shown on the current landing page after the 2-day free trial. ${PAYMENT_DETAILS}.`,
     active: true
   },
   {
