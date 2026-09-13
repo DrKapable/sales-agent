@@ -17,10 +17,10 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const oauthError = url.searchParams.get("error");
-  if (oauthError) return NextResponse.redirect(destination(request, "/admin/facebook", "cancelled"));
-  if (!code || !state || !config.oauthConfigured) return NextResponse.redirect(destination(request, "/admin/facebook", "invalid-callback"));
+  if (oauthError) return NextResponse.redirect(destination(request, "/admin/social", "cancelled"));
+  if (!code || !state || !config.oauthConfigured) return NextResponse.redirect(destination(request, "/admin/social", "invalid-callback"));
 
-  let returnTo = "/admin/facebook";
+  let returnTo = "/admin/social";
   try {
     returnTo = verifyFacebookOAuthState(state).returnTo;
     const redirectUri = `${publicOrigin(request)}/api/admin/facebook/callback`;
