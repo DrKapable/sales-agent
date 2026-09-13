@@ -21,23 +21,35 @@ function Brand({ logoSrc, compact = false }: { logoSrc: string; compact?: boolea
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: compact ? "7px 10px" : "9px 13px",
-      borderRadius: compact ? 13 : 16,
-      background: "rgba(255,255,255,.97)",
+      padding: compact ? "6px 9px" : "8px 12px",
+      borderRadius: compact ? 12 : 15,
+      background: "rgba(255,255,255,.99)",
       border: "1px solid rgba(16,43,40,.10)",
-      boxShadow: "0 8px 22px rgba(16,43,40,.10)"
+      boxShadow: "0 8px 22px rgba(16,43,40,.12)"
     }
   }, React.createElement("img", {
     src: logoSrc,
-    width: compact ? 154 : 188,
-    height: compact ? 65 : 80,
-    style: { width: compact ? 154 : 188, height: compact ? 65 : 80, objectFit: "contain" }
+    width: compact ? 150 : 184,
+    height: compact ? 62 : 78,
+    style: { width: compact ? 150 : 184, height: compact ? 62 : 78, objectFit: "contain" }
   }));
 }
 
 function Cta({ text, light = false }: { text: string; light?: boolean }) {
-  return React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "12px 21px", borderRadius: 999, background: light ? COLORS.white : COLORS.green, color: light ? COLORS.greenDark : COLORS.white, fontSize: 19, fontWeight: 850 } },
-    React.createElement("span", null, text), React.createElement("span", { style: { fontSize: 22 } }, "→"));
+  return React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 21px",
+      borderRadius: 999,
+      background: light ? COLORS.white : COLORS.green,
+      color: light ? COLORS.greenDark : COLORS.white,
+      fontSize: 19,
+      fontWeight: 850,
+      boxShadow: light ? "0 8px 24px rgba(0,0,0,.14)" : "none"
+    }
+  }, React.createElement("span", null, text), React.createElement("span", { style: { fontSize: 22 } }, "→"));
 }
 
 function Promo({ logoSrc, headline, support, cta, label }: { logoSrc: string; headline: string; support: string; cta: string; label: string }) {
@@ -51,11 +63,11 @@ function Promo({ logoSrc, headline, support, cta, label }: { logoSrc: string; he
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, color: "#8be0c9", fontSize: 13, fontWeight: 900, letterSpacing: 2, marginBottom: 16 } },
           React.createElement("span", { style: { width: 38, height: 5, borderRadius: 999, background: "#58c8ac" } }), label),
         React.createElement("div", { style: { color: COLORS.white, fontSize: size, fontWeight: 900, lineHeight: 1.05, letterSpacing: -1.7 } }, headline),
-        support ? React.createElement("div", { style: { color: "#cfe5df", fontSize: 24, lineHeight: 1.38, marginTop: 19, maxWidth: 780 } }, support) : null
+        support ? React.createElement("div", { style: { color: "#e2f0ec", fontSize: 24, lineHeight: 1.38, marginTop: 19, maxWidth: 780 } }, support) : null
       ),
       React.createElement("div", { style: { display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 28 } },
         React.createElement(Cta, { text: cta, light: true }),
-        React.createElement("div", { style: { color: "rgba(255,255,255,.72)", fontSize: 14, textAlign: "right", lineHeight: 1.4 } }, "Medical learning • Research support • Digital tools")
+        React.createElement("div", { style: { color: "rgba(255,255,255,.80)", fontSize: 14, textAlign: "right", lineHeight: 1.4 } }, "Medical learning • Research support • Digital tools")
       )
     )
   );
@@ -73,7 +85,7 @@ function Education({ logoSrc, headline, support, cta, label, faq = false }: { lo
       React.createElement("div", { style: { display: "flex", flexDirection: "column", maxWidth: 950 } },
         React.createElement("div", { style: { color: COLORS.green, fontSize: 15, fontWeight: 900, letterSpacing: 2.2, marginBottom: 14 } }, faq ? `${label} FAQ` : label),
         React.createElement("div", { style: { color: COLORS.ink, fontSize: size, fontWeight: 900, lineHeight: 1.08, letterSpacing: -1.4 } }, headline),
-        support ? React.createElement("div", { style: { color: COLORS.muted, fontSize: 24, lineHeight: 1.42, marginTop: 20, maxWidth: 850 } }, support) : null
+        support ? React.createElement("div", { style: { color: "#435e59", fontSize: 24, lineHeight: 1.42, marginTop: 20, maxWidth: 850 } }, support) : null
       ),
       React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
         React.createElement(Cta, { text: cta }),
@@ -84,16 +96,32 @@ function Education({ logoSrc, headline, support, cta, label, faq = false }: { lo
 }
 
 function Photo({ logoSrc, photoSrc, headline, support, cta, label }: { logoSrc: string; photoSrc: string; headline: string; support: string; cta: string; label: string }) {
-  const size = headline.length > 70 ? 41 : 49;
+  const size = headline.length > 68 ? 43 : headline.length > 44 ? 50 : 58;
   return React.createElement("div", { style: { width: "100%", height: "100%", display: "flex", position: "relative", overflow: "hidden", background: COLORS.ink } },
-    React.createElement("img", { src: photoSrc, width: 1200, height: 628, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" } }),
-    React.createElement("div", { style: { position: "absolute", inset: 0, background: "linear-gradient(90deg,rgba(16,43,40,.97) 0%,rgba(16,43,40,.90) 30%,rgba(16,43,40,.62) 52%,rgba(16,43,40,.14) 76%,rgba(16,43,40,0) 100%)" } }),
-    React.createElement("div", { style: { position: "relative", zIndex: 2, width: "61%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "36px 52px 38px" } },
+    React.createElement("img", { src: photoSrc, width: 1200, height: 628, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "70% 50%" } }),
+    React.createElement("div", { style: { position: "absolute", inset: 0, background: "linear-gradient(90deg,rgba(7,85,72,.44) 0%,rgba(7,85,72,.16) 44%,rgba(7,85,72,0) 70%)" } }),
+    React.createElement("div", {
+      style: {
+        position: "relative",
+        zIndex: 2,
+        width: "50%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        margin: "24px 0 24px 28px",
+        padding: "24px 30px 26px",
+        borderRadius: 24,
+        background: "rgba(7,85,72,.94)",
+        border: "1px solid rgba(255,255,255,.14)",
+        boxShadow: "0 18px 42px rgba(0,0,0,.24)"
+      }
+    },
       React.createElement(Brand, { logoSrc, compact: true }),
-      React.createElement("div", { style: { display: "flex", flexDirection: "column", maxWidth: 650 } },
-        React.createElement("div", { style: { color: "#8be0c9", fontSize: 13, fontWeight: 900, letterSpacing: 2.1, marginBottom: 13 } }, label),
-        React.createElement("div", { style: { color: COLORS.white, fontSize: size, fontWeight: 900, lineHeight: 1.04, letterSpacing: -1.5 } }, headline),
-        support ? React.createElement("div", { style: { color: "rgba(255,255,255,.84)", fontSize: 20, lineHeight: 1.4, marginTop: 15, maxWidth: 590 } }, support) : null
+      React.createElement("div", { style: { display: "flex", flexDirection: "column", maxWidth: 520 } },
+        React.createElement("div", { style: { color: "#a8ead8", fontSize: 13, fontWeight: 900, letterSpacing: 2.1, marginBottom: 13 } }, label),
+        React.createElement("div", { style: { color: COLORS.white, fontSize: size, fontWeight: 900, lineHeight: 1.02, letterSpacing: -1.4 } }, headline),
+        support ? React.createElement("div", { style: { color: "#f3fbf8", fontSize: 22, fontWeight: 560, lineHeight: 1.36, marginTop: 16, maxWidth: 500 } }, support) : null
       ),
       React.createElement(Cta, { text: cta, light: true })
     )
@@ -104,9 +132,9 @@ function propsFor(post: ContentPost) {
   const type = post.contentType.toLowerCase();
   const label = type.includes("medminds prep") ? "MEDMINDS PREP" : type.includes("research") || type.includes("data analysis") ? "MEDMINDS RESEARCH" : type.includes("digital") || type.includes("software") ? "MEDMINDS DIGITAL" : "MEDMINDS";
   return {
-    headline: (post.creativeHeadline || post.title || "MedMinds").slice(0, 100),
-    support: (post.creativeSupportingText || "").slice(0, 230),
-    cta: (post.creativeCta || "Message MedMinds").slice(0, 60),
+    headline: (post.creativeHeadline || post.title || "MedMinds").slice(0, 90),
+    support: (post.creativeSupportingText || "").slice(0, 165),
+    cta: (post.creativeCta || "Message MedMinds").slice(0, 48),
     label
   };
 }
