@@ -55,11 +55,14 @@ function aliasSlug(service: string, programme?: string | null) {
   if (/\b(chest x ray|chest xray)\b/.test(text)) return "course-chest-xray";
   if (/\bkobotoolbox\b/.test(text) && /\b(course|training|learn|data collection)\b/.test(text)) return "course-kobotoolbox";
   if (/\bosce high yield|osce revision session\b/.test(text)) return "course-osce-revision";
-  if (/\bpa gym\b/.test(text) && /\b(theory.*osce|osce.*theory|combined|both)\b/.test(text)) return "pa-gym-combined";
-  if (/\bpa gym\b/.test(text) && /\bosce\b/.test(text)) return "pa-gym-osce";
-  if (/\bpa gym\b/.test(text) && /\bpreclinical\b/.test(text)) return "pa-gym-preclinical";
-  if (/\bpa gym\b/.test(text) && /\bnmcz|nursing\b/.test(text)) return "pa-gym-nmcz";
-  if (/\bpa gym\b/.test(text)) return "pa-gym";
+
+  const prep = /\b(medminds prep|pa gym)\b/.test(text);
+  if (prep && /\b(theory.*osce|osce.*theory|combined|both)\b/.test(text)) return "pa-gym-combined";
+  if (prep && /\bosce\b/.test(text)) return "pa-gym-osce";
+  if (prep && /\bpreclinical\b/.test(text)) return "pa-gym-preclinical";
+  if (prep && /\bnmcz|nursing\b/.test(text)) return "pa-gym-nmcz";
+  if (prep) return "pa-gym";
+
   if (/\bpowerpoint|presentation from (?:a )?(?:dissertation|proposal)\b/.test(text)) return "powerpoint-presentation";
   if (/\bwhatsapp\b/.test(text) && /\bautomation|agency\b/.test(text)) return "whatsapp-agency-automation";
   if (/\bweb(?:site)? development|website design\b/.test(text)) return "web-development";

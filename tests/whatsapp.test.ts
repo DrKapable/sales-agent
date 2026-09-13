@@ -19,7 +19,7 @@ describe("WhatsApp webhook security", () => {
 
   it("extracts supported text messages and ignores other events", () => {
     const messages = parseIncomingMessages({ entry: [{ changes: [{ value: { contacts: [{ profile: { name: "Amina" } }], messages: [{ id: "wamid.1", from: "260970000000", type: "text", text: { body: "  Hi  " } }, { id: "wamid.2", from: "260970000000", type: "image" }] } }] }] });
-    expect(messages).toEqual([{ id: "wamid.1", phone: "260970000000", name: "Amina", text: "Hi" }]);
+    expect(messages).toEqual([{ id: "wamid.1", phone: "260970000000", name: "Amina", text: "Hi", phoneNumberId: null, displayPhoneNumber: null }]);
   });
 
   it("keeps useful Meta error fields while redacting sensitive values", () => {

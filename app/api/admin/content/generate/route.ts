@@ -2,6 +2,7 @@ import { gateway, ToolLoopAgent } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAiModelCandidates } from "@/lib/env";
+import { normalizeMedMindsBranding } from "@/lib/medminds-brand";
 import { listOffers } from "@/lib/store";
 
 const schema = z.object({
@@ -19,15 +20,26 @@ const schema = z.object({
   variationCount: z.number().int().min(1).max(3).default(3)
 });
 
-function fallback(input: z.infer<typeof schema>) {
-  const audience = input.audience ? `For ${input.audience}. ` : "";
-  const base = `${input.objective}\n\n${audience}MedMinds provides practical learning, research and academic support designed to help students and professionals work more confidently. Message MedMinds for the most appropriate next step.`;
+function brandSafeOutput<T extends { body: string; alternatives: string[]; headline: string; imageBrief: string }>(output: T) {
+  const alternatives = output.alternatives.map(normalizeMedMindsBranding);
   return {
+    ...output,
+    body: normalizeMedMindsBranding(output.body),
+    alternatives,
+    headline: normalizeMedMindsBranding(output.headline),
+    imageBrief: normalizeMedMindsBranding(output.imageBrief)
+  };
+}
+
+function fallback(input: z.infer<typeof schema>) {
+  const audience = input.audience ? `For ${normalizeMedMindsBranding(input.audience)}. ` : "";
+  const base = `${normalizeMedMindsBranding(input.objective)}\n\n${audience}MedMinds provides practical learning, research and academic support designed to help students and professionals work more confidently. Message MedMinds for the most appropriate next step.`;
+  return brandSafeOutput({
     body: base,
     alternatives: [base],
-    headline: input.objective.slice(0, 76),
+    headline: normalizeMedMindsBranding(input.objective).slice(0, 76),
     imageBrief: "Clean MedMinds visual in deep green, cream and white, showing a credible African medical, academic or research context with one clear message."
-  };
+  });
 }
 
 function parseOutput(text: string, wanted: number) {
@@ -41,7 +53,7 @@ function parseOutput(text: string, wanted: number) {
     if (value) captions.push(value);
   }
   if (!captions.length && cleaned) captions.push(cleaned.replace(/\[\[[A-Z0-9_]+\]\]/g, "").trim());
-  return { body: captions[0] || "", alternatives: captions.slice(0, wanted), headline, imageBrief };
+  return brandSafeOutput({ body: captions[0] || "", alternatives: captions.slice(0, wanted), headline, imageBrief });
 }
 
 export async function POST(request: Request) {
@@ -49,10 +61,10 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid content generation request." }, { status: 400 });
 
   const offers = (await listOffers()).filter((offer) => offer.active).map((offer) => ({
-    name: offer.name,
-    category: offer.category,
-    description: offer.description,
-    features: offer.features,
+    name: normalizeMedMindsBranding(offer.name),
+    category: normalizeMedMindsBranding(offer.category),
+    description: normalizeMedMindsBranding(offer.description),
+    features: offer.features.map(normalizeMedMindsBranding),
     priceZmw: offer.priceZmw,
     rushPriceZmw: offer.rushPriceZmw
   }));
@@ -60,17 +72,22 @@ export async function POST(request: Request) {
   const input = parsed.data;
   const lengthGuide = input.length === "short" ? "180-380 characters" : input.length === "long" ? "700-1200 characters" : "350-750 characters";
   const actionGuide = input.action === "humanise"
-    ? `Rewrite the supplied caption so it sounds natural, specific and human while preserving factual claims. Existing caption: ${input.existingBody}`
+    ? `Rewrite the supplied caption so it sounds natural, specific and human while preserving factual claims. Existing caption: ${normalizeMedMindsBranding(input.existingBody)}`
     : input.action === "strengthen-hook"
-      ? `Rewrite the supplied caption with a stronger but credible opening. Avoid clickbait. Existing caption: ${input.existingBody}`
+      ? `Rewrite the supplied caption with a stronger but credible opening. Avoid clickbait. Existing caption: ${normalizeMedMindsBranding(input.existingBody)}`
       : input.action === "shorten"
-        ? `Shorten the supplied caption without losing important information. Existing caption: ${input.existingBody}`
+        ? `Shorten the supplied caption without losing important information. Existing caption: ${normalizeMedMindsBranding(input.existingBody)}`
         : "Create new content from the brief.";
 
   const instructions = `You are the senior content editor for MedMinds Learning Centre, a Zambia-based medical education, research-support and digital-services brand. Every draft is reviewed by an authenticated administrator before publication.
 
 BRAND VOICE
-${input.brandVoice}
+${normalizeMedMindsBranding(input.brandVoice)}
+
+CURRENT BRAND NAMING
+- MedMinds Prep is the current name of the examination-preparation product.
+- Never use the retired name for MedMinds Prep in headlines, captions, CTAs, image briefs or service descriptions, even if older catalogue data or user wording contains it.
+- Preserve legacy URL paths when supplied because a URL path may still contain the former product slug.
 
 WRITING STANDARD
 - Write like a knowledgeable MedMinds educator or research-support professional, not a generic marketing bot.
@@ -93,7 +110,7 @@ ACADEMIC, CLINICAL AND ETHICAL SAFEGUARDS
 
 MEDMINDS CONTENT PRIORITIES
 - Research: proposal development, dissertation/thesis support, manuscript support, data collection tools, quantitative/qualitative/mixed-methods analysis, editing and research training.
-- Learning: Pa Gym theory, OSCE and NMCZ/preclinical preparation; medical courses; ECG, chest X-ray and OSCE revision.
+- Learning: MedMinds Prep theory, question practice, OSCE, NMCZ and preclinical preparation; medical courses; ECG, chest X-ray and OSCE revision.
 - Digital: ZaTafa MedStats, web/software development and WhatsApp automation where relevant.
 - Educational posts should teach something useful before selling.
 - Promotional posts should explain who the service is for, the practical benefit and one simple next step.
@@ -119,7 +136,7 @@ ${input.variationCount >= 2 ? "[[CAPTION_2]]\n<different caption>\n" : ""}${inpu
 APPROVED MEDMINDS CATALOGUE
 ${JSON.stringify(offers)}`;
 
-  const prompt = `Task: ${actionGuide}\nContent type: ${input.contentType}\nObjective: ${input.objective}\nAudience: ${input.audience}\nTone: ${input.tone}\nAngle: ${input.angle}\nLength: ${input.length}\nCTA: ${input.cta}\nAdditional instructions: ${input.notes || "None"}`;
+  const prompt = `Task: ${actionGuide}\nContent type: ${normalizeMedMindsBranding(input.contentType)}\nObjective: ${normalizeMedMindsBranding(input.objective)}\nAudience: ${normalizeMedMindsBranding(input.audience)}\nTone: ${input.tone}\nAngle: ${input.angle}\nLength: ${input.length}\nCTA: ${input.cta}\nAdditional instructions: ${normalizeMedMindsBranding(input.notes || "None")}`;
   let lastError: unknown = null;
   for (const model of getAiModelCandidates()) {
     try {

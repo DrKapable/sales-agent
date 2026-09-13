@@ -3,7 +3,6 @@ import { buildInboxConversationIntelligence, type InboxLeadSignals } from "@/lib
 import { SERVICE_CATEGORY_ORDER, harmonizeServiceCategory, precisePercentage, serviceCategoryForLead, summarizeServiceCategories } from "@/lib/service-categories";
 
 type SnapshotLike = Parameters<typeof buildBusinessAnalytics>[0] & { leads?: any[]; offers?: any[] };
-
 type SignalKey = keyof InboxLeadSignals["signals"];
 
 function activeLead(lead: any) {
@@ -155,7 +154,7 @@ export async function buildBusinessAnalyticsWithInbox(snapshot: SnapshotLike, da
     limitations: [
       ...base.limitations,
       "Percentages use one-decimal precision. Service lead share is calculated as service leads divided by all leads in the selected period; service conversion is converted leads divided by leads in that service category.",
-      "Management service reporting is harmonized into five categories: Research Support Services, Online Courses, Pa Gym Services, Software, AI & Automation, and Others. Exact service names remain available internally for quotations and fulfilment.",
+      "Management service reporting is harmonized into five categories: Research Support Services, Online Courses, MedMinds Prep Services, Software, AI & Automation, and Others. Exact service names remain available internally for quotations and fulfilment.",
       "Inbox conversation signals are pattern-based screening of recent stored messages. They identify conversations worth reviewing but do not prove the client’s underlying motive or sentiment.",
       "Only recent stored inbox turns are analysed per lead, so very old objections may not appear if they are outside the current analysis window."
     ]

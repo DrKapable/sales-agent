@@ -46,7 +46,7 @@ export default function Home() {
       <section id="services" className="featureSection shell homeServices">
         <div className="sectionHeading"><div><span className="kicker">What we do</span><h2>Support built around real academic and professional needs.</h2></div></div>
         <div className="featureGrid homeFeatureGrid">
-          <article><h3>Medical learning</h3><p>Pa Gym, exam-focused notes, question practice, OSCE preparation, tutorials and selected courses.</p><button type="button" className="serviceChatLink" data-medminds-open-chat>Ask about learning support →</button></article>
+          <article><h3>Medical learning</h3><p>MedMinds Prep, exam-focused notes, question practice, OSCE preparation, tutorials and selected courses.</p><button type="button" className="serviceChatLink" data-medminds-open-chat>Ask about learning support →</button></article>
           <article><h3>Research support</h3><p>Research topics, proposals, dissertations, data analysis, editing and other approved research services.</p><button type="button" className="serviceChatLink" data-medminds-open-chat>Ask about research support →</button></article>
           <article><h3>Digital solutions</h3><p>Software development, websites, business automation and selected systems developed by MedMinds.</p><button type="button" className="serviceChatLink" data-medminds-open-chat>Ask about digital solutions →</button></article>
         </div>

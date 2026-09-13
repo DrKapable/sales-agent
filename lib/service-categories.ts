@@ -1,7 +1,7 @@
 export const SERVICE_CATEGORY_ORDER = [
   "Research Support Services",
   "Online Courses",
-  "Pa Gym Services",
+  "MedMinds Prep Services",
   "Software, AI & Automation",
   "Others"
 ] as const;
@@ -50,7 +50,8 @@ function categoryFromCatalogueMetadata(offer: OfferLike): ServiceCategory | null
   const slug = normalize(offer.slug);
   const category = normalize(offer.category);
 
-  if (slug.startsWith("pa gym") || category === "pa gym") return "Pa Gym Services";
+  // Legacy pa-gym slugs remain supported for compatibility with existing links and records.
+  if (slug.startsWith("pa gym") || category === "pa gym" || category === "medminds prep") return "MedMinds Prep Services";
   if (slug.startsWith("course ") || ["courses", "training"].includes(category)) return "Online Courses";
 
   if (
@@ -73,7 +74,7 @@ function categoryFromFreeText(value: string): ServiceCategory {
   const text = normalize(value);
   if (!text) return "Others";
 
-  if (/\bpa gym\b|\bnmcz\b.*\b(prep|preparation|exam)\b/.test(text)) return "Pa Gym Services";
+  if (/\bmedminds prep\b|\bpa gym\b|\bnmcz\b.*\b(prep|preparation|exam)\b/.test(text)) return "MedMinds Prep Services";
 
   if (
     /\b(course|courses|training|tutorial|tutorials|learn|learning programme|self paced|master ecg interpretation|ecg interpretation|mastering chest x ray|chest x ray interpretation|digital surveys|kobotoolbox course|osce high yield revision|ai assisted research proposal writing)\b/.test(text)

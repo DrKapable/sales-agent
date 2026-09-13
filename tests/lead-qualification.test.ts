@@ -23,6 +23,7 @@ function lead(overrides: Partial<Lead> = {}): Lead {
     source: "whatsapp",
     createdAt: "2026-08-17T10:00:00.000Z",
     updatedAt: "2026-08-17T10:00:00.000Z",
+    lastMessageAt: null,
     ...overrides
   };
 }
@@ -77,11 +78,11 @@ describe("lead qualification before pricing", () => {
     expect(result.qualified).toBe(true);
   });
 
-  it("requires Pa Gym fit before pricing", () => {
+  it("requires MedMinds Prep fit before pricing", () => {
     const result = assessLeadQualification({
-      lead: lead({ serviceInterest: "Pa Gym", programme: "MBChB" }),
-      history: [user("How much is Pa Gym?")],
-      latestText: "How much is Pa Gym?"
+      lead: lead({ serviceInterest: "MedMinds Prep", programme: "MBChB" }),
+      history: [user("How much is MedMinds Prep?")],
+      latestText: "How much is MedMinds Prep?"
     });
     expect(result.qualified).toBe(false);
     expect(result.missing).toBe("format");

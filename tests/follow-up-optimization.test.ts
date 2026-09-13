@@ -23,6 +23,7 @@ function lead(overrides: Partial<Lead> = {}): Lead {
     source: "whatsapp",
     createdAt: "2026-08-16T10:00:00.000Z",
     updatedAt: "2026-08-16T10:00:00.000Z",
+    lastMessageAt: null,
     ...overrides
   };
 }

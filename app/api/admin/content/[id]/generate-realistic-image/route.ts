@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const schema = z.object({
-  scene: z.enum(["research-work", "clinical-learning", "student-study", "data-analysis", "teaching", "digital-health", "neutral-portrait"]).default("research-work"),
+  scene: z.enum(["research-work", "clinical-learning", "student-study", "exam-prep", "data-analysis", "teaching", "digital-health", "neutral-portrait"]).default("research-work"),
   subject: z.enum(["woman", "man", "mixed-pair", "small-group", "clinician", "student"]).default("woman"),
   setting: z.enum(["modern-office", "university", "clinical-classroom", "library", "workspace", "urban-outdoor"]).default("modern-office"),
   mood: z.enum(["confident", "approachable", "focused", "curious", "warm"]).default("focused"),
@@ -32,6 +32,7 @@ const sceneMap: Record<string, string> = {
   "research-work": "working thoughtfully on a health research project with a laptop, notebook and non-identifiable charts or papers",
   "clinical-learning": "participating in a professional medical learning session using a tablet, notebook or teaching image without showing a real patient",
   "student-study": "studying medical or nursing material in a focused, realistic university setting",
+  "exam-prep": "preparing for a medical or nursing examination using generic revision notes, a laptop or tablet, question-practice cues and an OSCE-style study environment without showing any real examination paper, answer key or confidential assessment material",
   "data-analysis": "reviewing a clean research dashboard, spreadsheet or statistical output on a laptop with no private data visible",
   teaching: "a small teaching or mentorship interaction around a laptop or whiteboard with natural body language",
   "digital-health": "using a contemporary digital health or education platform on a laptop or tablet in a credible professional setting",
@@ -85,7 +86,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const derivedDirection = `${subjectMap[input.subject]}; ${sceneMap[input.scene]}; ${settingMap[input.setting]}; mood: ${moodMap[input.mood]}; ${styleMap[input.style]}.`;
     const primaryDirection = input.extraDirection || derivedDirection;
-    const prompt = `Create a highly photorealistic landscape advertising photograph for MedMinds Learning Centre, a medical education, research-support and digital-health brand based in Zambia.
+    const prompt = `Create a highly photorealistic landscape advertising photograph for MedMinds Learning Centre, a medical education, research-support and digital-health brand based in Zambia. MedMinds Prep is its examination-preparation product.
 
 PRIMARY CREATIVE DIRECTION
 ${primaryDirection}
@@ -105,6 +106,7 @@ COMPOSITION
 MEDICAL, ACADEMIC AND PRIVACY SAFEGUARDS
 - Use entirely fictional adults; do not resemble public figures, real students, real clinicians or real patients.
 - Do not show identifiable patient faces, patient charts, names, phone numbers, student IDs, examination papers, confidential records or real research data.
+- For MedMinds Prep scenes, show revision activity rather than an actual examination in progress. Generic educational props are acceptable; real or realistic leaked exam papers, answers, marking keys and confidential assessments are not.
 - Avoid graphic procedures, distress, illness, blood, needles, operating scenes or sensational medical imagery unless explicitly requested for a safe educational purpose.
 - Do not show fake certificates, fabricated journal covers, guaranteed-results language, exam answers or plagiarism/cheating cues.
 - No visible MedMinds logo, company name, watermarks or promotional text inside the raw photograph; branding is added separately.

@@ -7,7 +7,8 @@ const PAYMENT_DETAILS = "Submit payment to 0977259132, registered to Juma Phiri.
 const PAYMENT_AFTER_QUOTE = "Once the amount is approved, submit payment to 0977259132, registered to Juma Phiri, and confirm it with Dr. Mustafa Juma Phiri on 0977259132";
 const GENERAL_CONTACT = "Dr Kanyembo Ng'andwe on 0974634555";
 const RESEARCH_PAYMENT = `Review research pricing at ${RESEARCH_PRICING_URL}. ${PAYMENT_DETAILS}. For other enquiries, contact ${GENERAL_CONTACT}.`;
-const PA_GYM_ACCOUNT = "https://medmindslc.site/pa-gym-start.html?ref=jumamustafap";
+// The public path remains legacy for compatibility; the customer-facing product name is MedMinds Prep.
+const MEDMINDS_PREP_ACCOUNT = "https://medmindslc.site/pa-gym-start.html?ref=jumamustafap";
 const AI_PROPOSAL_COURSE_PAYMENT = "AI-Assisted Research Proposal Writing course payment: Airtel Money 0977259132 (Juma Phiri) or MTN Money 0969152364 (Musonda Mupeta). After payment, send proof of payment and your email address for account activation. Create your account at https://medmindslc.online/user-account/.";
 
 type ResearchPrice = {
@@ -103,13 +104,13 @@ const courseOffers: OfferSeed[] = [
   { slug: "course-osce-revision", name: "OSCE High-Yield Revision Session", category: "Courses", description: "High-yield station practice, clinical examination, history taking and communication skills.", features: ["Advanced level", "Certificate included", "Exam preparation"], priceZmw: 2000, rushPriceZmw: 2000, paymentInstructions: `${PAYMENT_DETAILS}.`, active: true }
 ];
 
-const paGymOffers: OfferSeed[] = [
-  { slug: "pa-gym", name: "Pa Gym Theory", category: "Pa Gym", description: "Monthly undergraduate medical theory practice with timed question sets and worked explanations.", features: ["Internal Medicine", "Paediatrics", "Obstetrics and Gynaecology", "Surgery", "Train by system or random circuit"], priceZmw: 100, rushPriceZmw: 100, paymentInstructions: `Use https://medmindslc.site/mayadi.html. ${PAYMENT_DETAILS}. Create an account or claim a 24-hour free pass at ${PA_GYM_ACCOUNT}.`, active: true },
-  { slug: "pa-gym-osce", name: "Pa Gym OSCE", category: "Pa Gym", description: "Monthly undergraduate medical OSCE preparation and clinical practice.", features: ["Undergraduate medical students", "OSCE preparation", "Monthly access"], priceZmw: 100, rushPriceZmw: 100, paymentInstructions: `Use https://medmindslc.site/mayadi.html. ${PAYMENT_DETAILS}. Create an account or claim a 24-hour free pass at ${PA_GYM_ACCOUNT}.`, active: true },
-  { slug: "pa-gym-combined", name: "Pa Gym Theory and OSCE", category: "Pa Gym", description: "Monthly undergraduate access to both Pa Gym theory and OSCE preparation.", features: ["Theory access: K100 per month", "OSCE access: K100 per month", "Total monthly price: K200"], priceZmw: 200, rushPriceZmw: 200, paymentInstructions: `Use https://medmindslc.site/mayadi.html. ${PAYMENT_DETAILS}. Create an account or claim a 24-hour free pass at ${PA_GYM_ACCOUNT}.`, active: true },
-  { slug: "pa-gym-preclinical", name: "Pa Gym Preclinical", category: "Pa Gym", description: "Pa Gym access for preclinical students. The client should use the dedicated page for the current package and payment amount.", features: ["Preclinical student access", `Account creation and 24-hour free pass: ${PA_GYM_ACCOUNT}`], priceZmw: null, rushPriceZmw: null, paymentInstructions: `View the current package at https://medmindslc.site/preclinical.html. ${PAYMENT_DETAILS}.`, active: true },
-  { slug: "pa-gym-nmcz", name: "Pa Gym NMCZ Nursing Preparation", category: "Pa Gym", description: "Pa Gym examination preparation for nurses preparing for NMCZ.", features: ["NMCZ preparation", `Account creation and 24-hour free pass: ${PA_GYM_ACCOUNT}`], priceZmw: null, rushPriceZmw: null, paymentInstructions: `View the current package at https://medmindslc.site/nmcz.html. ${PAYMENT_DETAILS}.`, active: true },
-  { slug: "pa-gym-free-pass", name: "Pa Gym 24-Hour Free Pass", category: "Pa Gym", description: "A 24-hour trial for clients who want to try Pa Gym. The same page is used by paid clients who still need an account.", features: ["24-hour trial", "Account creation for already-paid clients"], priceZmw: 0, rushPriceZmw: 0, paymentInstructions: `Create the account at ${PA_GYM_ACCOUNT}.`, active: true }
+const medMindsPrepOffers: OfferSeed[] = [
+  { slug: "pa-gym", name: "MedMinds Prep Theory", category: "MedMinds Prep", description: "Monthly undergraduate medical theory practice with timed question sets and worked explanations.", features: ["Internal Medicine", "Paediatrics", "Obstetrics and Gynaecology", "Surgery", "Train by system or random circuit"], priceZmw: 100, rushPriceZmw: 100, paymentInstructions: `Use https://medmindslc.site/mayadi.html. ${PAYMENT_DETAILS}. Create an account or claim a 24-hour free pass at ${MEDMINDS_PREP_ACCOUNT}.`, active: true },
+  { slug: "pa-gym-osce", name: "MedMinds Prep OSCE", category: "MedMinds Prep", description: "Monthly undergraduate medical OSCE preparation and clinical practice.", features: ["Undergraduate medical students", "OSCE preparation", "Monthly access"], priceZmw: 100, rushPriceZmw: 100, paymentInstructions: `Use https://medmindslc.site/mayadi.html. ${PAYMENT_DETAILS}. Create an account or claim a 24-hour free pass at ${MEDMINDS_PREP_ACCOUNT}.`, active: true },
+  { slug: "pa-gym-combined", name: "MedMinds Prep Theory and OSCE", category: "MedMinds Prep", description: "Monthly undergraduate access to both MedMinds Prep theory and OSCE preparation.", features: ["Theory access: K100 per month", "OSCE access: K100 per month", "Total monthly price: K200"], priceZmw: 200, rushPriceZmw: 200, paymentInstructions: `Use https://medmindslc.site/mayadi.html. ${PAYMENT_DETAILS}. Create an account or claim a 24-hour free pass at ${MEDMINDS_PREP_ACCOUNT}.`, active: true },
+  { slug: "pa-gym-preclinical", name: "MedMinds Prep Preclinical", category: "MedMinds Prep", description: "MedMinds Prep access for preclinical students. The client should use the dedicated page for the current package and payment amount.", features: ["Preclinical student access", `Account creation and 24-hour free pass: ${MEDMINDS_PREP_ACCOUNT}`], priceZmw: null, rushPriceZmw: null, paymentInstructions: `View the current package at https://medmindslc.site/preclinical.html. ${PAYMENT_DETAILS}.`, active: true },
+  { slug: "pa-gym-nmcz", name: "MedMinds Prep NMCZ Nursing Preparation", category: "MedMinds Prep", description: "MedMinds Prep examination preparation for nurses preparing for NMCZ.", features: ["NMCZ preparation", `Account creation and 24-hour free pass: ${MEDMINDS_PREP_ACCOUNT}`], priceZmw: null, rushPriceZmw: null, paymentInstructions: `View the current package at https://medmindslc.site/nmcz.html. ${PAYMENT_DETAILS}.`, active: true },
+  { slug: "pa-gym-free-pass", name: "MedMinds Prep 24-Hour Free Pass", category: "MedMinds Prep", description: "A 24-hour trial for clients who want to try MedMinds Prep. The same page is used by paid clients who still need an account.", features: ["24-hour trial", "Account creation for already-paid clients"], priceZmw: 0, rushPriceZmw: 0, paymentInstructions: `Create the account at ${MEDMINDS_PREP_ACCOUNT}.`, active: true }
 ];
 
 const otherOffers: OfferSeed[] = [
@@ -122,7 +123,7 @@ const otherOffers: OfferSeed[] = [
 
 export const offerSeeds: OfferSeed[] = [
   ...researchPrices.map(researchOffer),
-  ...paGymOffers,
+  ...medMindsPrepOffers,
   ...courseOffers,
   ...otherOffers
 ];

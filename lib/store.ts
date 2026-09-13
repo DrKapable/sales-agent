@@ -1,5 +1,6 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { offerSeeds } from "@/lib/catalogue";
+import { normalizeMedMindsBranding } from "@/lib/medminds-brand";
 import type { ConversationMessage, Lead, LeadPatch, Offer } from "@/lib/types";
 
 type MemoryStore = {
@@ -8,7 +9,7 @@ type MemoryStore = {
   offers: Map<string, Offer>;
 };
 
-const CATALOGUE_VERSION = 2;
+const CATALOGUE_VERSION = 3;
 const AI_PROPOSAL_COURSE_VERSION = 3;
 
 declare global {
@@ -111,11 +112,11 @@ function withMemoryLastMessage(lead: Lead): Lead {
 
 function mapOffer(row: Record<string, unknown>): Offer {
   return {
-    id: String(row.id), slug: String(row.slug), name: String(row.name), category: String(row.category),
-    description: String(row.description), features: Array.isArray(row.features) ? row.features.map(String) : [],
+    id: String(row.id), slug: String(row.slug), name: normalizeMedMindsBranding(String(row.name)), category: normalizeMedMindsBranding(String(row.category)),
+    description: normalizeMedMindsBranding(String(row.description)), features: Array.isArray(row.features) ? row.features.map((feature) => normalizeMedMindsBranding(String(feature))) : [],
     priceZmw: row.price_zmw === null ? null : Number(row.price_zmw),
     rushPriceZmw: row.rush_price_zmw === null ? null : Number(row.rush_price_zmw),
-    paymentInstructions: row.payment_instructions ? String(row.payment_instructions) : null,
+    paymentInstructions: row.payment_instructions ? normalizeMedMindsBranding(String(row.payment_instructions)) : null,
     active: Boolean(row.active), updatedAt: new Date(String(row.updated_at)).toISOString()
   };
 }
@@ -189,7 +190,7 @@ export async function getConversation(phone: string, limit = 14): Promise<Conver
 export async function listOffers(activeOnly = false): Promise<Offer[]> {
   await ensureDatabase();
   const db = database();
-  if (!db) return [...memory.offers.values()].filter((offer) => !activeOnly || offer.active);
+  if (!db) return [...memory.offers.values()].filter((offer) => !activeOnly || offer.active).map((offer) => ({ ...offer, name: normalizeMedMindsBranding(offer.name), category: normalizeMedMindsBranding(offer.category), description: normalizeMedMindsBranding(offer.description), features: offer.features.map(normalizeMedMindsBranding), paymentInstructions: offer.paymentInstructions ? normalizeMedMindsBranding(offer.paymentInstructions) : null }));
   const rows = await db.query(`SELECT * FROM offers ${activeOnly ? "WHERE active=TRUE" : ""} ORDER BY category,name`);
   return rows.map((row) => mapOffer(row as Record<string, unknown>));
 }
