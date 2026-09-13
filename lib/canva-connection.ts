@@ -40,7 +40,17 @@ function secret(){const value=process.env.CANVA_TOKEN_ENCRYPTION_KEY?.trim()||pr
 function encrypt(value:string){const iv=randomBytes(12);const cipher=createCipheriv("aes-256-gcm",secret(),iv);const encrypted=Buffer.concat([cipher.update(value,"utf8"),cipher.final()]);const tag=cipher.getAuthTag();return `${iv.toString("base64url")}.${tag.toString("base64url")}.${encrypted.toString("base64url")}`;}
 function decrypt(value:string){const [ivPart,tagPart,dataPart]=value.split(".");if(!ivPart||!tagPart||!dataPart)throw new Error("Stored Canva token is invalid.");const decipher=createDecipheriv("aes-256-gcm",secret(),Buffer.from(ivPart,"base64url"));decipher.setAuthTag(Buffer.from(tagPart,"base64url"));return Buffer.concat([decipher.update(Buffer.from(dataPart,"base64url")),decipher.final()]).toString("utf8");}
 
-export function getCanvaConfig(){const clientId=process.env.CANVA_CLIENT_ID?.trim()||"";const clientSecret=process.env.CANVA_CLIENT_SECRET?.trim()||"";return {clientId,clientSecret,oauthConfigured:Boolean(clientId&&clientSecret),scopes:["design:content:read","design:content:write","design:meta:read","brandtemplate:meta:read","brandtemplate:content:read","profile:read"]};}
+function normalizeEnvCredential(value:string|undefined){
+  const trimmed=value?.trim()||"";
+  if(trimmed.length>=2){
+    const first=trimmed[0];
+    const last=trimmed[trimmed.length-1];
+    if((first==='"'&&last==='"')||(first==="'"&&last==="'"))return trimmed.slice(1,-1).trim();
+  }
+  return trimmed;
+}
+
+export function getCanvaConfig(){const clientId=normalizeEnvCredential(process.env.CANVA_CLIENT_ID);const clientSecret=normalizeEnvCredential(process.env.CANVA_CLIENT_SECRET);return {clientId,clientSecret,oauthConfigured:Boolean(clientId&&clientSecret),scopes:["design:content:read","design:content:write","design:meta:read","brandtemplate:meta:read","brandtemplate:content:read","profile:read"]};}
 export function canvaPublicOrigin(request:Request){return process.env.PUBLIC_URL?.trim().replace(/\/+$/,"")||new URL(request.url).origin;}
 
 export async function validateCanvaCredentials():Promise<CanvaCredentialCheck>{
