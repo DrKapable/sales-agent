@@ -32,8 +32,9 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("Content-Security-Policy", policy);
   const isProtected = path.startsWith("/admin") || path.startsWith("/api/admin");
   const isLogin = path === "/admin/login" || path === "/api/admin/login";
+  const isCanvaOAuthCallback = path === "/api/admin/canva/callback";
 
-  if (isProtected && !isLogin && !verifySessionToken(request.cookies.get(sessionCookieName)?.value)) {
+  if (isProtected && !isLogin && !isCanvaOAuthCallback && !verifySessionToken(request.cookies.get(sessionCookieName)?.value)) {
     if (path.startsWith("/api/")) return applyContentSecurityPolicy(NextResponse.json({ error: "Unauthorized" }, { status: 401 }), policy);
     const login = new URL("/admin/login", request.url);
     login.searchParams.set("next", path);
