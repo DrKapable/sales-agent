@@ -5,14 +5,21 @@ import { normalizeMedMindsBranding } from "@/lib/medminds-brand";
 
 const schema = z.object({
   template: z.enum(["promo-clean", "education-card", "faq-notice"]).optional(),
-  headline: z.string().trim().max(90).optional(),
-  supportingText: z.string().trim().max(180).optional(),
-  cta: z.string().trim().max(48).optional()
+  headline: z.string().trim().max(500).optional(),
+  supportingText: z.string().trim().max(1200).optional(),
+  cta: z.string().trim().max(160).optional()
 });
+
+function compact(value: string, max: number) {
+  const clean = normalizeMedMindsBranding(value).replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const clipped = clean.slice(0, max - 1).replace(/\s+\S*$/, "").trim();
+  return `${clipped || clean.slice(0, max - 1).trim()}…`;
+}
 
 function deriveSupport(body: string) {
   const clean = normalizeMedMindsBranding(body).replace(/#[A-Za-z0-9_]+/g, "").replace(/\s+/g, " ").trim();
-  return (clean.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 1).join(" ") || clean).slice(0, 165).trim();
+  return compact(clean.split(/(?<=[.!?])\s+/)[0] || clean, 108);
 }
 
 function deriveTemplate(contentType: string): CreativeTemplate {
@@ -31,9 +38,7 @@ function deriveCta(contentType: string) {
 }
 
 function publicOrigin(request: Request) {
-  const configured = process.env.PUBLIC_URL?.trim().replace(/\/+$/, "");
-  if (configured) return configured;
-  return new URL(request.url).origin;
+  return process.env.PUBLIC_URL?.trim().replace(/\/+$/, "") || new URL(request.url).origin;
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -41,14 +46,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const post = await getContentPost(id);
   if (!post) return NextResponse.json({ error: "Content post not found." }, { status: 404 });
   const parsed = schema.safeParse(await request.json().catch(() => ({})));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid creative settings. Keep the headline, supporting text and CTA concise for a readable Facebook graphic." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Invalid creative settings.", fields: parsed.error.flatten().fieldErrors }, { status: 400 });
 
   const input = parsed.data;
   const version = Math.max(1, (post.creativeVersion || 1) + 1);
   const template = input.template || post.creativeTemplate || deriveTemplate(post.contentType);
-  const headline = normalizeMedMindsBranding(input.headline || post.creativeHeadline || post.title.slice(0, 90));
-  const supportingText = normalizeMedMindsBranding(input.supportingText || post.creativeSupportingText || deriveSupport(post.body));
-  const cta = normalizeMedMindsBranding(input.cta || post.creativeCta || deriveCta(post.contentType));
+  const headline = compact(input.headline || post.creativeHeadline || post.title, 64);
+  const supportingText = compact(input.supportingText || post.creativeSupportingText || deriveSupport(post.body), 108);
+  const cta = compact(input.cta || post.creativeCta || deriveCta(post.contentType), 32);
   const previewUrl = `/api/content/creative/${post.id}?v=${version}`;
   const mediaUrl = `${publicOrigin(request)}${previewUrl}`;
 
