@@ -1,0 +1,91 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import styles from "./facebook-content-scheduler.module.css";
+
+type Post = { id:string; title:string; contentType:string; body:string; mediaUrl:string|null; status:string; creativeVersion:number };
+type FacebookStatus = { configured:boolean; oauthConfigured:boolean; connected:boolean; targetPageName:string; pageId:string|null; pageName:string|null; source:string|null };
+type Publication = { id:string; postId:string; status:string; scheduledAt:string|null; publishedAt:string|null; facebookPostId:string|null; failureReason:string|null; createdAt:string };
+
+function defaultLocalTime(){
+  const d=new Date(Date.now()+60*60*1000);
+  return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+}
+
+export function FacebookContentScheduler(){
+  const [posts,setPosts]=useState<Post[]>([]);
+  const [facebook,setFacebook]=useState<FacebookStatus|null>(null);
+  const [publications,setPublications]=useState<Publication[]>([]);
+  const [times,setTimes]=useState<Record<string,string>>({});
+  const [loading,setLoading]=useState(true);
+  const [busy,setBusy]=useState("");
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+
+  const load=useCallback(async()=>{
+    setLoading(true);
+    try{
+      const [a,b,c]=await Promise.all([fetch("/api/admin/content",{cache:"no-store"}),fetch("/api/admin/facebook/status",{cache:"no-store"}),fetch("/api/admin/facebook/publications",{cache:"no-store"})]);
+      const [content,status,pubs]=await Promise.all([a.json(),b.json(),c.json()]);
+      if(!a.ok)throw new Error(content.error||"Unable to load approved content.");
+      if(!b.ok)throw new Error(status.error||"Unable to check Facebook connection.");
+      if(!c.ok)throw new Error(pubs.error||"Unable to load Facebook schedule.");
+      setPosts((Array.isArray(content.posts)?content.posts:[]).filter((p:Post)=>p.status==="APPROVED"));
+      setFacebook(status);
+      setPublications(Array.isArray(pubs.publications)?pubs.publications:[]);
+      setError("");
+    }catch(e){setError(e instanceof Error?e.message:"Unable to load Facebook Scheduler.");}
+    finally{setLoading(false);}
+  },[]);
+
+  useEffect(()=>{void load();},[load]);
+  useEffect(()=>{
+    const result=new URLSearchParams(window.location.search).get("facebook");
+    if(result==="connected")setNotice("MedMinds Learning Centre is connected to the Sales Agent.");
+    if(result==="page-not-found")setError("The authorized account did not return a managed Page named MedMinds Learning Centre.");
+    if(result==="connection-failed")setError("Facebook authorization could not be completed. Please connect again and approve the requested Page permissions.");
+    if(result==="setup-required")setError("Facebook authorization needs the Meta app credentials configured on the Sales Agent first.");
+  },[]);
+
+  const latest=useMemo(()=>{
+    const map=new Map<string,Publication>();
+    for(const p of publications)if(!map.has(p.postId))map.set(p.postId,p);
+    return map;
+  },[publications]);
+
+  async function schedule(post:Post){
+    const when=new Date(times[post.id]||defaultLocalTime());
+    if(Number.isNaN(when.getTime())){setError("Choose a valid date and time.");return;}
+    setBusy(post.id);setError("");setNotice("");
+    try{
+      const r=await fetch(`/api/admin/content/${post.id}/schedule-facebook`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scheduledAt:when.toISOString()})});
+      const d=await r.json();if(!r.ok)throw new Error(d.error||"Unable to schedule this Facebook post.");
+      setNotice(`Scheduled “${post.title}” for ${when.toLocaleString()}. The approved caption and image have been frozen for publishing.`);
+      await load();
+    }catch(e){setError(e instanceof Error?e.message:"Unable to schedule post.");}
+    finally{setBusy("");}
+  }
+
+  async function cancel(post:Post){
+    setBusy(post.id);setError("");setNotice("");
+    try{
+      const r=await fetch(`/api/admin/content/${post.id}/schedule-facebook`,{method:"DELETE"});const d=await r.json();if(!r.ok)throw new Error(d.error||"Unable to cancel schedule.");
+      setNotice(`Schedule cancelled for “${post.title}”.`);await load();
+    }catch(e){setError(e instanceof Error?e.message:"Unable to cancel schedule.");}
+    finally{setBusy("");}
+  }
+
+  return <main className={styles.page}><div className={styles.shell}>
+    <header className={styles.topbar}><div><Link className={styles.back} href="/admin">← Sales Agent dashboard</Link><span className={styles.eyebrow}>MedMinds social publishing</span><h1>Facebook Scheduler</h1><p>Approve content in Content Studio, then schedule the exact caption and generated creative for the MedMinds Learning Centre Facebook Page.</p></div><Link className={styles.studioLink} href="/admin/content">Open Content Studio</Link></header>
+    {(error||notice)&&<div className={error?styles.error:styles.notice}>{error||notice}</div>}
+    <section className={`${styles.connection} ${facebook?.connected?styles.connected:""}`}><div className={styles.connectionInfo}><span className={styles.statusDot}/><div><h2>{facebook?.pageName||facebook?.targetPageName||"MedMinds Learning Centre"}</h2><p>{facebook?.connected?"Connected for scheduled Facebook Page publishing.":"Connect the Page once, then approved content can be scheduled from this workspace."}</p></div></div><div className={styles.connectionActions}>{!facebook?.connected&&facebook?.oauthConfigured&&<a className={styles.primary} href="/api/admin/facebook/connect">Connect Facebook Page</a>}<button className={styles.secondary} disabled={loading} onClick={()=>void load()}>Refresh</button></div></section>
+    {facebook&&!facebook.connected&&!facebook.oauthConfigured&&<div className={styles.setup}><strong>One-time Meta app setup is required.</strong><p>Configure <code>META_FACEBOOK_APP_ID</code> and <code>META_FACEBOOK_APP_SECRET</code>, then register <code>https://sales.medmindslc.online/api/admin/facebook/callback</code> as a valid OAuth redirect URI. The connection is restricted to “{facebook.targetPageName}”.</p></div>}
+    <div className={styles.header}><div><span className={styles.eyebrow}>Approved content</span><h2>Ready to schedule</h2></div><span>{posts.length} approved post{posts.length===1?"":"s"}</span></div>
+    {loading?<div className={styles.empty}>Loading scheduler…</div>:posts.length===0?<div className={styles.empty}>No approved content is ready. <Link href="/admin/content">Create and approve a post in Content Studio.</Link></div>:<div className={styles.grid}>{posts.map(post=>{
+      const publication=latest.get(post.id);const isBusy=busy===post.id;const canSchedule=Boolean(facebook?.connected&&post.mediaUrl);const value=times[post.id]||defaultLocalTime();
+      return <article className={styles.card} key={post.id}><div className={styles.creative}>{post.mediaUrl?<img src={`/api/content/creative/${post.id}?v=${post.creativeVersion||1}`} alt={`${post.title} approved creative`}/>:<div className={styles.noCreative}>Generate an image in Content Studio before scheduling.</div>}</div><div className={styles.content}><div className={styles.meta}><span className={styles.type}>{post.contentType}</span>{publication&&publication.status!=="CANCELLED"&&<b className={`${styles.badge} ${publication.status==="SCHEDULED"?styles.scheduled:publication.status==="PUBLISHED"?styles.published:publication.status==="FAILED"?styles.failed:""}`}>{publication.status}</b>}</div><h3>{post.title}</h3><p className={styles.caption}>{post.body}</p>{publication&&publication.status!=="CANCELLED"&&<div className={`${styles.publication} ${publication.status==="FAILED"?styles.failure:""}`}>{publication.status==="SCHEDULED"&&publication.scheduledAt&&<>Scheduled for {new Date(publication.scheduledAt).toLocaleString()}. Caption and image snapshot saved.</>}{publication.status==="PUBLISHED"&&<>Published {publication.publishedAt?new Date(publication.publishedAt).toLocaleString():""}</>}{publication.status==="FAILED"&&<>Publishing failed: {publication.failureReason||"Unknown Facebook error."}</>}</div>}<div className={styles.controls}><label className={styles.dateLabel}>Publish date & time<input type="datetime-local" value={value} onChange={e=>setTimes(current=>({...current,[post.id]:e.target.value}))}/></label><div className={styles.actions}><button className={styles.primary} disabled={!canSchedule||isBusy} onClick={()=>void schedule(post)}>{isBusy?"Working…":publication?.status==="SCHEDULED"?"Reschedule":"Schedule"}</button>{publication?.status==="SCHEDULED"&&<button className={styles.danger} disabled={isBusy} onClick={()=>void cancel(post)}>Cancel schedule</button>}</div></div></div></article>;
+    })}</div>}
+    <p className={styles.footnote}>Each scheduled item stores an immutable copy of the approved caption and rendered creative. Later Content Studio edits do not change the queued Facebook post.</p>
+  </div></main>;
+}
