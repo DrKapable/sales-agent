@@ -5,159 +5,107 @@ import { getContentPost, type ContentPost } from "@/lib/content-studio";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const COLORS = {
-  green: "#0d725f",
-  greenDark: "#075548",
-  ink: "#102b28",
-  mint: "#dff3ec",
-  cream: "#f7f5ef",
-  white: "#ffffff",
-  muted: "#61736f"
-};
+const COLORS = { green:"#0d725f", greenDark:"#075548", ink:"#102b28", mint:"#dff3ec", cream:"#f7f5ef", white:"#ffffff", muted:"#61736f" };
 
-function Brand({ logoSrc, compact = false }: { logoSrc: string; compact?: boolean }) {
-  return React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: compact ? "6px 9px" : "8px 12px",
-      borderRadius: compact ? 12 : 15,
-      background: "rgba(255,255,255,.99)",
-      border: "1px solid rgba(16,43,40,.10)",
-      boxShadow: "0 8px 22px rgba(16,43,40,.12)"
-    }
-  }, React.createElement("img", {
-    src: logoSrc,
-    width: compact ? 150 : 184,
-    height: compact ? 62 : 78,
-    style: { width: compact ? 150 : 184, height: compact ? 62 : 78, objectFit: "contain" }
-  }));
+function Brand({logoSrc}:{logoSrc:string}){
+  return React.createElement("div",{style:{display:"flex",alignItems:"center",width:154,height:62,padding:"5px 9px",borderRadius:12,background:"rgba(255,255,255,.98)",border:"1px solid rgba(16,43,40,.08)"}},
+    React.createElement("img",{src:logoSrc,width:136,height:50,style:{width:136,height:50,objectFit:"contain"}}));
 }
 
-function Cta({ text, light = false }: { text: string; light?: boolean }) {
-  return React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      padding: "12px 21px",
-      borderRadius: 999,
-      background: light ? COLORS.white : COLORS.green,
-      color: light ? COLORS.greenDark : COLORS.white,
-      fontSize: 19,
-      fontWeight: 850,
-      boxShadow: light ? "0 8px 24px rgba(0,0,0,.14)" : "none"
-    }
-  }, React.createElement("span", null, text), React.createElement("span", { style: { fontSize: 22 } }, "→"));
+function Cta({text,light=false}:{text:string;light?:boolean}){
+  return React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"center",padding:"10px 17px",borderRadius:999,background:light?COLORS.white:COLORS.green,color:light?COLORS.greenDark:COLORS.white,fontSize:17,fontWeight:850,maxWidth:300}},text);
 }
 
-function Promo({ logoSrc, headline, support, cta, label }: { logoSrc: string; headline: string; support: string; cta: string; label: string }) {
-  const size = headline.length > 70 ? 45 : headline.length > 48 ? 52 : 59;
-  return React.createElement("div", { style: { width: "100%", height: "100%", display: "flex", position: "relative", overflow: "hidden", background: COLORS.ink, padding: "45px 62px 48px" } },
-    React.createElement("div", { style: { position: "absolute", width: 520, height: 520, borderRadius: 999, right: -160, top: -185, background: "#17443d" } }),
-    React.createElement("div", { style: { position: "absolute", width: 350, height: 350, borderRadius: 999, right: 80, bottom: -235, background: COLORS.green } }),
-    React.createElement("div", { style: { position: "relative", flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", zIndex: 2 } },
-      React.createElement(Brand, { logoSrc, compact: true }),
-      React.createElement("div", { style: { display: "flex", flexDirection: "column", maxWidth: 850 } },
-        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, color: "#8be0c9", fontSize: 13, fontWeight: 900, letterSpacing: 2, marginBottom: 16 } },
-          React.createElement("span", { style: { width: 38, height: 5, borderRadius: 999, background: "#58c8ac" } }), label),
-        React.createElement("div", { style: { color: COLORS.white, fontSize: size, fontWeight: 900, lineHeight: 1.05, letterSpacing: -1.7 } }, headline),
-        support ? React.createElement("div", { style: { color: "#e2f0ec", fontSize: 24, lineHeight: 1.38, marginTop: 19, maxWidth: 780 } }, support) : null
-      ),
-      React.createElement("div", { style: { display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 28 } },
-        React.createElement(Cta, { text: cta, light: true }),
-        React.createElement("div", { style: { color: "rgba(255,255,255,.80)", fontSize: 14, textAlign: "right", lineHeight: 1.4 } }, "Medical learning • Research support • Digital tools")
-      )
-    )
-  );
+function Label({text,dark=false}:{text:string;dark?:boolean}){
+  return React.createElement("div",{style:{display:"flex",alignItems:"center",gap:9,color:dark?COLORS.green:"#9ee8d5",fontSize:12,fontWeight:900,letterSpacing:2.1}},
+    React.createElement("span",{style:{width:26,height:3,borderRadius:999,background:dark?COLORS.green:"#58c8ac"}}),text);
 }
 
-function Education({ logoSrc, headline, support, cta, label, faq = false }: { logoSrc: string; headline: string; support: string; cta: string; label: string; faq?: boolean }) {
-  const size = headline.length > 70 ? 43 : 52;
-  return React.createElement("div", { style: { width: "100%", height: "100%", display: "flex", background: COLORS.cream, padding: "42px 60px 48px" } },
-    React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" } },
-      React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
-        React.createElement(Brand, { logoSrc, compact: true }),
-        faq ? React.createElement("div", { style: { width: 66, height: 66, borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.mint, color: COLORS.greenDark, fontSize: 39, fontWeight: 900 } }, "?")
-          : React.createElement("div", { style: { padding: "10px 16px", borderRadius: 999, background: COLORS.mint, color: COLORS.greenDark, fontSize: 14, fontWeight: 850 } }, "LEARN • APPLY • GROW")
-      ),
-      React.createElement("div", { style: { display: "flex", flexDirection: "column", maxWidth: 950 } },
-        React.createElement("div", { style: { color: COLORS.green, fontSize: 15, fontWeight: 900, letterSpacing: 2.2, marginBottom: 14 } }, faq ? `${label} FAQ` : label),
-        React.createElement("div", { style: { color: COLORS.ink, fontSize: size, fontWeight: 900, lineHeight: 1.08, letterSpacing: -1.4 } }, headline),
-        support ? React.createElement("div", { style: { color: "#435e59", fontSize: 24, lineHeight: 1.42, marginTop: 20, maxWidth: 850 } }, support) : null
-      ),
-      React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
-        React.createElement(Cta, { text: cta }),
-        React.createElement("div", { style: { color: COLORS.muted, fontSize: 13 } }, "medmindslc.online")
-      )
-    )
-  );
+function Promo({logoSrc,headline,support,cta,label}:{logoSrc:string;headline:string;support:string;cta:string;label:string}){
+  const size=headline.length>54?47:56;
+  return React.createElement("div",{style:{width:"100%",height:"100%",display:"flex",position:"relative",overflow:"hidden",background:COLORS.ink,padding:"42px 56px"}},
+    React.createElement("div",{style:{position:"absolute",width:500,height:500,borderRadius:999,right:-210,top:-220,background:"#17443d"}}),
+    React.createElement("div",{style:{position:"relative",zIndex:2,width:"100%",display:"flex",flexDirection:"column",justifyContent:"space-between"}},
+      React.createElement(Brand,{logoSrc}),
+      React.createElement("div",{style:{display:"flex",flexDirection:"column",maxWidth:790,gap:14}},
+        React.createElement(Label,{text:label}),
+        React.createElement("div",{style:{color:COLORS.white,fontSize:size,fontWeight:900,lineHeight:1.04,letterSpacing:-1.5,maxWidth:820}},headline),
+        support?React.createElement("div",{style:{color:"#d7e9e4",fontSize:21,lineHeight:1.38,maxWidth:720}},support):null),
+      React.createElement(Cta,{text:cta,light:true})
+    ));
 }
 
-function Photo({ logoSrc, photoSrc, headline, support, cta, label }: { logoSrc: string; photoSrc: string; headline: string; support: string; cta: string; label: string }) {
-  const size = headline.length > 68 ? 43 : headline.length > 44 ? 50 : 58;
-  return React.createElement("div", { style: { width: "100%", height: "100%", display: "flex", position: "relative", overflow: "hidden", background: COLORS.ink } },
-    React.createElement("img", { src: photoSrc, width: 1200, height: 628, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "70% 50%" } }),
-    React.createElement("div", { style: { position: "absolute", inset: 0, background: "linear-gradient(90deg,rgba(7,85,72,.44) 0%,rgba(7,85,72,.16) 44%,rgba(7,85,72,0) 70%)" } }),
-    React.createElement("div", {
-      style: {
-        position: "relative",
-        zIndex: 2,
-        width: "50%",
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        margin: "24px 0 24px 28px",
-        padding: "24px 30px 26px",
-        borderRadius: 24,
-        background: "rgba(7,85,72,.94)",
-        border: "1px solid rgba(255,255,255,.14)",
-        boxShadow: "0 18px 42px rgba(0,0,0,.24)"
-      }
-    },
-      React.createElement(Brand, { logoSrc, compact: true }),
-      React.createElement("div", { style: { display: "flex", flexDirection: "column", maxWidth: 520 } },
-        React.createElement("div", { style: { color: "#a8ead8", fontSize: 13, fontWeight: 900, letterSpacing: 2.1, marginBottom: 13 } }, label),
-        React.createElement("div", { style: { color: COLORS.white, fontSize: size, fontWeight: 900, lineHeight: 1.02, letterSpacing: -1.4 } }, headline),
-        support ? React.createElement("div", { style: { color: "#f3fbf8", fontSize: 22, fontWeight: 560, lineHeight: 1.36, marginTop: 16, maxWidth: 500 } }, support) : null
-      ),
-      React.createElement(Cta, { text: cta, light: true })
-    )
-  );
+function Education({logoSrc,headline,support,cta,label,faq=false}:{logoSrc:string;headline:string;support:string;cta:string;label:string;faq?:boolean}){
+  const size=headline.length>54?45:54;
+  return React.createElement("div",{style:{width:"100%",height:"100%",display:"flex",background:COLORS.cream,padding:"42px 58px"}},
+    React.createElement("div",{style:{width:"100%",display:"flex",flexDirection:"column",justifyContent:"space-between"}},
+      React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
+        React.createElement(Brand,{logoSrc}),
+        faq?React.createElement("div",{style:{padding:"8px 13px",borderRadius:999,background:COLORS.mint,color:COLORS.greenDark,fontSize:12,fontWeight:900}},"FAQ"):null),
+      React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:14,maxWidth:900}},
+        React.createElement(Label,{text:label,dark:true}),
+        React.createElement("div",{style:{color:COLORS.ink,fontSize:size,fontWeight:900,lineHeight:1.05,letterSpacing:-1.35,maxWidth:900}},headline),
+        support?React.createElement("div",{style:{color:"#435e59",fontSize:21,lineHeight:1.4,maxWidth:760}},support):null),
+      React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
+        React.createElement(Cta,{text:cta}),
+        React.createElement("div",{style:{color:COLORS.muted,fontSize:13}},"medmindslc.online"))
+    ));
 }
 
-function propsFor(post: ContentPost) {
-  const type = post.contentType.toLowerCase();
-  const label = type.includes("medminds prep") ? "MEDMINDS PREP" : type.includes("research") || type.includes("data analysis") ? "MEDMINDS RESEARCH" : type.includes("digital") || type.includes("software") ? "MEDMINDS DIGITAL" : "MEDMINDS";
+function Photo({logoSrc,photoSrc,headline,support,cta,label}:{logoSrc:string;photoSrc:string;headline:string;support:string;cta:string;label:string}){
+  const size=headline.length>54?44:headline.length>38?50:57;
+  return React.createElement("div",{style:{width:"100%",height:"100%",display:"flex",position:"relative",overflow:"hidden",background:COLORS.ink}},
+    React.createElement("img",{src:photoSrc,width:1200,height:628,style:{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"72% 50%"}}),
+    React.createElement("div",{style:{position:"absolute",inset:0,background:"linear-gradient(90deg,rgba(16,43,40,.28) 0%,rgba(16,43,40,.08) 48%,rgba(16,43,40,0) 72%)"}}),
+    React.createElement("div",{style:{position:"relative",zIndex:2,width:"43%",height:"calc(100% - 64px)",margin:"32px 0 32px 34px",padding:"26px 28px",borderRadius:24,display:"flex",flexDirection:"column",justifyContent:"space-between",background:"rgba(7,85,72,.95)",border:"1px solid rgba(255,255,255,.13)",boxShadow:"0 18px 44px rgba(0,0,0,.24)"}},
+      React.createElement(Brand,{logoSrc}),
+      React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:13,maxWidth:455}},
+        React.createElement(Label,{text:label}),
+        React.createElement("div",{style:{color:COLORS.white,fontSize:size,fontWeight:900,lineHeight:1.02,letterSpacing:-1.35,maxWidth:450}},headline),
+        support?React.createElement("div",{style:{color:"#eef8f5",fontSize:19,lineHeight:1.35,maxWidth:440}},support):null),
+      React.createElement(Cta,{text:cta,light:true})
+    ));
+}
+
+function compactSentence(value:string,max:number){
+  const clean=value.replace(/\s+/g," ").trim();
+  if(!clean)return "";
+  const first=clean.split(/(?<=[.!?])\s+/)[0]||clean;
+  if(first.length<=max)return first;
+  const clipped=first.slice(0,max-1).replace(/\s+\S*$/," ").trim();
+  return `${clipped || first.slice(0,max-1).trim()}…`;
+}
+
+function propsFor(post:ContentPost){
+  const type=post.contentType.toLowerCase();
+  const label=type.includes("medminds prep")?"MEDMINDS PREP":type.includes("research")||type.includes("data analysis")?"MEDMINDS RESEARCH":type.includes("digital")||type.includes("software")?"MEDMINDS DIGITAL":"MEDMINDS";
   return {
-    headline: (post.creativeHeadline || post.title || "MedMinds").slice(0, 90),
-    support: (post.creativeSupportingText || "").slice(0, 165),
-    cta: (post.creativeCta || "Message MedMinds").slice(0, 48),
+    headline:compactSentence(post.creativeHeadline||post.title||"MedMinds",64),
+    support:compactSentence(post.creativeSupportingText||"",108),
+    cta:compactSentence(post.creativeCta||"Message MedMinds",32),
     label
   };
 }
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const { id } = await context.params;
-  const post = await getContentPost(id);
-  if (!post) return new Response("Creative not found", { status: 404 });
-  const origin = new URL(request.url).origin;
-  const logoSrc = `${origin}/medminds-logo.png`;
-  const props = propsFor(post);
-  let element: React.ReactElement;
-  if (post.creativeVisualMode === "photo" && post.photoGeneratedAt) {
-    const photoSrc = `${origin}/api/content/photo/${post.id}?v=${post.photoVersion || 1}`;
-    element = React.createElement(Photo, { ...props, logoSrc, photoSrc });
-  } else if (post.creativeTemplate === "education-card") {
-    element = React.createElement(Education, { ...props, logoSrc });
-  } else if (post.creativeTemplate === "faq-notice") {
-    element = React.createElement(Education, { ...props, logoSrc, faq: true });
-  } else {
-    element = React.createElement(Promo, { ...props, logoSrc });
+export async function GET(request:Request,context:{params:Promise<{id:string}>}){
+  const {id}=await context.params;
+  const post=await getContentPost(id);
+  if(!post)return new Response("Creative not found",{status:404});
+  const origin=new URL(request.url).origin;
+  const logoSrc=`${origin}/medminds-logo.png`;
+  const props=propsFor(post);
+  let element:React.ReactElement;
+  if(post.creativeVisualMode==="photo"&&post.photoGeneratedAt){
+    const photoSrc=`${origin}/api/content/photo/${post.id}?v=${post.photoVersion||1}`;
+    element=React.createElement(Photo,{...props,logoSrc,photoSrc});
+  }else if(post.creativeTemplate==="education-card"){
+    element=React.createElement(Education,{...props,logoSrc});
+  }else if(post.creativeTemplate==="faq-notice"){
+    element=React.createElement(Education,{...props,logoSrc,faq:true});
+  }else{
+    element=React.createElement(Promo,{...props,logoSrc});
   }
-  const response = new ImageResponse(element, { width: 1200, height: 628 });
-  response.headers.set("Cache-Control", "no-store, max-age=0");
+  const response=new ImageResponse(element,{width:1200,height:628});
+  response.headers.set("Cache-Control","no-store, max-age=0");
   return response;
 }
