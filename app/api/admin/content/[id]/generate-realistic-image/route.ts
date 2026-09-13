@@ -23,16 +23,16 @@ const subjects: Record<string, string> = {
   woman: "one fictional Black African woman",
   man: "one fictional Black African man",
   "mixed-pair": "two fictional Black African adults, one woman and one man",
-  "small-group": "a small mixed-gender group of fictional Black African students or health professionals",
+  "small-group": "a small mixed-gender group of three fictional Black African students or health professionals",
   clinician: "one fictional Black African clinician",
   student: "one fictional Black African university student"
 };
 
 const scenes: Record<string, string> = {
-  "research-work": "working on a health research project with a laptop and notebook",
+  "research-work": "working on a health research project with a laptop and one notebook",
   "clinical-learning": "taking part in a professional medical learning session without a real patient",
-  "student-study": "studying medical or nursing material",
-  "exam-prep": "preparing for MedMinds Prep revision with generic notes, question practice and OSCE study cues",
+  "student-study": "studying medical or nursing material with a laptop or a single notebook",
+  "exam-prep": "preparing for MedMinds Prep revision with generic notes and question-practice cues",
   "data-analysis": "reviewing a clean research dashboard or statistical output with no private data visible",
   teaching: "taking part in a small teaching or mentorship session",
   "digital-health": "using a contemporary digital health or education platform",
@@ -42,9 +42,9 @@ const scenes: Record<string, string> = {
 const settings: Record<string, string> = {
   "modern-office": "a clean contemporary office with soft daylight",
   university: "a modern African university learning environment",
-  "clinical-classroom": "a clinical skills or medical teaching room",
-  library: "a bright university library or quiet study area",
-  workspace: "a believable professional workspace",
+  "clinical-classroom": "a simple clinical skills or medical teaching room",
+  library: "a bright uncluttered university library or quiet study area",
+  workspace: "a clean believable professional workspace",
   "urban-outdoor": "a contemporary Southern African campus or professional outdoor setting"
 };
 
@@ -63,9 +63,16 @@ const styles: Record<string, string> = {
   documentary: "refined documentary-style photography"
 };
 
+function compact(value: string, max: number) {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const clipped = clean.slice(0, max - 1).replace(/\s+\S*$/, "").trim();
+  return `${clipped || clean.slice(0, max - 1).trim()}…`;
+}
+
 function cleanSupport(body: string) {
   const clean = body.replace(/#[A-Za-z0-9_]+/g, "").replace(/\s+/g, " ").trim();
-  return (clean.split(/(?<=[.!?])\s+/)[0] || clean).slice(0, 165);
+  return compact(clean.split(/(?<=[.!?])\s+/)[0] || clean, 108);
 }
 
 function publicOrigin(request: Request) {
@@ -85,15 +92,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
 
     const input = parsed.data;
-    const headline = (input.headline || post.creativeHeadline || post.title || "MedMinds").trim().slice(0, 90);
-    const supportingText = (input.supportingText || post.creativeSupportingText || cleanSupport(post.body)).trim().slice(0, 165);
-    const cta = (input.cta || post.creativeCta || "Message MedMinds").trim().slice(0, 48);
+    const headline = compact(input.headline || post.creativeHeadline || post.title || "MedMinds", 64);
+    const supportingText = compact(input.supportingText || post.creativeSupportingText || cleanSupport(post.body), 108);
+    const cta = compact(input.cta || post.creativeCta || "Message MedMinds", 32);
     const preset = `${subjects[input.subject]} ${scenes[input.scene]} in ${settings[input.setting]}, appearing ${moods[input.mood]}, photographed as ${styles[input.style]}.`;
-    const direction = (input.extraDirection || preset).trim().slice(0, 1800);
+    const direction = compact(input.extraDirection || preset, 1800);
 
     const prompt = `Create a highly photorealistic premium advertising photograph for MedMinds Learning Centre in Zambia. ${direction}
 
-Compose it for a 1200 x 628 Facebook creative. Keep the main person, face and important action in the right half of the frame. Keep the left half calm and uncluttered so branded text can be added later. Use realistic skin texture, believable hands, natural expressions and professional lighting. Use fictional adults only. Do not include visible logos, watermarks, promotional text, identifiable private records, patient information or confidential assessment material. For MedMinds Prep scenes, show revision activity rather than an examination in progress. The raw photograph itself must contain no MedMinds branding because the overlay is added separately.`;
+Compose it for a clean 1200 x 628 Facebook creative. The photograph must feel spacious, calm and premium rather than busy. Keep the main person, face and important action in the right 42% of the frame. Keep the entire left half as genuine negative space: soft background, subdued contrast, no faces, no hands, no screens, no readable books, no anatomy posters, no charts, no wall text and no bright objects. Use only the minimum props needed to communicate the activity. Avoid crowded desks, stacks of books, multiple posters and decorative clutter. Keep background detail softly out of focus. Use realistic skin texture, believable hands, natural expressions and professional daylight. Use fictional adults only. Do not include visible logos, watermarks, promotional text, identifiable private records, patient information or confidential assessment material. For MedMinds Prep scenes, show revision activity rather than an examination in progress. The raw photograph itself must contain no MedMinds branding because the clean branded overlay is added separately.`;
 
     const result = await generateImage({
       model: gateway.imageModel("openai/gpt-image-2"),
