@@ -32,6 +32,7 @@ function syncTeamControls() {
   const nav = document.querySelector<HTMLElement>(".sidebar nav");
   if (nav) {
     appendAdminLink(nav, "/admin/content", "contentStudioLink", "Content Studio");
+    appendAdminLink(nav, "/admin/social", "facebookSchedulerLink", "Facebook Scheduler");
     appendAdminLink(nav, "/admin/business", "businessIntelligenceLink", "Business Intelligence");
   }
 
