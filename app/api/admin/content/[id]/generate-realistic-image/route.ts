@@ -72,7 +72,7 @@ function compact(value: string, max: number) {
 
 function cleanSupport(body: string) {
   const clean = body.replace(/#[A-Za-z0-9_]+/g, "").replace(/\s+/g, " ").trim();
-  return compact(clean.split(/(?<=[.!?])\s+/)[0] || clean, 108);
+  return compact(clean.split(/(?<=[.!?])\s+/)[0] || clean, 140);
 }
 
 function publicOrigin(request: Request) {
@@ -92,20 +92,35 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
 
     const input = parsed.data;
-    const headline = compact(input.headline || post.creativeHeadline || post.title || "MedMinds", 64);
-    const supportingText = compact(input.supportingText || post.creativeSupportingText || cleanSupport(post.body), 108);
-    const cta = compact(input.cta || post.creativeCta || "Message MedMinds", 32);
+    const headline = compact(input.headline || post.creativeHeadline || post.title || "MedMinds", 54);
+    const supportingText = compact(input.supportingText || post.creativeSupportingText || cleanSupport(post.body), 140);
+    const cta = compact(input.cta || post.creativeCta || "Message MedMinds", 28);
     const preset = `${subjects[input.subject]} ${scenes[input.scene]} in ${settings[input.setting]}, appearing ${moods[input.mood]}, photographed as ${styles[input.style]}.`;
     const direction = compact(input.extraDirection || preset, 1800);
 
     const prompt = `Create a highly photorealistic premium advertising photograph for MedMinds Learning Centre in Zambia. ${direction}
 
-Compose it for a clean 1200 x 628 Facebook creative. The photograph must feel spacious, calm and premium rather than busy. Keep the main person, face and important action in the right 42% of the frame. Keep the entire left half as genuine negative space: soft background, subdued contrast, no faces, no hands, no screens, no readable books, no anatomy posters, no charts, no wall text and no bright objects. Use only the minimum props needed to communicate the activity. Avoid crowded desks, stacks of books, multiple posters and decorative clutter. Keep background detail softly out of focus. Use realistic skin texture, believable hands, natural expressions and professional daylight. Use fictional adults only. Do not include visible logos, watermarks, promotional text, identifiable private records, patient information or confidential assessment material. For MedMinds Prep scenes, show revision activity rather than an examination in progress. The raw photograph itself must contain no MedMinds branding because the clean branded overlay is added separately.`;
+Match the visual character of the existing MedMinds Learning Centre Facebook feed. Compose a SQUARE 1:1 photograph intended for a 1080 x 1080 post. The scene must feel clean, academic-medical, calm and premium rather than busy. Use soft teal/blue-neutral environmental tones where natural, realistic daylight, shallow depth of field and restrained contrast.
+
+LAYOUT FOR THE MEDMINDS OVERLAY
+- Keep the main person, face and important action in the RIGHT 45% of the square frame.
+- Keep the LEFT 50% as genuine negative space for a white information card and navy headline.
+- Keep faces away from the canvas edges and away from the future text area.
+- Use one main subject whenever possible. A pair or small group must remain visually grouped on the right.
+- Use only the minimum props needed to explain the activity: at most one laptop/tablet and one notebook or simple teaching prop.
+- Keep the background softly blurred and simple. Avoid crowded desks, stacks of books, anatomy-poster clutter, charts, busy shelves, decorative wall text, bright signs and multiple competing objects.
+
+QUALITY AND PRIVACY
+- Use realistic Black African adults and natural expressions, skin texture and believable hands.
+- Use fictional people only; do not resemble public figures, real students, real clinicians or real patients.
+- Do not include visible logos, watermarks, promotional typography, readable private records, patient information, student IDs, examination papers, answer keys or confidential assessment material.
+- For MedMinds Prep scenes, show revision activity rather than an examination in progress.
+- The raw photograph itself must contain no MedMinds branding because the consistent Facebook Page branding is added by the renderer afterward.`;
 
     const result = await generateImage({
       model: gateway.imageModel("openai/gpt-image-2"),
       prompt,
-      aspectRatio: "3:2",
+      aspectRatio: "1:1",
       maxRetries: 1
     });
     const generated = result.images?.[0] ?? result.image;
@@ -136,7 +151,15 @@ Compose it for a clean 1200 x 628 Facebook creative. The photograph must feel sp
       photoVersion
     });
 
-    return NextResponse.json({ ...updated, hasRealisticPhoto: true, previewUrl, photoUrl, imageModel: "openai/gpt-image-2" });
+    return NextResponse.json({
+      ...updated,
+      hasRealisticPhoto: true,
+      previewUrl,
+      photoUrl,
+      imageModel: "openai/gpt-image-2",
+      dimensions: "1080x1080",
+      visualSystem: "MedMinds Facebook house style"
+    });
   } catch (error) {
     console.error("MedMinds realistic image generation failed", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to generate the realistic image.", retryable: true }, { status: 502 });
