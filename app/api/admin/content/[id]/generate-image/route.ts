@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getContentPost, saveContentPost, type CreativeTemplate } from "@/lib/content-studio";
+import { resolveCreativeLayout } from "@/lib/content-creative-layout";
 import { normalizeMedMindsBranding } from "@/lib/medminds-brand";
 
 const schema = z.object({
@@ -18,7 +19,7 @@ function compact(value: string, max: number) {
 }
 
 function deriveSupport(body: string) {
-  const clean = normalizeMedMindsBranding(body).replace(/#[A-Za-z0-9_]+/g, "").replace(/\s+/g, " ").trim();
+  const clean = normalizeMedMindsBranding(body).replace(/#[A-Za-z0-9_]+/g, "").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim();
   return compact(clean.split(/(?<=[.!?])\s+/)[0] || clean, 140);
 }
 
@@ -51,9 +52,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const input = parsed.data;
   const version = Math.max(1, (post.creativeVersion || 1) + 1);
   const template = input.template || post.creativeTemplate || deriveTemplate(post.contentType);
-
-  // Facebook house-style guardrails from the current MedMinds Page audit.
-  // Keep copy intentionally short; the caption carries the detail while the creative stays clean.
   const headline = compact(input.headline || post.creativeHeadline || post.title, 54);
   const supportingText = compact(input.supportingText || post.creativeSupportingText || deriveSupport(post.body), 155);
   const cta = compact(input.cta || post.creativeCta || deriveCta(post.contentType), 28);
@@ -71,12 +69,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     creativeGeneratedAt: new Date().toISOString(),
     creativeVersion: version
   });
+  const resolvedLayout = resolveCreativeLayout(updated, "auto");
 
   return NextResponse.json({
     ...updated,
     previewUrl,
     facebookReady: true,
     dimensions: "1080x1080",
-    visualSystem: "MedMinds Facebook house style"
+    resolvedLayout,
+    visualSystem: "MedMinds variable Facebook house style"
   });
 }
