@@ -3,7 +3,8 @@ export type ResearchCampaignOpening = {
   serviceInterest: string;
 };
 
-const OTHER_SERVICE = /\b(pa\s*gym|osce|exam prep|tutorial|software|website|web development|automation|cybersecurity|workforce|logbook)\b/i;
+// Recognize both the current product name and legacy wording so MedMinds Prep enquiries are never mistaken for research leads.
+const OTHER_SERVICE = /\b(medminds\s*prep|pa\s*gym|pagym|osce|exam prep|tutorial|software|website|web development|automation|cybersecurity|workforce|logbook)\b/i;
 const VAGUE_AD_ENQUIRY = /\b(more\s+info(?:rmation)?|info\s+on\s+this|tell\s+me\s+more|details(?:\s+please)?|how\s+does\s+this\s+work|i(?:'|’)?.?m\s+interested|interested\s+in\s+this|saw\s+your\s+ad|seen\s+your\s+ad|about\s+this|what\s+is\s+this|can\s+i\s+get\s+more)\b/i;
 const SHORT_PRICE_ENQUIRY = /\b(how\s+much|price|cost|fee|charges?)\b/i;
 
