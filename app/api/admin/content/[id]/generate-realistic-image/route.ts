@@ -13,65 +13,63 @@ const schema = z.object({
   setting: z.enum(["modern-office", "university", "clinical-classroom", "library", "workspace", "urban-outdoor"]).default("modern-office"),
   mood: z.enum(["confident", "approachable", "focused", "curious", "warm"]).default("focused"),
   style: z.enum(["editorial", "lifestyle", "premium", "documentary"]).default("editorial"),
-  headline: z.string().trim().max(90).optional(),
-  supportingText: z.string().trim().max(180).optional(),
-  cta: z.string().trim().max(48).optional(),
-  extraDirection: z.string().trim().max(1200).optional().default("")
+  headline: z.string().trim().max(500).optional(),
+  supportingText: z.string().trim().max(1200).optional(),
+  cta: z.string().trim().max(160).optional(),
+  extraDirection: z.string().trim().max(4000).optional().default("")
 });
 
-const subjectMap: Record<string, string> = {
-  woman: "one fictional Black African woman aged about 23-42",
-  man: "one fictional Black African man aged about 23-45",
-  "mixed-pair": "two fictional Black African adults, one woman and one man, aged about 23-45",
-  "small-group": "a small mixed-gender group of three fictional Black African students or health professionals aged about 22-42",
-  clinician: "one fictional Black African clinician aged about 27-45 in professional but non-identifiable attire",
-  student: "one fictional Black African university student aged about 21-32"
+const subjects: Record<string, string> = {
+  woman: "one fictional Black African woman",
+  man: "one fictional Black African man",
+  "mixed-pair": "two fictional Black African adults, one woman and one man",
+  "small-group": "a small mixed-gender group of fictional Black African students or health professionals",
+  clinician: "one fictional Black African clinician",
+  student: "one fictional Black African university student"
 };
 
-const sceneMap: Record<string, string> = {
-  "research-work": "working thoughtfully on a health research project with a laptop, notebook and non-identifiable charts or papers",
-  "clinical-learning": "participating in a professional medical learning session using a tablet, notebook or teaching image without showing a real patient",
-  "student-study": "studying medical or nursing material in a focused, realistic university setting",
-  "exam-prep": "preparing for a medical or nursing examination using generic revision notes, a laptop or tablet, question-practice cues and an OSCE-style study environment without showing any real examination paper, answer key or confidential assessment material",
-  "data-analysis": "reviewing a clean research dashboard, spreadsheet or statistical output on a laptop with no private data visible",
-  teaching: "a small teaching or mentorship interaction around a laptop or whiteboard with natural body language",
-  "digital-health": "using a contemporary digital health or education platform on a laptop or tablet in a credible professional setting",
-  "neutral-portrait": "an editorial environmental portrait with relaxed posture and a believable candid expression"
+const scenes: Record<string, string> = {
+  "research-work": "working on a health research project with a laptop and notebook",
+  "clinical-learning": "taking part in a professional medical learning session without a real patient",
+  "student-study": "studying medical or nursing material",
+  "exam-prep": "preparing for MedMinds Prep revision with generic notes, question practice and OSCE study cues",
+  "data-analysis": "reviewing a clean research dashboard or statistical output with no private data visible",
+  teaching: "taking part in a small teaching or mentorship session",
+  "digital-health": "using a contemporary digital health or education platform",
+  "neutral-portrait": "in a natural editorial environmental portrait"
 };
 
-const settingMap: Record<string, string> = {
-  "modern-office": "a clean contemporary office with modest furnishings and soft daylight",
-  university: "a modern African university learning environment with desks, notebooks and subtle academic context",
-  "clinical-classroom": "a clinical skills or medical teaching room with educational equipment but no identifiable patient",
+const settings: Record<string, string> = {
+  "modern-office": "a clean contemporary office with soft daylight",
+  university: "a modern African university learning environment",
+  "clinical-classroom": "a clinical skills or medical teaching room",
   library: "a bright university library or quiet study area",
-  workspace: "a believable professional workspace with a laptop and research materials",
-  "urban-outdoor": "a contemporary Southern African urban campus or professional outdoor setting with no identifiable landmarks"
+  workspace: "a believable professional workspace",
+  "urban-outdoor": "a contemporary Southern African campus or professional outdoor setting"
 };
 
-const moodMap: Record<string, string> = {
-  confident: "calm confidence and competence",
-  approachable: "friendly, approachable and trustworthy energy",
-  focused: "focused, purposeful and composed energy",
-  curious: "intellectual curiosity and active learning",
-  warm: "warm human connection with natural expressions"
+const moods: Record<string, string> = {
+  confident: "calm and confident",
+  approachable: "friendly and approachable",
+  focused: "focused and purposeful",
+  curious: "curious and actively learning",
+  warm: "warm and human"
 };
 
-const styleMap: Record<string, string> = {
-  editorial: "premium editorial commercial photography with realistic skin texture, natural depth of field and restrained colour grading",
-  lifestyle: "high-end lifestyle photography with candid composition, natural light and authentic expressions",
-  premium: "polished premium commercial photography with sophisticated lighting while remaining believable and accessible",
-  documentary: "refined documentary-style photography with candid realism, natural gestures and minimal posing"
+const styles: Record<string, string> = {
+  editorial: "premium editorial commercial photography",
+  lifestyle: "high-end candid lifestyle photography",
+  premium: "polished premium commercial photography",
+  documentary: "refined documentary-style photography"
 };
 
 function cleanSupport(body: string) {
   const clean = body.replace(/#[A-Za-z0-9_]+/g, "").replace(/\s+/g, " ").trim();
-  return clean.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 1).join(" ").slice(0, 165);
+  return (clean.split(/(?<=[.!?])\s+/)[0] || clean).slice(0, 165);
 }
 
 function publicOrigin(request: Request) {
-  const configured = process.env.PUBLIC_URL?.trim().replace(/\/+$/, "");
-  if (configured) return configured;
-  return new URL(request.url).origin;
+  return process.env.PUBLIC_URL?.trim().replace(/\/+$/, "") || new URL(request.url).origin;
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -79,39 +77,23 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { id } = await context.params;
     const post = await getContentPost(id);
     if (!post) return NextResponse.json({ error: "Content post not found." }, { status: 404 });
+
     const parsed = schema.safeParse(await request.json().catch(() => ({})));
-    if (!parsed.success) return NextResponse.json({ error: "Invalid realistic image settings." }, { status: 400 });
+    if (!parsed.success) {
+      console.warn("Invalid MedMinds realistic image settings", parsed.error.flatten());
+      return NextResponse.json({ error: "Invalid realistic image settings.", fields: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
     const input = parsed.data;
+    const headline = (input.headline || post.creativeHeadline || post.title || "MedMinds").trim().slice(0, 90);
+    const supportingText = (input.supportingText || post.creativeSupportingText || cleanSupport(post.body)).trim().slice(0, 165);
+    const cta = (input.cta || post.creativeCta || "Message MedMinds").trim().slice(0, 48);
+    const preset = `${subjects[input.subject]} ${scenes[input.scene]} in ${settings[input.setting]}, appearing ${moods[input.mood]}, photographed as ${styles[input.style]}.`;
+    const direction = (input.extraDirection || preset).trim().slice(0, 1800);
 
-    const derivedDirection = `${subjectMap[input.subject]}; ${sceneMap[input.scene]}; ${settingMap[input.setting]}; mood: ${moodMap[input.mood]}; ${styleMap[input.style]}.`;
-    const primaryDirection = input.extraDirection || derivedDirection;
-    const prompt = `Create a highly photorealistic premium advertising photograph for MedMinds Learning Centre, a medical education, research-support and digital-health brand based in Zambia. MedMinds Prep is its examination-preparation product.
+    const prompt = `Create a highly photorealistic premium advertising photograph for MedMinds Learning Centre in Zambia. ${direction}
 
-PRIMARY CREATIVE DIRECTION
-${primaryDirection}
-
-SECONDARY CAST AND STYLE GUIDANCE
-${derivedDirection}
-If the primary direction specifies the subject, setting, activity, props, clothing, camera framing or mood, it overrides the secondary presets.
-
-FACEBOOK CREATIVE COMPOSITION — VERY IMPORTANT
-- The final branded creative will be cropped to 1200 x 628 (about 1.91:1), so compose the photograph to survive a wide crop.
-- Place the principal person, face and important action clearly in the RIGHT 45% of the frame.
-- Keep the LEFT 48% visually calm, low-detail and free of faces, hands, screens, books with readable text, bright highlights or important objects. This is the protected text-safe zone.
-- Keep the principal face inside the centre-right safe area, not near the top, bottom or right edge.
-- Avoid putting a second face behind the future text area. If there is a pair or group, keep all faces mostly on the right half.
-- Prefer clean depth separation, uncluttered backgrounds, realistic daylight and crisp facial focus.
-- No baked-in text, logos, posters with readable wording, watermarks, UI labels or promotional typography in the raw photograph.
-- Real-camera realism, natural skin texture and believable hands. Avoid CGI, illustration, oversmoothing and artificial glossy skin.
-
-MEDICAL, ACADEMIC AND PRIVACY SAFEGUARDS
-- Use entirely fictional adults; do not resemble public figures, real students, real clinicians or real patients.
-- Do not show identifiable patient faces, patient charts, names, phone numbers, student IDs, examination papers, confidential records or real research data.
-- For MedMinds Prep scenes, show revision activity rather than an actual examination in progress. Generic educational props are acceptable; real or realistic leaked exam papers, answers, marking keys and confidential assessments are not.
-- Avoid graphic procedures, distress, illness, blood, needles, operating scenes or sensational medical imagery unless explicitly requested for a safe educational purpose.
-- Do not show fake certificates, fabricated journal covers, guaranteed-results language, exam answers or plagiarism/cheating cues.
-- No visible MedMinds logo, company name, watermarks or promotional text inside the raw photograph; branding is added separately.
-- Keep the scene dignified, intellectually credible, modern and locally believable.`;
+Compose it for a 1200 x 628 Facebook creative. Keep the main person, face and important action in the right half of the frame. Keep the left half calm and uncluttered so branded text can be added later. Use realistic skin texture, believable hands, natural expressions and professional lighting. Use fictional adults only. Do not include visible logos, watermarks, promotional text, identifiable private records, patient information or confidential assessment material. For MedMinds Prep scenes, show revision activity rather than an examination in progress. The raw photograph itself must contain no MedMinds branding because the overlay is added separately.`;
 
     const result = await generateImage({
       model: gateway.imageModel("openai/gpt-image-2"),
@@ -125,17 +107,16 @@ MEDICAL, ACADEMIC AND PRIVACY SAFEGUARDS
     const photoVersion = Math.max(1, (post.photoVersion || 1) + 1);
     const creativeVersion = Math.max(1, (post.creativeVersion || 1) + 1);
     const previewUrl = `/api/content/creative/${post.id}?v=${creativeVersion}`;
-    const mediaUrl = `${publicOrigin(request)}${previewUrl}`;
     const photoUrl = `/api/content/photo/${post.id}?v=${photoVersion}`;
 
     await saveContentPhoto(post.id, generated.base64, generated.mediaType || "image/png", prompt, photoVersion);
     const updated = await saveContentPost({
       ...post,
-      mediaUrl,
+      mediaUrl: `${publicOrigin(request)}${previewUrl}`,
       creativeVisualMode: "photo",
-      creativeHeadline: input.headline || post.creativeHeadline || post.title.slice(0, 90),
-      creativeSupportingText: input.supportingText || post.creativeSupportingText || cleanSupport(post.body),
-      creativeCta: input.cta || post.creativeCta || "Message MedMinds",
+      creativeHeadline: headline,
+      creativeSupportingText: supportingText,
+      creativeCta: cta,
       creativeGeneratedAt: new Date().toISOString(),
       creativeVersion,
       photoPrompt: prompt,
