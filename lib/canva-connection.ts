@@ -56,6 +56,7 @@ export function canvaPublicOrigin(request:Request){return process.env.PUBLIC_URL
 export async function validateCanvaCredentials():Promise<CanvaCredentialCheck>{
   const config=getCanvaConfig();
   if(!config.oauthConfigured)return {attempted:false,valid:false,code:"not_configured",message:"Canva OAuth credentials are not configured."};
+  if(!config.clientSecret.startsWith("cnvca"))return {attempted:false,valid:false,code:"invalid_secret_format",message:"CANVA_CLIENT_SECRET is not a Canva Connect API client secret. Canva client secrets begin with cnvca."};
   try{
     const response=await fetch("https://api.canva.com/rest/v1/oauth/token",{
       method:"POST",
