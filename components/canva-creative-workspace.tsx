@@ -22,6 +22,16 @@ type BrandTemplate = {
   thumbnail?: { width?: number; height?: number; url?: string };
 };
 
+function canvaFailureMessage(code:string|null){
+  if(code==="invalid_client")return "Canva rejected the configured Client Secret. Generate a new Client Secret for this integration in the Canva Developer Portal, replace CANVA_CLIENT_SECRET in Vercel, then reconnect.";
+  if(code==="invalid_grant")return "The Canva authorization code expired or was already used. Start the Canva connection again.";
+  if(code==="invalid_scope")return "The Canva integration is missing one or more required scopes. Enable the requested design, Brand Template and profile scopes in the Canva Developer Portal.";
+  if(code==="redirect_uri_mismatch"||code==="invalid_redirect_uri")return "The Canva redirect URL does not match the integration settings. Register https://sales.medmindslc.online/api/admin/canva/callback exactly in the Canva Developer Portal.";
+  if(code==="missing_pkce")return "The secure Canva sign-in session expired before the callback completed. Start the Canva connection again in this browser.";
+  if(code==="access_denied")return "Canva access was not approved. Reconnect and approve the requested permissions.";
+  return "Canva authorization could not be completed. Reconnect Canva; if it fails again, check the error details in the Sales Agent runtime logs.";
+}
+
 export function CanvaCreativeWorkspace({ postId }: { postId: string }) {
   const [workspace,setWorkspace]=useState<Workspace|null>(null);
   const [templates,setTemplates]=useState<BrandTemplate[]>([]);
@@ -61,10 +71,13 @@ export function CanvaCreativeWorkspace({ postId }: { postId: string }) {
 
   useEffect(()=>{void (async()=>{const data=await loadWorkspace();if(data?.canva.connected)await loadTemplates();})();},[loadWorkspace,loadTemplates]);
   useEffect(()=>{
-    const result=new URLSearchParams(window.location.search).get("canva");
+    const params=new URLSearchParams(window.location.search);
+    const result=params.get("canva");
+    const errorCode=params.get("canva_error");
     if(result==="connected")setNotice("Canva is connected. You can now use Brand Templates in this content workflow.");
     if(result==="setup-required")setError("Canva Developer credentials must be configured before connecting Canva.");
-    if(result==="connection-failed")setError("Canva authorization could not be completed. Please reconnect and approve the requested permissions.");
+    if(result==="invalid-client")setError("Canva rejected the configured Client Secret. Generate a new Client Secret for this integration in the Canva Developer Portal, replace CANVA_CLIENT_SECRET in Vercel, then reconnect.");
+    if(result==="connection-failed")setError(canvaFailureMessage(errorCode));
   },[]);
 
   async function createFromTemplate(template:BrandTemplate){
