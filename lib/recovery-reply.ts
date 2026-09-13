@@ -31,7 +31,7 @@ export async function verifiedConversationFallback(phone: string, text: string) 
   }
 
   if (/^(yes|yes please|please|sure)[.! ]*$/i.test(message) && /list|options|category|categories/.test(lastAssistant)) {
-    return "Sure. MedMinds services include research and writing, data analysis, editing and quality assurance, plagiarism and AI checks, courses and training, Pa Gym, academic support, and digital services. Which category would you like me to show first?";
+    return "Sure. MedMinds services include research and writing, data analysis, editing and quality assurance, plagiarism and AI checks, courses and training, MedMinds Prep, academic support, and digital services. Which category would you like me to show first?";
   }
 
   const asksForLink = /\blink\b|check (it|this) myself|website|web page|page for this|where can i (check|see)|online/i.test(lower);
@@ -39,8 +39,8 @@ export async function verifiedConversationFallback(phone: string, text: string) 
     if (/research|proposal|dissertation|thesis|topic development|research pricing/.test(recentContext)) {
       return "Yes. You can check the current MedMinds research pricing here: https://www.medmindslc.online/pricing. I can still help you work out the exact amount if your institution or deadline changes the price.";
     }
-    if (/pa gym|pagym/.test(recentContext)) {
-      return "Yes. You can open Pa Gym here: https://medmindslc.site/mayadi.html. If you still need an account, use https://medmindslc.site/pa-gym-start.html?ref=jumamustafap.";
+    if (/medminds prep|pa gym|pagym/.test(recentContext)) {
+      return "Yes. You can open MedMinds Prep here: https://medmindslc.site/mayadi.html. If you still need an account, use https://medmindslc.site/pa-gym-start.html?ref=jumamustafap.";
     }
 
     const offers = await listOffers(true).catch(() => []);
@@ -83,8 +83,8 @@ export async function verifiedConversationFallback(phone: string, text: string) 
   if (/data analysis|analyse|analyze|statistics|statistical/.test(lower)) {
     return "Yes, we can help with data analysis. Is your study quantitative, qualitative or mixed methods?";
   }
-  if (/pa gym|pagym/.test(lower)) {
-    return "Yes, I can help with Pa Gym. Are you looking for theory, OSCE practice, or both?";
+  if (/medminds prep|pa gym|pagym/.test(lower)) {
+    return "Yes, I can help with MedMinds Prep. Are you looking for theory, OSCE practice, or both?";
   }
   if (/dissertation|thesis/.test(lower)) {
     return "Yes, we can help with dissertation or thesis support. What level are you doing?";
