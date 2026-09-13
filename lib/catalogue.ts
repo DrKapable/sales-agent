@@ -1,4 +1,5 @@
 import type { Offer } from "@/lib/types";
+import { CURRENT_CONTENT_DESTINATIONS } from "@/lib/content-destinations";
 
 export type OfferSeed = Omit<Offer, "id" | "updatedAt">;
 
@@ -7,8 +8,12 @@ const PAYMENT_DETAILS = "Submit payment to 0977259132, registered to Juma Phiri.
 const PAYMENT_AFTER_QUOTE = "Once the amount is approved, submit payment to 0977259132, registered to Juma Phiri, and confirm it with Dr. Mustafa Juma Phiri on 0977259132";
 const GENERAL_CONTACT = "Dr Kanyembo Ng'andwe on 0974634555";
 const RESEARCH_PAYMENT = `Review research pricing at ${RESEARCH_PRICING_URL}. ${PAYMENT_DETAILS}. For other enquiries, contact ${GENERAL_CONTACT}.`;
-// The public path remains legacy for compatibility; the customer-facing product name is MedMinds Prep.
-const MEDMINDS_PREP_ACCOUNT = "https://medmindslc.site/pa-gym-start.html?ref=jumamustafap";
+const PREP_NMCZ = CURRENT_CONTENT_DESTINATIONS["prep-nmcz"].url;
+const PREP_PRECLINICAL = CURRENT_CONTENT_DESTINATIONS["prep-preclinical"].url;
+const PREP_MEDICAL = CURRENT_CONTENT_DESTINATIONS["prep-medical-students"].url;
+const PREP_PG_IM = CURRENT_CONTENT_DESTINATIONS["prep-pg-internal-medicine"].url;
+const RESEARCH_PORTAL = CURRENT_CONTENT_DESTINATIONS["research-portal"].url;
+const ZATAFA_MEDSTATS = CURRENT_CONTENT_DESTINATIONS["zatafa-medstats"].url;
 const AI_PROPOSAL_COURSE_PAYMENT = "AI-Assisted Research Proposal Writing course payment: Airtel Money 0977259132 (Juma Phiri) or MTN Money 0969152364 (Musonda Mupeta). After payment, send proof of payment and your email address for account activation. Create your account at https://medmindslc.online/user-account/.";
 
 type ResearchPrice = {
@@ -65,7 +70,8 @@ function researchOffer(price: ResearchPrice): OfferSeed {
       `Source range: K${price.min} to K${price.max}`,
       "International clients: add 25% after other adjustments",
       ...(price.adjustments ? ["Non-medical field: add K200", "UNZA, UNILUS or Cavendish: add K200"] : []),
-      `Self-service pricing: ${RESEARCH_PRICING_URL}`
+      `Self-service pricing: ${RESEARCH_PRICING_URL}`,
+      `Research Client Portal: ${RESEARCH_PORTAL}`
     ],
     priceZmw: standard,
     rushPriceZmw: price.max,
@@ -105,12 +111,89 @@ const courseOffers: OfferSeed[] = [
 ];
 
 const medMindsPrepOffers: OfferSeed[] = [
-  { slug: "pa-gym", name: "MedMinds Prep Theory", category: "MedMinds Prep", description: "Monthly undergraduate medical theory practice with timed question sets and worked explanations.", features: ["Internal Medicine", "Paediatrics", "Obstetrics and Gynaecology", "Surgery", "Train by system or random circuit"], priceZmw: 100, rushPriceZmw: 100, paymentInstructions: `Use https://medmindslc.site/mayadi.html. ${PAYMENT_DETAILS}. Create an account or claim a 24-hour free pass at ${MEDMINDS_PREP_ACCOUNT}.`, active: true },
-  { slug: "pa-gym-osce", name: "MedMinds Prep OSCE", category: "MedMinds Prep", description: "Monthly undergraduate medical OSCE preparation and clinical practice.", features: ["Undergraduate medical students", "OSCE preparation", "Monthly access"], priceZmw: 100, rushPriceZmw: 100, paymentInstructions: `Use https://medmindslc.site/mayadi.html. ${PAYMENT_DETAILS}. Create an account or claim a 24-hour free pass at ${MEDMINDS_PREP_ACCOUNT}.`, active: true },
-  { slug: "pa-gym-combined", name: "MedMinds Prep Theory and OSCE", category: "MedMinds Prep", description: "Monthly undergraduate access to both MedMinds Prep theory and OSCE preparation.", features: ["Theory access: K100 per month", "OSCE access: K100 per month", "Total monthly price: K200"], priceZmw: 200, rushPriceZmw: 200, paymentInstructions: `Use https://medmindslc.site/mayadi.html. ${PAYMENT_DETAILS}. Create an account or claim a 24-hour free pass at ${MEDMINDS_PREP_ACCOUNT}.`, active: true },
-  { slug: "pa-gym-preclinical", name: "MedMinds Prep Preclinical", category: "MedMinds Prep", description: "MedMinds Prep access for preclinical students. The client should use the dedicated page for the current package and payment amount.", features: ["Preclinical student access", `Account creation and 24-hour free pass: ${MEDMINDS_PREP_ACCOUNT}`], priceZmw: null, rushPriceZmw: null, paymentInstructions: `View the current package at https://medmindslc.site/preclinical.html. ${PAYMENT_DETAILS}.`, active: true },
-  { slug: "pa-gym-nmcz", name: "MedMinds Prep NMCZ Nursing Preparation", category: "MedMinds Prep", description: "MedMinds Prep examination preparation for nurses preparing for NMCZ.", features: ["NMCZ preparation", `Account creation and 24-hour free pass: ${MEDMINDS_PREP_ACCOUNT}`], priceZmw: null, rushPriceZmw: null, paymentInstructions: `View the current package at https://medmindslc.site/nmcz.html. ${PAYMENT_DETAILS}.`, active: true },
-  { slug: "pa-gym-free-pass", name: "MedMinds Prep 24-Hour Free Pass", category: "MedMinds Prep", description: "A 24-hour trial for clients who want to try MedMinds Prep. The same page is used by paid clients who still need an account.", features: ["24-hour trial", "Account creation for already-paid clients"], priceZmw: 0, rushPriceZmw: 0, paymentInstructions: `Create the account at ${MEDMINDS_PREP_ACCOUNT}.`, active: true }
+  {
+    slug: "pa-gym",
+    name: "MedMinds Prep QBank and Past Papers Theory",
+    category: "MedMinds Prep",
+    description: "Undergraduate medical exam preparation with QBank practice, Past Papers Theory and linked clinical revision.",
+    features: ["Internal Medicine", "Paediatrics", "Obstetrics and Gynaecology", "Surgery", "2-day free trial", `Current medical-student landing page: ${PREP_MEDICAL}`],
+    priceZmw: 100,
+    rushPriceZmw: 100,
+    paymentInstructions: `Start with the current medical-student landing page at ${PREP_MEDICAL}. The landing page shows the current plan options after the 2-day free trial. ${PAYMENT_DETAILS}.`,
+    active: true
+  },
+  {
+    slug: "pa-gym-osce",
+    name: "MedMinds Prep OSCE Clinical Skills",
+    category: "MedMinds Prep",
+    description: "Undergraduate medical OSCE and clinical-skills preparation.",
+    features: ["Undergraduate medical students", "OSCE Clinical Skills", "2-day free trial", `Current medical-student landing page: ${PREP_MEDICAL}`],
+    priceZmw: 100,
+    rushPriceZmw: 100,
+    paymentInstructions: `Start at ${PREP_MEDICAL}. The landing page includes the current medical-student plan options after the 2-day free trial. ${PAYMENT_DETAILS}.`,
+    active: true
+  },
+  {
+    slug: "pa-gym-combined",
+    name: "MedMinds Prep QBank, Past Papers Theory and OSCE Clinical Skills",
+    category: "MedMinds Prep",
+    description: "Undergraduate medical access covering QBank practice, Past Papers Theory and OSCE Clinical Skills.",
+    features: ["QBank", "Past Papers Theory", "OSCE Clinical Skills", "2-day free trial", `Current medical-student landing page: ${PREP_MEDICAL}`],
+    priceZmw: 200,
+    rushPriceZmw: 200,
+    paymentInstructions: `Start at ${PREP_MEDICAL}. Use the plan information shown on the current landing page after the 2-day free trial. ${PAYMENT_DETAILS}.`,
+    active: true
+  },
+  {
+    slug: "pa-gym-preclinical",
+    name: "MedMinds Prep Preclinical",
+    category: "MedMinds Prep",
+    description: "Focused QBank practice for foundational and preclinical medical sciences.",
+    features: ["Preclinical student access", "Foundational medical sciences", "2-day free trial", `Current preclinical landing page: ${PREP_PRECLINICAL}`],
+    priceZmw: null,
+    rushPriceZmw: null,
+    paymentInstructions: `View the current preclinical trial and plans at ${PREP_PRECLINICAL}.`,
+    active: true
+  },
+  {
+    slug: "pa-gym-nmcz",
+    name: "MedMinds Prep NMCZ Nursing Preparation",
+    category: "MedMinds Prep",
+    description: "Practice for nurses preparing for the NMCZ competence examination.",
+    features: ["NMCZ competence-exam preparation", "2-day free trial", `Current NMCZ landing page: ${PREP_NMCZ}`],
+    priceZmw: null,
+    rushPriceZmw: null,
+    paymentInstructions: `View the current NMCZ trial and plan options at ${PREP_NMCZ}.`,
+    active: true
+  },
+  {
+    slug: "pa-gym-pg-internal-medicine",
+    name: "MedMinds Prep STP/MMed Internal Medicine",
+    category: "MedMinds Prep",
+    description: "Postgraduate Internal Medicine revision with past papers, written practice and OSCE preparation.",
+    features: ["STP Internal Medicine", "MMed Internal Medicine", "Past papers", "Written practice", "OSCE preparation", "2-day free trial", `Current postgraduate Internal Medicine landing page: ${PREP_PG_IM}`],
+    priceZmw: null,
+    rushPriceZmw: null,
+    paymentInstructions: `View the current STP/MMed Internal Medicine trial and plan options at ${PREP_PG_IM}.`,
+    active: true
+  },
+  {
+    slug: "pa-gym-free-pass",
+    name: "MedMinds Prep 2-Day Free Trial",
+    category: "MedMinds Prep",
+    description: "A 2-day trial. Use the programme-specific landing page rather than a legacy generic registration page.",
+    features: [
+      "2-day trial",
+      `NMCZ: ${PREP_NMCZ}`,
+      `Preclinical: ${PREP_PRECLINICAL}`,
+      `Medical students: ${PREP_MEDICAL}`,
+      `STP/MMed Internal Medicine: ${PREP_PG_IM}`
+    ],
+    priceZmw: 0,
+    rushPriceZmw: 0,
+    paymentInstructions: `Choose the programme-specific current landing page: NMCZ ${PREP_NMCZ}; Preclinical ${PREP_PRECLINICAL}; Medical students ${PREP_MEDICAL}; STP/MMed Internal Medicine ${PREP_PG_IM}.`,
+    active: true
+  }
 ];
 
 const otherOffers: OfferSeed[] = [
@@ -118,7 +201,7 @@ const otherOffers: OfferSeed[] = [
   { slug: "software-development", name: "Software Development", category: "Digital Services", description: "Custom software development scoped with a human assistant.", features: ["Custom quotation required"], priceZmw: null, rushPriceZmw: null, paymentInstructions: `Refer the client to ${GENERAL_CONTACT} for requirements and a quotation. ${PAYMENT_AFTER_QUOTE}.`, active: true },
   { slug: "web-development", name: "Web Development", category: "Digital Services", description: "Website design and development scoped with a human assistant.", features: ["Custom quotation required"], priceZmw: null, rushPriceZmw: null, paymentInstructions: `Refer the client to ${GENERAL_CONTACT} for requirements and a quotation. ${PAYMENT_AFTER_QUOTE}.`, active: true },
   { slug: "whatsapp-agency-automation", name: "WhatsApp Agency Automation", category: "Digital Services", description: "WhatsApp sales and agency automation scoped with a human assistant.", features: ["Custom quotation required"], priceZmw: null, rushPriceZmw: null, paymentInstructions: `Refer the client to ${GENERAL_CONTACT} for requirements and a quotation. ${PAYMENT_AFTER_QUOTE}.`, active: true },
-  { slug: "zatafa-medstats", name: "ZaTafa MedStats", category: "Digital Services", description: "Guided medical and health research data analysis from dataset cleaning to tables, figures and an editable results narrative.", features: ["Data cleaning", "Analysis tables", "Figures and exports", "Open at https://zatafa.medmindslc.online/"], priceZmw: null, rushPriceZmw: null, paymentInstructions: `Open https://zatafa.medmindslc.online/ or contact ${GENERAL_CONTACT} for assistance.`, active: true }
+  { slug: "zatafa-medstats", name: "ZaTafa MedStats", category: "Digital Services", description: "Guided medical and health research data analysis from dataset cleaning to tables, figures and an editable results narrative.", features: ["Data cleaning", "Analysis tables", "Figures and exports", `Current information page: ${ZATAFA_MEDSTATS}`], priceZmw: null, rushPriceZmw: null, paymentInstructions: `Open ${ZATAFA_MEDSTATS} or contact ${GENERAL_CONTACT} for assistance.`, active: true }
 ];
 
 export const offerSeeds: OfferSeed[] = [

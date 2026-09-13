@@ -1,3 +1,4 @@
+import { CURRENT_CONTENT_DESTINATIONS, selectContentDestination } from "@/lib/content-destinations";
 import { getConversation, listOffers } from "@/lib/store";
 
 function money(value: number) {
@@ -36,11 +37,12 @@ export async function verifiedConversationFallback(phone: string, text: string) 
 
   const asksForLink = /\blink\b|check (it|this) myself|website|web page|page for this|where can i (check|see)|online/i.test(lower);
   if (asksForLink) {
+    const linkContext = `${recentContext} ${lower}`;
+    const destination = selectContentDestination({ body: linkContext });
+    if (destination) return `Yes. Use the current ${destination.label} page here: ${destination.url}`;
+
     if (/research|proposal|dissertation|thesis|topic development|research pricing/.test(recentContext)) {
-      return "Yes. You can check the current MedMinds research pricing here: https://www.medmindslc.online/pricing. I can still help you work out the exact amount if your institution or deadline changes the price.";
-    }
-    if (/medminds prep|pa gym|pagym/.test(recentContext)) {
-      return "Yes. You can open MedMinds Prep here: https://medmindslc.site/mayadi.html. If you still need an account, use https://medmindslc.site/pa-gym-start.html?ref=jumamustafap.";
+      return `Yes. You can check the current MedMinds research pricing here: ${CURRENT_CONTENT_DESTINATIONS["research-pricing"].url}. I can still help you work out the exact amount if your institution or deadline changes the price.`;
     }
 
     const offers = await listOffers(true).catch(() => []);
@@ -52,8 +54,8 @@ export async function verifiedConversationFallback(phone: string, text: string) 
     }).sort((a, b) => b.score - a.score);
     const matched = ranked[0]?.score ? ranked[0].offer : null;
     const url = firstUrl(matched?.paymentInstructions) || matched?.features.map(firstUrl).find(Boolean) || null;
-    if (url) return `Yes. You can check it here: ${url}.`;
-    return "Yes. The main MedMinds site is https://www.medmindslc.online/. Tell me which service you want to check and I’ll point you to the exact page.";
+    if (url && !url.includes("medmindslc.site")) return `Yes. You can check it here: ${url}.`;
+    return `Yes. The main MedMinds site is ${CURRENT_CONTENT_DESTINATIONS["main-site"].url}. Tell me which service you want to check and I’ll point you to the exact page.`;
   }
 
   if (/research/.test(lower) && /topic/.test(lower)) {
@@ -84,7 +86,7 @@ export async function verifiedConversationFallback(phone: string, text: string) 
     return "Yes, we can help with data analysis. Is your study quantitative, qualitative or mixed methods?";
   }
   if (/medminds prep|pa gym|pagym/.test(lower)) {
-    return "Yes, I can help with MedMinds Prep. Are you looking for theory, OSCE practice, or both?";
+    return "Yes, I can help with MedMinds Prep. Are you looking for NMCZ, preclinical, undergraduate medical QBank/OSCE, or STP/MMed Internal Medicine preparation?";
   }
   if (/dissertation|thesis/.test(lower)) {
     return "Yes, we can help with dissertation or thesis support. What level are you doing?";

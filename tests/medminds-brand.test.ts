@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessMedMindsContent, hasLegacyPrepBrand, normalizeMedMindsBranding } from "@/lib/medminds-brand";
+import { assessMedMindsContent, hasLegacyContentDestination, hasLegacyPrepBrand, normalizeMedMindsBranding } from "@/lib/medminds-brand";
 
 describe("MedMinds brand rules", () => {
   it("normalizes the retired prep name without changing legacy URL slugs unless passed as prose", () => {
@@ -12,6 +12,11 @@ describe("MedMinds brand rules", () => {
     expect(hasLegacyPrepBrand("Try MedMinds Prep today")).toBe(false);
   });
 
+  it("detects outdated public content destinations", () => {
+    expect(hasLegacyContentDestination("Open https://medmindslc.site/nmcz.html")).toBe(true);
+    expect(hasLegacyContentDestination("Open https://www.medmindslc.online/affiliate/nmcz?ref=jumamustafap")).toBe(false);
+  });
+
   it("flags retired branding and unsupported guarantees", () => {
     const quality = assessMedMindsContent({
       title: "Pa Gym campaign",
@@ -19,5 +24,15 @@ describe("MedMinds brand rules", () => {
     });
     expect(quality.blockers).toContain("Replace the retired product name with MedMinds Prep.");
     expect(quality.warnings.some((warning) => warning.includes("unsupported guarantee"))).toBe(true);
+  });
+
+  it("blocks legacy Prep links and old 24-hour trial wording", () => {
+    const quality = assessMedMindsContent({
+      title: "MedMinds Prep NMCZ",
+      contentType: "MedMinds Prep / exam preparation",
+      body: "Start your 24-hour free trial at https://medmindslc.site/pa-gym-start.html?ref=jumamustafap"
+    });
+    expect(quality.blockers.some((item) => item.includes("outdated MedMinds link"))).toBe(true);
+    expect(quality.blockers.some((item) => item.includes("2-day free trial"))).toBe(true);
   });
 });
