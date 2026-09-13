@@ -5,14 +5,14 @@ import { normalizeMedMindsBranding } from "@/lib/medminds-brand";
 
 const schema = z.object({
   template: z.enum(["promo-clean", "education-card", "faq-notice"]).optional(),
-  headline: z.string().trim().max(100).optional(),
-  supportingText: z.string().trim().max(230).optional(),
-  cta: z.string().trim().max(60).optional()
+  headline: z.string().trim().max(90).optional(),
+  supportingText: z.string().trim().max(180).optional(),
+  cta: z.string().trim().max(48).optional()
 });
 
 function deriveSupport(body: string) {
   const clean = normalizeMedMindsBranding(body).replace(/#[A-Za-z0-9_]+/g, "").replace(/\s+/g, " ").trim();
-  return (clean.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 2).join(" ") || clean).slice(0, 210).trim();
+  return (clean.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 1).join(" ") || clean).slice(0, 165).trim();
 }
 
 function deriveTemplate(contentType: string): CreativeTemplate {
@@ -33,7 +33,6 @@ function deriveCta(contentType: string) {
 function publicOrigin(request: Request) {
   const configured = process.env.PUBLIC_URL?.trim().replace(/\/+$/, "");
   if (configured) return configured;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return new URL(request.url).origin;
 }
 
@@ -42,12 +41,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const post = await getContentPost(id);
   if (!post) return NextResponse.json({ error: "Content post not found." }, { status: 404 });
   const parsed = schema.safeParse(await request.json().catch(() => ({})));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid creative settings." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Invalid creative settings. Keep the headline, supporting text and CTA concise for a readable Facebook graphic." }, { status: 400 });
 
   const input = parsed.data;
   const version = Math.max(1, (post.creativeVersion || 1) + 1);
   const template = input.template || post.creativeTemplate || deriveTemplate(post.contentType);
-  const headline = normalizeMedMindsBranding(input.headline || post.creativeHeadline || post.title.slice(0, 100));
+  const headline = normalizeMedMindsBranding(input.headline || post.creativeHeadline || post.title.slice(0, 90));
   const supportingText = normalizeMedMindsBranding(input.supportingText || post.creativeSupportingText || deriveSupport(post.body));
   const cta = normalizeMedMindsBranding(input.cta || post.creativeCta || deriveCta(post.contentType));
   const previewUrl = `/api/content/creative/${post.id}?v=${version}`;
@@ -64,5 +63,5 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     creativeGeneratedAt: new Date().toISOString(),
     creativeVersion: version
   });
-  return NextResponse.json({ ...updated, previewUrl });
+  return NextResponse.json({ ...updated, previewUrl, facebookReady: true, dimensions: "1200x628" });
 }
