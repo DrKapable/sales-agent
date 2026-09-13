@@ -8,6 +8,13 @@ export type CanvaConnectionStatus = {
   expiresAt: string | null;
 };
 
+export type CanvaCredentialCheck = {
+  attempted: boolean;
+  valid: boolean | null;
+  code: string | null;
+  message: string | null;
+};
+
 type StoredCanvaConnection = {
   accessToken: string;
   refreshToken: string;
@@ -35,6 +42,26 @@ function decrypt(value:string){const [ivPart,tagPart,dataPart]=value.split(".");
 
 export function getCanvaConfig(){const clientId=process.env.CANVA_CLIENT_ID?.trim()||"";const clientSecret=process.env.CANVA_CLIENT_SECRET?.trim()||"";return {clientId,clientSecret,oauthConfigured:Boolean(clientId&&clientSecret),scopes:["design:content:read","design:content:write","design:meta:read","brandtemplate:meta:read","brandtemplate:content:read","profile:read"]};}
 export function canvaPublicOrigin(request:Request){return process.env.PUBLIC_URL?.trim().replace(/\/+$/,"")||new URL(request.url).origin;}
+
+export async function validateCanvaCredentials():Promise<CanvaCredentialCheck>{
+  const config=getCanvaConfig();
+  if(!config.oauthConfigured)return {attempted:false,valid:false,code:"not_configured",message:"Canva OAuth credentials are not configured."};
+  try{
+    const response=await fetch("https://api.canva.com/rest/v1/oauth/token",{
+      method:"POST",
+      headers:{Authorization:`Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64")}`,"Content-Type":"application/x-www-form-urlencoded"},
+      body:new URLSearchParams({grant_type:"refresh_token",refresh_token:"medminds-canva-credential-validation"}),
+      cache:"no-store"
+    });
+    const data=await response.json().catch(()=>({})) as {code?:string;message?:string};
+    const code=data.code||null;
+    if(code==="invalid_grant")return {attempted:true,valid:true,code,message:data.message||null};
+    if(code==="invalid_client")return {attempted:true,valid:false,code,message:data.message||"Canva rejected the configured client secret."};
+    return {attempted:true,valid:null,code,message:data.message||`Canva credential validation returned HTTP ${response.status}.`};
+  }catch(error){
+    return {attempted:true,valid:null,code:"network_error",message:error instanceof Error?error.message:"Unable to validate Canva credentials."};
+  }
+}
 
 export async function saveCanvaConnection(input:{accessToken:string;refreshToken:string;expiresIn:number}){const now=new Date();const item:StoredCanvaConnection={accessToken:input.accessToken.trim(),refreshToken:input.refreshToken.trim(),expiresAt:new Date(now.getTime()+Math.max(60,input.expiresIn||14400)*1000).toISOString(),connectedAt:now.toISOString()};const db=database();if(!db){memory=item;return item;}await ensureTable(db);await db.query(`INSERT INTO medminds_canva_connection (connection_key,access_token_cipher,refresh_token_cipher,expires_at,connected_at,updated_at)
 VALUES ('primary',$1,$2,$3,NOW(),NOW()) ON CONFLICT (connection_key) DO UPDATE SET access_token_cipher=EXCLUDED.access_token_cipher,refresh_token_cipher=EXCLUDED.refresh_token_cipher,expires_at=EXCLUDED.expires_at,connected_at=NOW(),updated_at=NOW()`,[encrypt(item.accessToken),encrypt(item.refreshToken),item.expiresAt]);return item;}
