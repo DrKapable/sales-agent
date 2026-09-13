@@ -13,9 +13,9 @@ const schema = z.object({
   setting: z.enum(["modern-office", "university", "clinical-classroom", "library", "workspace", "urban-outdoor"]).default("modern-office"),
   mood: z.enum(["confident", "approachable", "focused", "curious", "warm"]).default("focused"),
   style: z.enum(["editorial", "lifestyle", "premium", "documentary"]).default("editorial"),
-  headline: z.string().trim().max(100).optional(),
-  supportingText: z.string().trim().max(230).optional(),
-  cta: z.string().trim().max(60).optional(),
+  headline: z.string().trim().max(90).optional(),
+  supportingText: z.string().trim().max(180).optional(),
+  cta: z.string().trim().max(48).optional(),
   extraDirection: z.string().trim().max(1200).optional().default("")
 });
 
@@ -65,13 +65,12 @@ const styleMap: Record<string, string> = {
 
 function cleanSupport(body: string) {
   const clean = body.replace(/#[A-Za-z0-9_]+/g, "").replace(/\s+/g, " ").trim();
-  return clean.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 2).join(" ").slice(0, 210);
+  return clean.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 1).join(" ").slice(0, 165);
 }
 
 function publicOrigin(request: Request) {
   const configured = process.env.PUBLIC_URL?.trim().replace(/\/+$/, "");
   if (configured) return configured;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return new URL(request.url).origin;
 }
 
@@ -86,7 +85,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const derivedDirection = `${subjectMap[input.subject]}; ${sceneMap[input.scene]}; ${settingMap[input.setting]}; mood: ${moodMap[input.mood]}; ${styleMap[input.style]}.`;
     const primaryDirection = input.extraDirection || derivedDirection;
-    const prompt = `Create a highly photorealistic landscape advertising photograph for MedMinds Learning Centre, a medical education, research-support and digital-health brand based in Zambia. MedMinds Prep is its examination-preparation product.
+    const prompt = `Create a highly photorealistic premium advertising photograph for MedMinds Learning Centre, a medical education, research-support and digital-health brand based in Zambia. MedMinds Prep is its examination-preparation product.
 
 PRIMARY CREATIVE DIRECTION
 ${primaryDirection}
@@ -95,13 +94,15 @@ SECONDARY CAST AND STYLE GUIDANCE
 ${derivedDirection}
 If the primary direction specifies the subject, setting, activity, props, clothing, camera framing or mood, it overrides the secondary presets.
 
-COMPOSITION
-- Landscape composition around 3:2, suitable for cropping to a wide Facebook or LinkedIn creative.
-- Keep faces and hands natural and anatomically believable.
-- When practical, leave uncluttered space on the left for a later MedMinds text overlay.
-- Contemporary Zambian/Southern African context without stereotypes, flags, identifiable hospitals or costume-like styling.
-- Use realistic everyday professional or student clothing. Clinical attire may be used only when appropriate to the requested scene.
-- Natural daylight or soft commercial lighting. Real-camera realism, not illustration, CGI or glossy synthetic skin.
+FACEBOOK CREATIVE COMPOSITION — VERY IMPORTANT
+- The final branded creative will be cropped to 1200 x 628 (about 1.91:1), so compose the photograph to survive a wide crop.
+- Place the principal person, face and important action clearly in the RIGHT 45% of the frame.
+- Keep the LEFT 48% visually calm, low-detail and free of faces, hands, screens, books with readable text, bright highlights or important objects. This is the protected text-safe zone.
+- Keep the principal face inside the centre-right safe area, not near the top, bottom or right edge.
+- Avoid putting a second face behind the future text area. If there is a pair or group, keep all faces mostly on the right half.
+- Prefer clean depth separation, uncluttered backgrounds, realistic daylight and crisp facial focus.
+- No baked-in text, logos, posters with readable wording, watermarks, UI labels or promotional typography in the raw photograph.
+- Real-camera realism, natural skin texture and believable hands. Avoid CGI, illustration, oversmoothing and artificial glossy skin.
 
 MEDICAL, ACADEMIC AND PRIVACY SAFEGUARDS
 - Use entirely fictional adults; do not resemble public figures, real students, real clinicians or real patients.
@@ -132,7 +133,7 @@ MEDICAL, ACADEMIC AND PRIVACY SAFEGUARDS
       ...post,
       mediaUrl,
       creativeVisualMode: "photo",
-      creativeHeadline: input.headline || post.creativeHeadline || post.title.slice(0, 100),
+      creativeHeadline: input.headline || post.creativeHeadline || post.title.slice(0, 90),
       creativeSupportingText: input.supportingText || post.creativeSupportingText || cleanSupport(post.body),
       creativeCta: input.cta || post.creativeCta || "Message MedMinds",
       creativeGeneratedAt: new Date().toISOString(),
