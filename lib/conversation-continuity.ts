@@ -147,7 +147,7 @@ export async function captureConversationAnswer(phone: string, clientText: strin
 function clarificationReply(kind: QuestionKind) {
   if (kind === "deadline") return "By deadline, I mean when you need the work completed or submitted. An exact date is not necessary; even a month and year such as January 2027 is enough.";
   if (kind === "programme") return "By programme or academic level, I mean what you are studying and the level, for example diploma, bachelor’s, master’s, PhD, MBChB or MPH. You can answer in your own words.";
-  if (kind === "format") return "I mean which Pa Gym option you want: theory practice, OSCE preparation, or both.";
+  if (kind === "format") return "I mean which MedMinds Prep option you want: theory practice, OSCE preparation, or both.";
   if (kind === "scope") return "I mean the specific work or outcome you want MedMinds to help with. Just describe the part you want handled in your own words.";
   return "I meant the last detail I asked for so I can understand your request correctly. You can answer it in your own words; it does not need to follow a special format.";
 }
