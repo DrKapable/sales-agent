@@ -21,7 +21,8 @@ const lead: Lead = {
   followUpAt: null,
   source: "whatsapp",
   createdAt: "2026-08-10T00:00:00.000Z",
-  updatedAt: "2026-08-10T00:00:00.000Z"
+  updatedAt: "2026-08-10T00:00:00.000Z",
+  lastMessageAt: null
 };
 
 describe("referral notifications", () => {
