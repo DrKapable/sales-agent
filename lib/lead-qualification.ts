@@ -21,7 +21,8 @@ const RESEARCH_SCOPE = /\b(proposal|dissertation|thesis|methodology|literature r
 const COURSE = /\b(ai[- ]?(?:assisted|enhanced).*proposal|proposal writing course|research proposal writing course|course|training|self[- ]?paced|learn (?:the )?(?:proposal|research) process|do it myself|write it myself|work on it myself|complete it myself)\b/i;
 const SELF_DIRECTED_ROUTE = /\b(?:do|write|work on|complete|finish)\s+(?:it|the proposal|my proposal|the research|my research|the work|my work)?\s*myself\b|\bi want to (?:do|write|work on|complete|finish)\b.{0,35}\bmyself\b/ig;
 const HANDS_ON_ROUTE = /\b(?:do it for me|hands[- ]?on|direct support|help with my|assist me with my|help me with my|handle (?:it|this|the work)|complete (?:it|this|the work) for me)\b/ig;
-const PA_GYM = /\b(pa\s*gym|osce|theory practice|question practice|exam prep|exam preparation)\b/i;
+// `pa_gym` remains an internal compatibility key; MedMinds Prep is the only customer-facing name.
+const PA_GYM = /\b(medminds\s*prep|pa\s*gym|pagym|osce|theory practice|question practice|exam prep|exam preparation)\b/i;
 const PA_GYM_FORMAT = /\b(theory|osce|both|question practice|questions)\b/i;
 const DIGITAL = /\b(website|web development|software|system|app|application|automation|business automation|cybersecurity|portal|dashboard)\b/i;
 const DIGITAL_SCOPE = /\b(booking|payments?|inventory|attendance|exam|learning management|lms|dashboard|whatsapp|sms|client portal|student portal|employee|workforce|logbook|ecommerce|e-commerce|orders?|reports?|analytics|registration|database|crm|notifications?)\b/i;
