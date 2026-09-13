@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getContentPost, saveContentPost } from "@/lib/content-studio";
 import { getCreativeSettings, saveCreativeSettings } from "@/lib/content-creative-settings";
+import { creativeLayoutVariants } from "@/lib/content-creative-layout";
 import { normalizeMedMindsBranding } from "@/lib/medminds-brand";
 
 const schema = z.object({
@@ -17,7 +18,8 @@ const schema = z.object({
   cardOpacity: z.number().min(0.72).max(1).optional(),
   logoPosition: z.enum(["left", "center"]).optional(),
   textAlign: z.enum(["left", "center"]).optional(),
-  showWebsite: z.boolean().optional()
+  showWebsite: z.boolean().optional(),
+  layoutVariant: z.enum(creativeLayoutVariants).optional()
 });
 
 function originFor(request: Request) {
@@ -28,7 +30,12 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   const post = await getContentPost(id);
   if (!post) return NextResponse.json({ error: "Content post not found." }, { status: 404 });
-  return NextResponse.json({ post, settings: await getCreativeSettings(id), previewUrl: `/api/content/creative/${id}?v=${post.creativeVersion || 1}` });
+  return NextResponse.json({
+    post,
+    settings: await getCreativeSettings(id),
+    previewUrl: `/api/content/creative/${id}?v=${post.creativeVersion || 1}`,
+    photoUrl: post.photoGeneratedAt ? `/api/content/photo/${id}?v=${post.photoVersion || 1}` : null
+  });
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -42,6 +49,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const input = parsed.data;
     const version = Math.max(1, (post.creativeVersion || 1) + 1);
     const previewUrl = `/api/content/creative/${id}?v=${version}`;
+
+    const settings = await saveCreativeSettings(id, input);
     const updated = await saveContentPost({
       ...post,
       creativeTemplate: input.template || post.creativeTemplate,
@@ -52,9 +61,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       creativeVersion: version,
       mediaUrl: `${originFor(request)}${previewUrl}`
     });
-    const settings = await saveCreativeSettings(id, input);
+
     return NextResponse.json({ post: updated, settings, previewUrl });
   } catch (error) {
+    console.error("Unable to save MedMinds creative edits", error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to save creative edits." }, { status: 400 });
   }
 }
