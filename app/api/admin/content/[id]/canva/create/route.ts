@@ -15,7 +15,7 @@ export async function POST(request:Request,context:{params:Promise<{id:string}>}
     if(!parsed.success)return NextResponse.json({error:"Choose a valid Canva Brand Template."},{status:400});
     const connection=await getCanvaConnectionSecret();
     if(!connection)return NextResponse.json({error:"Connect Canva first."},{status:409});
-    const response=await fetch("https://api.canva.com/rest/v1/designs",{method:"POST",headers:{Authorization:`Bearer ${connection.accessToken}`,"Content-Type":"application/json"},body:JSON.stringify({type:"brand_template",brand_template_id:parsed.data.templateId}),cache:"no-store"});
+    const response=await fetch("https://api.canva.com/rest/v1/designs",{method:"POST",headers:{Authorization:`Bearer ${connection.accessToken}`,"Content-Type":"application/json"},body:JSON.stringify({type:"brand_template",brand_template_id:parsed.data.templateId,page_numbers:[1]}),cache:"no-store"});
     const data=await response.json().catch(()=>({})) as {design?:{id?:string;urls?:{edit_url?:string;view_url?:string}};message?:string};
     if(!response.ok||!data.design?.id||!data.design.urls?.edit_url)return NextResponse.json({error:data.message||"Canva could not create a design from this template. You can still open the template directly in Canva."},{status:response.status||400});
     const edit=new URL(data.design.urls.edit_url);
