@@ -145,12 +145,13 @@ export async function listRecentPublications(limit = 150) {
   return rows.map((row) => mapRow(row as Record<string, unknown>));
 }
 
+// Fallback queue only. New schedules are registered with Meta immediately and therefore have facebook_post_id set.
 export async function listDuePublications(limit = 20) {
   const db = database();
-  if (!db) return [...memory.values()].filter((item) => item.status === "SCHEDULED" && item.scheduledAt && new Date(item.scheduledAt) <= new Date()).slice(0, limit);
+  if (!db) return [...memory.values()].filter((item) => item.status === "SCHEDULED" && !item.facebookPostId && item.scheduledAt && new Date(item.scheduledAt) <= new Date()).slice(0, limit);
   await ensureTables(db);
   const rows = await db.query(`SELECT ${COLUMNS} FROM medminds_content_publications
-    WHERE status='SCHEDULED' AND scheduled_at IS NOT NULL AND scheduled_at<=NOW()
+    WHERE status='SCHEDULED' AND facebook_post_id IS NULL AND scheduled_at IS NOT NULL AND scheduled_at<=NOW()
     ORDER BY scheduled_at ASC LIMIT $1`, [limit]);
   return rows.map((row) => mapRow(row as Record<string, unknown>));
 }
@@ -167,6 +168,20 @@ export async function claimPublication(id: string) {
   await ensureTables(db);
   const rows = await db.query(`UPDATE medminds_content_publications SET status='PUBLISHING',updated_at=NOW()
     WHERE id=$1 AND status='SCHEDULED' RETURNING ${COLUMNS}`, [id]);
+  return rows[0] ? mapRow(rows[0] as Record<string, unknown>) : null;
+}
+
+export async function markPublicationRegistered(id: string, facebookPostId: string) {
+  const db = database();
+  if (!db) {
+    const item = memory.get(id);
+    if (!item) return null;
+    const updated = { ...item, status: "SCHEDULED" as const, facebookPostId, failureReason: null, updatedAt: new Date().toISOString() };
+    memory.set(id, updated);
+    return updated;
+  }
+  await ensureTables(db);
+  const rows = await db.query(`UPDATE medminds_content_publications SET status='SCHEDULED',facebook_post_id=$2,failure_reason=NULL,updated_at=NOW() WHERE id=$1 RETURNING ${COLUMNS}`, [id, facebookPostId]);
   return rows[0] ? mapRow(rows[0] as Record<string, unknown>) : null;
 }
 
