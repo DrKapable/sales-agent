@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { assessMedMindsContent, normalizeMedMindsBranding } from "@/lib/medminds-brand";
 import styles from "./medminds-content-studio.module.css";
 
 type Status = "DRAFT" | "REVIEW" | "APPROVED";
@@ -52,6 +53,15 @@ type FormState = {
 type CreativeState = { template: Template; headline: string; supportingText: string; cta: string };
 type PhotoState = { scene: string; subject: string; setting: string; mood: string; style: string; extraDirection: string };
 
+type QuickBrief = {
+  title: string;
+  contentType: string;
+  objective: string;
+  cta?: string;
+  template?: Template;
+  photoScene?: string;
+};
+
 const defaultVoice = "Credible, practical, academically grounded, warm and concise. Sound like an experienced MedMinds educator and research-support professional. Use clear Zambian English where appropriate, avoid hype, and make every post useful before it becomes promotional.";
 const defaultAudience = "Medical students, nurses, postgraduate students, health professionals and researchers in Zambia and beyond";
 
@@ -59,7 +69,7 @@ const contentTypes = [
   "Research education",
   "Research service promotion",
   "Data analysis",
-  "Pa Gym / exam preparation",
+  "MedMinds Prep / exam preparation",
   "Course promotion",
   "Clinical learning tip",
   "Student FAQ",
@@ -70,12 +80,12 @@ const contentTypes = [
   "Trust building"
 ];
 
-const quickBriefs = [
-  { title: "Research Tip", contentType: "Research education", objective: "Teach one practical research-methods concept that a postgraduate student can apply immediately." },
-  { title: "Pa Gym", contentType: "Pa Gym / exam preparation", objective: "Promote MedMinds Prep by showing how structured question practice and OSCE preparation can support exam revision without promising a pass." },
-  { title: "Data Analysis", contentType: "Data analysis", objective: "Explain a common data-analysis problem and show when a researcher may need MedMinds support." },
-  { title: "Course Spotlight", contentType: "Course promotion", objective: "Introduce one active MedMinds course, who it is for, what it teaches and a simple next step." },
-  { title: "FAQ", contentType: "Student FAQ", objective: "Answer one common question a student or researcher asks before using MedMinds services." }
+const quickBriefs: QuickBrief[] = [
+  { title: "Research Tip", contentType: "Research education", objective: "Teach one practical research-methods concept that a postgraduate student can apply immediately.", template: "education-card", photoScene: "research-work" },
+  { title: "MedMinds Prep", contentType: "MedMinds Prep / exam preparation", objective: "Promote MedMinds Prep by showing how structured question practice and OSCE preparation can support exam revision without promising a pass.", cta: "try", template: "promo-clean", photoScene: "exam-prep" },
+  { title: "Data Analysis", contentType: "Data analysis", objective: "Explain a common data-analysis problem and show when a researcher may need MedMinds support.", template: "education-card", photoScene: "data-analysis" },
+  { title: "Course Spotlight", contentType: "Course promotion", objective: "Introduce one active MedMinds course, who it is for, what it teaches and a simple next step.", cta: "enrol", template: "promo-clean", photoScene: "student-study" },
+  { title: "FAQ", contentType: "Student FAQ", objective: "Answer one common question a student or researcher asks before using MedMinds services.", template: "faq-notice", photoScene: "student-study" }
 ];
 
 const emptyForm: FormState = {
@@ -148,11 +158,20 @@ export function MedMindsContentStudio() {
 
   const visiblePosts = useMemo(() => posts.filter((post) => filter === "ALL" || post.status === filter), [posts, filter]);
   const counts = useMemo(() => ({ draft: posts.filter((post) => post.status === "DRAFT").length, review: posts.filter((post) => post.status === "REVIEW").length, approved: posts.filter((post) => post.status === "APPROVED").length }), [posts]);
-  const liveHeadline = creative.headline.trim() || form.title.trim() || "MedMinds";
-  const liveSupport = creative.supportingText.trim() || supportFromBody(form.body) || "Medical learning, research support and practical digital tools for students and professionals.";
-  const liveCta = creative.cta.trim() || ctaLabel(form.cta);
+  const quality = useMemo(() => assessMedMindsContent({ title: form.title, body: form.body, contentType: form.contentType, cta: form.cta }), [form.title, form.body, form.contentType, form.cta]);
+  const liveHeadline = normalizeMedMindsBranding(creative.headline.trim() || form.title.trim() || "MedMinds");
+  const liveSupport = normalizeMedMindsBranding(creative.supportingText.trim() || supportFromBody(form.body) || "Medical learning, research support and practical digital tools for students and professionals.");
+  const liveCta = normalizeMedMindsBranding(creative.cta.trim() || ctaLabel(form.cta));
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) { setForm((current) => ({ ...current, [key]: value })); }
+
+  function applyQuickBrief(item: QuickBrief) {
+    const nextCta = item.cta || "message";
+    setForm((current) => ({ ...current, title: item.title, contentType: item.contentType, objective: item.objective, cta: nextCta }));
+    setCreative((current) => ({ ...current, template: item.template || current.template, headline: item.title, cta: ctaLabel(nextCta) }));
+    if (item.photoScene) setPhoto((current) => ({ ...current, scene: item.photoScene! }));
+  }
+
   function reset() {
     setForm(emptyForm);
     setCreative(emptyCreative);
@@ -176,14 +195,14 @@ export function MedMindsContentStudio() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to generate content.");
-      const options = Array.isArray(data.alternatives) && data.alternatives.length ? data.alternatives : [data.body].filter(Boolean);
+      const options = (Array.isArray(data.alternatives) && data.alternatives.length ? data.alternatives : [data.body].filter(Boolean)).map((value: string) => normalizeMedMindsBranding(value));
       setAlternatives(options);
       update("body", options[0] || "");
-      setImageBrief(data.imageBrief || "");
-      if (!form.title.trim() && data.headline) update("title", String(data.headline).slice(0, 120));
-      setCreative((current) => ({ ...current, headline: String(data.headline || current.headline).slice(0, 100), cta: ctaLabel(form.cta) }));
+      setImageBrief(normalizeMedMindsBranding(data.imageBrief || ""));
+      if (!form.title.trim() && data.headline) update("title", normalizeMedMindsBranding(String(data.headline).slice(0, 120)));
+      setCreative((current) => ({ ...current, headline: normalizeMedMindsBranding(String(data.headline || current.headline).slice(0, 100)), cta: ctaLabel(form.cta) }));
       setPreviewUrl("");
-      setNotice(`${options.length} caption option${options.length === 1 ? "" : "s"} created. Review the facts and wording before approval.`);
+      setNotice(`${options.length} caption option${options.length === 1 ? "" : "s"} created. Review the facts and quality checks before approval.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to generate content.");
     } finally { setBusy(false); }
@@ -191,6 +210,7 @@ export function MedMindsContentStudio() {
 
   async function save(status: Status = "DRAFT") {
     if (!form.title.trim() || !form.body.trim()) { setError("A working title and caption are required."); return null; }
+    if (status === "APPROVED" && quality.blockers.length) { setError(quality.blockers[0]); return null; }
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/admin/content", {
@@ -200,10 +220,10 @@ export function MedMindsContentStudio() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to save content.");
-      setForm((current) => ({ ...current, id: data.id }));
+      setForm((current) => ({ ...current, id: data.id, title: data.title || current.title, contentType: data.contentType || current.contentType, objective: data.objective || current.objective, body: data.body || current.body }));
       if (data.previewUrl) setPreviewUrl(data.previewUrl);
       await load();
-      setNotice(status === "APPROVED" ? "Content approved." : status === "REVIEW" ? "Content moved to review." : "Draft saved.");
+      setNotice(status === "APPROVED" ? "Content approved after brand and quality checks." : status === "REVIEW" ? "Content moved to review." : "Draft saved.");
       return data as Post;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save content.");
@@ -224,10 +244,10 @@ export function MedMindsContentStudio() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to generate branded graphic.");
-      setCreative({ template: data.creativeTemplate || creative.template, headline: data.creativeHeadline || liveHeadline, supportingText: data.creativeSupportingText || liveSupport, cta: data.creativeCta || liveCta });
+      setCreative({ template: data.creativeTemplate || creative.template, headline: normalizeMedMindsBranding(data.creativeHeadline || liveHeadline), supportingText: normalizeMedMindsBranding(data.creativeSupportingText || liveSupport), cta: normalizeMedMindsBranding(data.creativeCta || liveCta) });
       setPreviewUrl(data.previewUrl || `/api/content/creative/${saved.id}?v=${data.creativeVersion || Date.now()}`);
       await load();
-      setNotice("MedMinds branded graphic generated.");
+      setNotice("MedMinds branded graphic generated with the official logo.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to generate branded graphic.");
     } finally { setImageBusy(false); }
@@ -248,17 +268,17 @@ export function MedMindsContentStudio() {
       if (!response.ok) throw new Error(data.error || "Unable to generate realistic image.");
       setPreviewUrl(data.previewUrl || `/api/content/creative/${saved.id}?v=${data.creativeVersion || Date.now()}`);
       await load();
-      setNotice("Realistic MedMinds campaign image generated with the branded overlay.");
+      setNotice("Realistic MedMinds campaign image generated with the official branded overlay.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to generate realistic image.");
     } finally { setImageBusy(false); }
   }
 
   function edit(post: Post) {
-    setForm({ ...emptyForm, id: post.id, title: post.title, contentType: post.contentType, objective: post.objective || "", audience: post.audience || defaultAudience, body: post.body });
-    setCreative({ template: post.creativeTemplate || "promo-clean", headline: post.creativeHeadline || post.title, supportingText: post.creativeSupportingText || "", cta: post.creativeCta || "Message MedMinds" });
+    setForm({ ...emptyForm, id: post.id, title: normalizeMedMindsBranding(post.title), contentType: normalizeMedMindsBranding(post.contentType), objective: normalizeMedMindsBranding(post.objective || ""), audience: normalizeMedMindsBranding(post.audience || defaultAudience), body: normalizeMedMindsBranding(post.body) });
+    setCreative({ template: post.creativeTemplate || "promo-clean", headline: normalizeMedMindsBranding(post.creativeHeadline || post.title), supportingText: normalizeMedMindsBranding(post.creativeSupportingText || ""), cta: normalizeMedMindsBranding(post.creativeCta || "Message MedMinds") });
     setPhoto({ ...emptyPhoto, scene: post.photoScene || emptyPhoto.scene, subject: post.photoSubject || emptyPhoto.subject, setting: post.photoSetting || emptyPhoto.setting, mood: post.photoMood || emptyPhoto.mood, style: post.photoStyle || emptyPhoto.style });
-    setAlternatives([post.body]);
+    setAlternatives([normalizeMedMindsBranding(post.body)]);
     setPreviewUrl(post.mediaUrl ? `/api/content/creative/${post.id}?v=${post.creativeVersion}` : "");
     setImageBrief("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -278,7 +298,7 @@ export function MedMindsContentStudio() {
 
   async function copyCaption() {
     if (!form.body) return;
-    await navigator.clipboard.writeText(form.body);
+    await navigator.clipboard.writeText(normalizeMedMindsBranding(form.body));
     setNotice("Caption copied.");
   }
 
@@ -288,7 +308,7 @@ export function MedMindsContentStudio() {
         <Link className={styles.back} href="/admin">← Sales Agent dashboard</Link>
         <span className={styles.eyebrow}>MedMinds marketing workspace</span>
         <h1>Content Studio</h1>
-        <p>Create credible MedMinds social content, generate branded graphics or realistic campaign images, and keep approved drafts in one workspace.</p>
+        <p>Create credible MedMinds social content, generate branded graphics or realistic campaign images, and keep reviewed content in one workspace.</p>
       </div>
       <div className={styles.heroStats}>
         <div><span>Drafts</span><strong>{counts.draft}</strong></div>
@@ -303,7 +323,7 @@ export function MedMindsContentStudio() {
       <div className={styles.editor}>
         <div className={styles.sectionHeading}><div><span>01</span><h2>Content brief</h2></div><button className={styles.textButton} onClick={reset} disabled={busy || imageBusy}>New post</button></div>
 
-        <div className={styles.quickBriefs}>{quickBriefs.map((item) => <button key={item.title} onClick={() => setForm((current) => ({ ...current, title: item.title, contentType: item.contentType, objective: item.objective }))}>{item.title}</button>)}</div>
+        <div className={styles.quickBriefs}>{quickBriefs.map((item) => <button key={item.title} onClick={() => applyQuickBrief(item)} disabled={busy || imageBusy}>{item.title}</button>)}</div>
 
         <div className={styles.formGrid}>
           <label className={styles.full}>Objective<textarea value={form.objective} onChange={(event) => update("objective", event.target.value)} placeholder="What should this post achieve?" /></label>
@@ -316,20 +336,29 @@ export function MedMindsContentStudio() {
           <label className={styles.full}>Extra instructions<textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} placeholder="Optional details, campaign dates, service emphasis, link or constraint." /></label>
           <details className={`${styles.voice} ${styles.full}`}><summary>Brand voice</summary><textarea value={brandVoice} onChange={(event) => setBrandVoice(event.target.value)} /></details>
         </div>
-        <button className={styles.primary} onClick={() => void generate()} disabled={busy}>{busy ? "Working…" : "Generate 3 caption options"}</button>
+        <button className={styles.primary} onClick={() => void generate()} disabled={busy || imageBusy}>{busy ? "Working…" : "Generate 3 caption options"}</button>
 
-        <div className={styles.sectionHeading}><div><span>02</span><h2>Caption editor</h2></div><button className={styles.textButton} onClick={() => void copyCaption()}>Copy caption</button></div>
+        <div className={styles.sectionHeading}><div><span>02</span><h2>Caption editor</h2></div><button className={styles.textButton} onClick={() => void copyCaption()} disabled={!form.body}>Copy caption</button></div>
         {alternatives.length > 1 && <div className={styles.variations}>{alternatives.map((option, index) => <button key={`${index}-${option.slice(0, 20)}`} className={form.body === option ? styles.activeVariation : ""} onClick={() => update("body", option)}>Option {index + 1}</button>)}</div>}
         <label className={styles.captionLabel}>Working title<input value={form.title} onChange={(event) => update("title", event.target.value)} placeholder="Internal title / creative headline" /></label>
-        <label className={styles.captionLabel}>Caption<textarea className={styles.caption} value={form.body} onChange={(event) => update("body", event.target.value)} placeholder="Generated or manually written caption" /></label>
-        <div className={styles.refineRow}><button onClick={() => void generate("humanise")} disabled={busy}>Humanise</button><button onClick={() => void generate("strengthen-hook")} disabled={busy}>Strengthen hook</button><button onClick={() => void generate("shorten")} disabled={busy}>Shorten</button></div>
-        <div className={styles.saveRow}><button onClick={() => void save("DRAFT")} disabled={busy}>Save draft</button><button onClick={() => void save("REVIEW")} disabled={busy}>Send to review</button><button className={styles.approve} onClick={() => void save("APPROVED")} disabled={busy}>Approve</button></div>
+        <div className={styles.captionMeta}><span>Caption</span><span>{form.body.length.toLocaleString()} characters</span></div>
+        <label className={styles.captionLabel}><textarea className={styles.caption} value={form.body} onChange={(event) => update("body", event.target.value)} placeholder="Generated or manually written caption" /></label>
+        <div className={styles.refineRow}><button onClick={() => void generate("humanise")} disabled={busy || imageBusy}>Humanise</button><button onClick={() => void generate("strengthen-hook")} disabled={busy || imageBusy}>Strengthen hook</button><button onClick={() => void generate("shorten")} disabled={busy || imageBusy}>Shorten</button></div>
+
+        <div className={styles.qualityCard}>
+          <div className={styles.qualityTop}><div><span className={styles.micro}>Pre-publication check</span><strong>Content quality</strong></div><b className={quality.score >= 80 ? styles.qualityGood : quality.score >= 60 ? styles.qualityWarn : styles.qualityBad}>{quality.score}%</b></div>
+          <div className={styles.qualityChecks}>{quality.checks.map((check) => <span key={check.label} className={check.ok ? styles.checkOk : styles.checkBad}>{check.ok ? "✓" : "!"} {check.label}</span>)}</div>
+          {quality.blockers.map((item) => <p key={item} className={styles.blocker}>{item}</p>)}
+          {quality.warnings.map((item) => <p key={item} className={styles.warning}>{item}</p>)}
+        </div>
+
+        <div className={styles.saveRow}><button onClick={() => void save("DRAFT")} disabled={busy || imageBusy}>Save draft</button><button onClick={() => void save("REVIEW")} disabled={busy || imageBusy}>Send to review</button><button className={styles.approve} onClick={() => void save("APPROVED")} disabled={busy || imageBusy || quality.blockers.length > 0}>Approve</button></div>
       </div>
 
       <aside className={styles.creativePanel}>
         <div className={styles.sectionHeading}><div><span>03</span><h2>Creative generator</h2></div></div>
         <div className={styles.preview}>
-          {previewUrl ? <img src={previewUrl} alt="Generated MedMinds social media creative" /> : <div className={styles.previewPlaceholder}><div className={styles.previewMark}>M</div><strong>{liveHeadline}</strong><p>{liveSupport}</p><span>{liveCta}</span></div>}
+          {previewUrl ? <img src={previewUrl} alt="Generated MedMinds social media creative" /> : <div className={styles.previewPlaceholder}><img className={styles.previewLogo} src="/medminds-logo.png" alt="MedMinds Learning Centre" /><strong>{liveHeadline}</strong><p>{liveSupport}</p><span>{liveCta}</span></div>}
         </div>
 
         <div className={styles.creativeFields}>
@@ -341,9 +370,9 @@ export function MedMindsContentStudio() {
         <button className={styles.primary} onClick={() => void generateGraphic()} disabled={imageBusy || busy}>{imageBusy ? "Generating…" : "Generate branded graphic"}</button>
 
         <div className={styles.photoBox}>
-          <div><span className={styles.micro}>AI photography</span><h3>Realistic MedMinds image</h3><p>Generate a fictional, privacy-safe African medical, research or student scene and apply the MedMinds overlay.</p></div>
+          <div><span className={styles.micro}>AI photography</span><h3>Realistic MedMinds image</h3><p>Generate a fictional, privacy-safe African medical, research, MedMinds Prep or student scene and apply the official MedMinds overlay.</p></div>
           <div className={styles.photoGrid}>
-            <label>Scene<select value={photo.scene} onChange={(event) => setPhoto((current) => ({ ...current, scene: event.target.value }))}><option value="research-work">Research work</option><option value="clinical-learning">Clinical learning</option><option value="student-study">Student study</option><option value="data-analysis">Data analysis</option><option value="teaching">Teaching</option><option value="digital-health">Digital health</option><option value="neutral-portrait">Portrait</option></select></label>
+            <label>Scene<select value={photo.scene} onChange={(event) => setPhoto((current) => ({ ...current, scene: event.target.value }))}><option value="research-work">Research work</option><option value="clinical-learning">Clinical learning</option><option value="student-study">Student study</option><option value="exam-prep">MedMinds Prep / exam revision</option><option value="data-analysis">Data analysis</option><option value="teaching">Teaching</option><option value="digital-health">Digital health</option><option value="neutral-portrait">Portrait</option></select></label>
             <label>Subject<select value={photo.subject} onChange={(event) => setPhoto((current) => ({ ...current, subject: event.target.value }))}><option value="woman">Woman</option><option value="man">Man</option><option value="mixed-pair">Mixed pair</option><option value="small-group">Small group</option><option value="clinician">Clinician</option><option value="student">Student</option></select></label>
             <label>Setting<select value={photo.setting} onChange={(event) => setPhoto((current) => ({ ...current, setting: event.target.value }))}><option value="modern-office">Modern office</option><option value="university">University</option><option value="clinical-classroom">Clinical classroom</option><option value="library">Library</option><option value="workspace">Workspace</option><option value="urban-outdoor">Urban outdoor</option></select></label>
             <label>Mood<select value={photo.mood} onChange={(event) => setPhoto((current) => ({ ...current, mood: event.target.value }))}><option value="focused">Focused</option><option value="confident">Confident</option><option value="approachable">Approachable</option><option value="curious">Curious</option><option value="warm">Warm</option></select></label>
@@ -359,9 +388,9 @@ export function MedMindsContentStudio() {
     <section className={styles.library}>
       <div className={styles.libraryHeader}><div><span className={styles.eyebrow}>Content library</span><h2>Saved MedMinds content</h2></div><div className={styles.filters}>{(["ALL", "DRAFT", "REVIEW", "APPROVED"] as const).map((item) => <button key={item} className={filter === item ? styles.activeFilter : ""} onClick={() => setFilter(item)}>{item === "ALL" ? "All" : item.toLowerCase()}</button>)}</div></div>
       {loading ? <p className={styles.empty}>Loading content…</p> : visiblePosts.length === 0 ? <p className={styles.empty}>No saved content in this view yet.</p> : <div className={styles.libraryGrid}>{visiblePosts.map((post) => <article key={post.id}>
-        <div className={styles.postTop}><span>{post.contentType}</span><b className={`${styles.status} ${styles[post.status.toLowerCase()]}`}>{post.status}</b></div>
-        {post.mediaUrl && <img src={`/api/content/creative/${post.id}?v=${post.creativeVersion}`} alt="" />}
-        <h3>{post.title}</h3><p>{post.body.slice(0, 220)}{post.body.length > 220 ? "…" : ""}</p>
+        <div className={styles.postTop}><span>{normalizeMedMindsBranding(post.contentType)}</span><b className={`${styles.status} ${styles[post.status.toLowerCase()]}`}>{post.status}</b></div>
+        {post.mediaUrl && <img src={`/api/content/creative/${post.id}?v=${post.creativeVersion}`} alt={`${post.title} MedMinds creative`} />}
+        <h3>{normalizeMedMindsBranding(post.title)}</h3><p>{normalizeMedMindsBranding(post.body).slice(0, 220)}{post.body.length > 220 ? "…" : ""}</p>
         <small>Updated {new Date(post.updatedAt).toLocaleString()}</small>
         <div className={styles.postActions}><button onClick={() => edit(post)}>Edit</button><button className={styles.delete} onClick={() => void remove(post)}>Delete</button></div>
       </article>)}</div>}
