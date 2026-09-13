@@ -13,6 +13,16 @@ function addTeamOptions(select: HTMLSelectElement) {
   }
 }
 
+function appendAdminLink(nav: HTMLElement, href: string, className: string, text: string) {
+  if (nav.querySelector(`.${className}`)) return;
+  const link = document.createElement("a");
+  link.href = href;
+  link.className = className;
+  link.textContent = text;
+  link.style.cssText = "display:block;padding:10px 12px;border-radius:10px;color:inherit;text-decoration:none;font-weight:700;margin-top:4px";
+  nav.appendChild(link);
+}
+
 function syncTeamControls() {
   document.querySelectorAll<HTMLSelectElement>(".conversationPanel label select").forEach((select) => {
     const label = select.closest("label")?.textContent?.toLowerCase() ?? "";
@@ -20,13 +30,9 @@ function syncTeamControls() {
   });
 
   const nav = document.querySelector<HTMLElement>(".sidebar nav");
-  if (nav && !nav.querySelector(".businessIntelligenceLink")) {
-    const link = document.createElement("a");
-    link.href = "/admin/business";
-    link.className = "businessIntelligenceLink";
-    link.textContent = "Business Intelligence";
-    link.style.cssText = "display:block;padding:10px 12px;border-radius:10px;color:inherit;text-decoration:none;font-weight:700;margin-top:4px";
-    nav.appendChild(link);
+  if (nav) {
+    appendAdminLink(nav, "/admin/content", "contentStudioLink", "Content Studio");
+    appendAdminLink(nav, "/admin/business", "businessIntelligenceLink", "Business Intelligence");
   }
 
   const setupGrid = document.querySelector<HTMLElement>(".setupGrid");
