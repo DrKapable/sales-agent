@@ -5,107 +5,230 @@ import { getContentPost, type ContentPost } from "@/lib/content-studio";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const COLORS = { green:"#0d725f", greenDark:"#075548", ink:"#102b28", mint:"#dff3ec", cream:"#f7f5ef", white:"#ffffff", muted:"#61736f" };
+// Visual system audited from the public MedMinds Learning Centre Facebook feed:
+// square-first, navy headlines, teal/green accents, white cards, small top logo,
+// generous margins, concise copy and rounded UI shapes.
+const COLORS = {
+  navy: "#17324d",
+  navyDeep: "#10283f",
+  teal: "#178e8b",
+  tealLight: "#dff4f2",
+  green: "#0d725f",
+  greenDark: "#075548",
+  cream: "#f5f7f4",
+  grey: "#edf1f2",
+  text: "#344b52",
+  muted: "#6b7d82",
+  white: "#ffffff",
+  gold: "#efb93f"
+};
 
-function Brand({logoSrc}:{logoSrc:string}){
-  return React.createElement("div",{style:{display:"flex",alignItems:"center",width:154,height:62,padding:"5px 9px",borderRadius:12,background:"rgba(255,255,255,.98)",border:"1px solid rgba(16,43,40,.08)"}},
-    React.createElement("img",{src:logoSrc,width:136,height:50,style:{width:136,height:50,objectFit:"contain"}}));
+function Brand({ logoSrc, centered = false }: { logoSrc: string; centered?: boolean }) {
+  return React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: centered ? "center" : "flex-start",
+      width: 150,
+      height: 62,
+      padding: "5px 8px",
+      borderRadius: 12,
+      background: COLORS.white,
+      boxShadow: "0 5px 16px rgba(23,50,77,.09)"
+    }
+  }, React.createElement("img", {
+    src: logoSrc,
+    width: 134,
+    height: 50,
+    style: { width: 134, height: 50, objectFit: "contain" }
+  }));
 }
 
-function Cta({text,light=false}:{text:string;light?:boolean}){
-  return React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"center",padding:"10px 17px",borderRadius:999,background:light?COLORS.white:COLORS.green,color:light?COLORS.greenDark:COLORS.white,fontSize:17,fontWeight:850,maxWidth:300}},text);
+function Pill({ text, light = false }: { text: string; light?: boolean }) {
+  return React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: 46,
+      padding: "10px 20px",
+      borderRadius: 999,
+      background: light ? COLORS.white : COLORS.green,
+      color: light ? COLORS.greenDark : COLORS.white,
+      fontSize: 25,
+      lineHeight: 1,
+      fontWeight: 800,
+      maxWidth: 360,
+      boxShadow: light ? "0 7px 20px rgba(23,50,77,.12)" : "0 7px 20px rgba(13,114,95,.16)"
+    }
+  }, text);
 }
 
-function Label({text,dark=false}:{text:string;dark?:boolean}){
-  return React.createElement("div",{style:{display:"flex",alignItems:"center",gap:9,color:dark?COLORS.green:"#9ee8d5",fontSize:12,fontWeight:900,letterSpacing:2.1}},
-    React.createElement("span",{style:{width:26,height:3,borderRadius:999,background:dark?COLORS.green:"#58c8ac"}}),text);
+function Category({ text, light = false }: { text: string; light?: boolean }) {
+  return React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      color: light ? "#dff4f2" : COLORS.teal,
+      fontSize: 20,
+      fontWeight: 900,
+      letterSpacing: 2.2,
+      textTransform: "uppercase"
+    }
+  },
+    React.createElement("span", { style: { width: 34, height: 4, borderRadius: 999, background: light ? "#82d8cf" : COLORS.teal } }),
+    text
+  );
 }
 
-function Promo({logoSrc,headline,support,cta,label}:{logoSrc:string;headline:string;support:string;cta:string;label:string}){
-  const size=headline.length>54?47:56;
-  return React.createElement("div",{style:{width:"100%",height:"100%",display:"flex",position:"relative",overflow:"hidden",background:COLORS.ink,padding:"42px 56px"}},
-    React.createElement("div",{style:{position:"absolute",width:500,height:500,borderRadius:999,right:-210,top:-220,background:"#17443d"}}),
-    React.createElement("div",{style:{position:"relative",zIndex:2,width:"100%",display:"flex",flexDirection:"column",justifyContent:"space-between"}},
-      React.createElement(Brand,{logoSrc}),
-      React.createElement("div",{style:{display:"flex",flexDirection:"column",maxWidth:790,gap:14}},
-        React.createElement(Label,{text:label}),
-        React.createElement("div",{style:{color:COLORS.white,fontSize:size,fontWeight:900,lineHeight:1.04,letterSpacing:-1.5,maxWidth:820}},headline),
-        support?React.createElement("div",{style:{color:"#d7e9e4",fontSize:21,lineHeight:1.38,maxWidth:720}},support):null),
-      React.createElement(Cta,{text:cta,light:true})
-    ));
+function CheckRow({ text }: { text: string }) {
+  return React.createElement("div", {
+    style: { display: "flex", alignItems: "flex-start", gap: 14, color: COLORS.text, fontSize: 30, lineHeight: 1.28, fontWeight: 650 }
+  },
+    React.createElement("div", {
+      style: {
+        display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 34px",
+        width: 34, height: 34, borderRadius: 999, background: COLORS.green, color: COLORS.white,
+        fontSize: 21, fontWeight: 900, marginTop: 1
+      }
+    }, "✓"),
+    React.createElement("div", { style: { display: "flex", maxWidth: 720 } }, text)
+  );
 }
 
-function Education({logoSrc,headline,support,cta,label,faq=false}:{logoSrc:string;headline:string;support:string;cta:string;label:string;faq?:boolean}){
-  const size=headline.length>54?45:54;
-  return React.createElement("div",{style:{width:"100%",height:"100%",display:"flex",background:COLORS.cream,padding:"42px 58px"}},
-    React.createElement("div",{style:{width:"100%",display:"flex",flexDirection:"column",justifyContent:"space-between"}},
-      React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        React.createElement(Brand,{logoSrc}),
-        faq?React.createElement("div",{style:{padding:"8px 13px",borderRadius:999,background:COLORS.mint,color:COLORS.greenDark,fontSize:12,fontWeight:900}},"FAQ"):null),
-      React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:14,maxWidth:900}},
-        React.createElement(Label,{text:label,dark:true}),
-        React.createElement("div",{style:{color:COLORS.ink,fontSize:size,fontWeight:900,lineHeight:1.05,letterSpacing:-1.35,maxWidth:900}},headline),
-        support?React.createElement("div",{style:{color:"#435e59",fontSize:21,lineHeight:1.4,maxWidth:760}},support):null),
-      React.createElement("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}},
-        React.createElement(Cta,{text:cta}),
-        React.createElement("div",{style:{color:COLORS.muted,fontSize:13}},"medmindslc.online"))
-    ));
+function splitSupport(value: string) {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  const parts = clean
+    .split(/(?:\n+|[•;]|(?<=[.!?])\s+)/)
+    .map((item) => item.trim().replace(/[.!?]+$/, ""))
+    .filter(Boolean);
+  const base = parts.length > 1 ? parts : [clean];
+  return base.slice(0, 3).map((item) => compactSentence(item, 76));
 }
 
-function Photo({logoSrc,photoSrc,headline,support,cta,label}:{logoSrc:string;photoSrc:string;headline:string;support:string;cta:string;label:string}){
-  const size=headline.length>54?44:headline.length>38?50:57;
-  return React.createElement("div",{style:{width:"100%",height:"100%",display:"flex",position:"relative",overflow:"hidden",background:COLORS.ink}},
-    React.createElement("img",{src:photoSrc,width:1200,height:628,style:{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"72% 50%"}}),
-    React.createElement("div",{style:{position:"absolute",inset:0,background:"linear-gradient(90deg,rgba(16,43,40,.28) 0%,rgba(16,43,40,.08) 48%,rgba(16,43,40,0) 72%)"}}),
-    React.createElement("div",{style:{position:"relative",zIndex:2,width:"43%",height:"calc(100% - 64px)",margin:"32px 0 32px 34px",padding:"26px 28px",borderRadius:24,display:"flex",flexDirection:"column",justifyContent:"space-between",background:"rgba(7,85,72,.95)",border:"1px solid rgba(255,255,255,.13)",boxShadow:"0 18px 44px rgba(0,0,0,.24)"}},
-      React.createElement(Brand,{logoSrc}),
-      React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:13,maxWidth:455}},
-        React.createElement(Label,{text:label}),
-        React.createElement("div",{style:{color:COLORS.white,fontSize:size,fontWeight:900,lineHeight:1.02,letterSpacing:-1.35,maxWidth:450}},headline),
-        support?React.createElement("div",{style:{color:"#eef8f5",fontSize:19,lineHeight:1.35,maxWidth:440}},support):null),
-      React.createElement(Cta,{text:cta,light:true})
-    ));
+function Promo({ logoSrc, headline, support, cta, label }: { logoSrc: string; headline: string; support: string; cta: string; label: string }) {
+  const headlineSize = headline.length > 48 ? 69 : headline.length > 32 ? 78 : 88;
+  const bullets = splitSupport(support);
+  return React.createElement("div", {
+    style: { width: "100%", height: "100%", display: "flex", position: "relative", overflow: "hidden", background: COLORS.grey, fontFamily: "Arial, sans-serif" }
+  },
+    React.createElement("div", { style: { position: "absolute", width: 650, height: 650, borderRadius: 999, right: -260, top: -250, background: "linear-gradient(145deg,#cfeeed,#97d8d5)" } }),
+    React.createElement("div", { style: { position: "absolute", width: 380, height: 380, borderRadius: 999, right: -110, bottom: -130, background: "linear-gradient(145deg,#168b88,#0d725f)" } }),
+    React.createElement("div", {
+      style: { width: "100%", height: "100%", display: "flex", flexDirection: "column", padding: "72px 78px 70px", position: "relative", zIndex: 2 }
+    },
+      React.createElement(Brand, { logoSrc }),
+      React.createElement("div", { style: { display: "flex", flexDirection: "column", width: 790, marginTop: 80 } },
+        React.createElement(Category, { text: label }),
+        React.createElement("div", {
+          style: { color: COLORS.navy, fontSize: headlineSize, fontWeight: 900, lineHeight: 1.02, letterSpacing: -1.8, marginTop: 22, textTransform: "uppercase", maxWidth: 850 }
+        }, headline),
+        bullets.length ? React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 18, marginTop: 34, maxWidth: 760 } }, bullets.map((item, index) => React.createElement(CheckRow, { key: `${index}-${item}`, text: item }))) : null
+      ),
+      React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" } },
+        React.createElement(Pill, { text: cta }),
+        React.createElement("div", { style: { color: COLORS.navy, fontSize: 21, fontWeight: 700 } }, "medmindslc.online")
+      )
+    )
+  );
 }
 
-function compactSentence(value:string,max:number){
-  const clean=value.replace(/\s+/g," ").trim();
-  if(!clean)return "";
-  const first=clean.split(/(?<=[.!?])\s+/)[0]||clean;
-  if(first.length<=max)return first;
-  const clipped=first.slice(0,max-1).replace(/\s+\S*$/," ").trim();
-  return `${clipped || first.slice(0,max-1).trim()}…`;
+function Education({ logoSrc, headline, support, cta, label, faq = false }: { logoSrc: string; headline: string; support: string; cta: string; label: string; faq?: boolean }) {
+  const headlineSize = headline.length > 48 ? 66 : headline.length > 30 ? 76 : 86;
+  const bullets = splitSupport(support);
+  return React.createElement("div", {
+    style: { width: "100%", height: "100%", display: "flex", position: "relative", overflow: "hidden", background: COLORS.white, fontFamily: "Arial, sans-serif" }
+  },
+    React.createElement("div", { style: { position: "absolute", inset: "0 0 auto auto", width: 340, height: 340, borderBottomLeftRadius: 300, background: "linear-gradient(145deg,#e5f6f5,#c4e8e6)" } }),
+    React.createElement("div", { style: { width: "100%", height: "100%", display: "flex", flexDirection: "column", padding: "70px 78px", position: "relative", zIndex: 2 } },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between" } },
+        React.createElement(Brand, { logoSrc }),
+        faq ? React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "center", width: 82, height: 82, borderRadius: 16, background: COLORS.tealLight, color: COLORS.teal, fontSize: 46, fontWeight: 900 } }, "?") : null
+      ),
+      React.createElement("div", { style: { display: "flex", flexDirection: "column", marginTop: 68, maxWidth: 865 } },
+        React.createElement(Category, { text: faq ? `${label} FAQ` : label }),
+        React.createElement("div", {
+          style: { color: COLORS.navy, fontSize: headlineSize, fontWeight: 900, lineHeight: 1.03, letterSpacing: -1.6, marginTop: 22, textTransform: "uppercase", maxWidth: 875 }
+        }, headline),
+        bullets.length ? React.createElement("div", {
+          style: { display: "flex", flexDirection: "column", gap: 20, marginTop: 42, padding: "32px 34px", borderRadius: 16, background: COLORS.cream, boxShadow: "0 8px 25px rgba(23,50,77,.06)", maxWidth: 835 }
+        }, bullets.map((item, index) => React.createElement(CheckRow, { key: `${index}-${item}`, text: item }))) : null
+      ),
+      React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" } },
+        React.createElement(Pill, { text: cta }),
+        React.createElement("div", { style: { color: COLORS.muted, fontSize: 21, fontWeight: 700 } }, "MEDMINDS LEARNING CENTRE")
+      )
+    )
+  );
 }
 
-function propsFor(post:ContentPost){
-  const type=post.contentType.toLowerCase();
-  const label=type.includes("medminds prep")?"MEDMINDS PREP":type.includes("research")||type.includes("data analysis")?"MEDMINDS RESEARCH":type.includes("digital")||type.includes("software")?"MEDMINDS DIGITAL":"MEDMINDS";
+function Photo({ logoSrc, photoSrc, headline, support, cta, label }: { logoSrc: string; photoSrc: string; headline: string; support: string; cta: string; label: string }) {
+  const headlineSize = headline.length > 46 ? 62 : headline.length > 30 ? 72 : 82;
+  const bullets = splitSupport(support).slice(0, 2);
+  return React.createElement("div", {
+    style: { width: "100%", height: "100%", display: "flex", position: "relative", overflow: "hidden", background: COLORS.grey, fontFamily: "Arial, sans-serif" }
+  },
+    React.createElement("img", { src: photoSrc, width: 1080, height: 1080, style: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "74% 50%" } }),
+    React.createElement("div", { style: { position: "absolute", inset: 0, background: "linear-gradient(90deg,rgba(237,241,242,.94) 0%,rgba(237,241,242,.85) 44%,rgba(237,241,242,.12) 68%,rgba(237,241,242,0) 100%)" } }),
+    React.createElement("div", { style: { width: "100%", height: "100%", display: "flex", flexDirection: "column", position: "relative", zIndex: 2, padding: "66px 72px" } },
+      React.createElement(Brand, { logoSrc }),
+      React.createElement("div", {
+        style: { display: "flex", flexDirection: "column", width: 560, marginTop: 68, padding: "34px 36px 36px", borderRadius: 16, background: "rgba(255,255,255,.94)", boxShadow: "0 14px 36px rgba(23,50,77,.13)" }
+      },
+        React.createElement(Category, { text: label }),
+        React.createElement("div", { style: { color: COLORS.navy, fontSize: headlineSize, fontWeight: 900, lineHeight: 1.02, letterSpacing: -1.5, marginTop: 20, textTransform: "uppercase" } }, headline),
+        bullets.length ? React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 18, marginTop: 30 } }, bullets.map((item, index) => React.createElement(CheckRow, { key: `${index}-${item}`, text: item }))) : null,
+        React.createElement("div", { style: { display: "flex", marginTop: 32 } }, React.createElement(Pill, { text: cta }))
+      )
+    )
+  );
+}
+
+function compactSentence(value: string, max: number) {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  const first = clean.split(/(?<=[.!?])\s+/)[0] || clean;
+  if (first.length <= max) return first;
+  const clipped = first.slice(0, max - 1).replace(/\s+\S*$/, "").trim();
+  return `${clipped || first.slice(0, max - 1).trim()}…`;
+}
+
+function propsFor(post: ContentPost) {
+  const type = post.contentType.toLowerCase();
+  const label = type.includes("medminds prep") ? "MEDMINDS PREP" : type.includes("research") || type.includes("data analysis") ? "MEDMINDS RESEARCH" : type.includes("digital") || type.includes("software") ? "MEDMINDS DIGITAL" : "MEDMINDS";
   return {
-    headline:compactSentence(post.creativeHeadline||post.title||"MedMinds",64),
-    support:compactSentence(post.creativeSupportingText||"",108),
-    cta:compactSentence(post.creativeCta||"Message MedMinds",32),
+    headline: compactSentence(post.creativeHeadline || post.title || "MedMinds", 54),
+    support: compactSentence(post.creativeSupportingText || "", 155),
+    cta: compactSentence(post.creativeCta || "Message MedMinds", 28),
     label
   };
 }
 
-export async function GET(request:Request,context:{params:Promise<{id:string}>}){
-  const {id}=await context.params;
-  const post=await getContentPost(id);
-  if(!post)return new Response("Creative not found",{status:404});
-  const origin=new URL(request.url).origin;
-  const logoSrc=`${origin}/medminds-logo.png`;
-  const props=propsFor(post);
-  let element:React.ReactElement;
-  if(post.creativeVisualMode==="photo"&&post.photoGeneratedAt){
-    const photoSrc=`${origin}/api/content/photo/${post.id}?v=${post.photoVersion||1}`;
-    element=React.createElement(Photo,{...props,logoSrc,photoSrc});
-  }else if(post.creativeTemplate==="education-card"){
-    element=React.createElement(Education,{...props,logoSrc});
-  }else if(post.creativeTemplate==="faq-notice"){
-    element=React.createElement(Education,{...props,logoSrc,faq:true});
-  }else{
-    element=React.createElement(Promo,{...props,logoSrc});
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
+  const post = await getContentPost(id);
+  if (!post) return new Response("Creative not found", { status: 404 });
+
+  const origin = new URL(request.url).origin;
+  const logoSrc = `${origin}/medminds-logo.png`;
+  const props = propsFor(post);
+  let element: React.ReactElement;
+
+  if (post.creativeVisualMode === "photo" && post.photoGeneratedAt) {
+    const photoSrc = `${origin}/api/content/photo/${post.id}?v=${post.photoVersion || 1}`;
+    element = React.createElement(Photo, { ...props, logoSrc, photoSrc });
+  } else if (post.creativeTemplate === "education-card") {
+    element = React.createElement(Education, { ...props, logoSrc });
+  } else if (post.creativeTemplate === "faq-notice") {
+    element = React.createElement(Education, { ...props, logoSrc, faq: true });
+  } else {
+    element = React.createElement(Promo, { ...props, logoSrc });
   }
-  const response=new ImageResponse(element,{width:1200,height:628});
-  response.headers.set("Cache-Control","no-store, max-age=0");
+
+  const response = new ImageResponse(element, { width: 1080, height: 1080 });
+  response.headers.set("Cache-Control", "no-store, max-age=0");
+  response.headers.set("X-MedMinds-Creative-Format", "facebook-square-1080");
   return response;
 }
