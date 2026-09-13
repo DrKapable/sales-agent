@@ -3,6 +3,7 @@ import { generateImage } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getContentPost, saveContentPhoto, saveContentPost } from "@/lib/content-studio";
+import { resolveCreativeLayout } from "@/lib/content-creative-layout";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -79,6 +80,15 @@ function publicOrigin(request: Request) {
   return process.env.PUBLIC_URL?.trim().replace(/\/+$/, "") || new URL(request.url).origin;
 }
 
+function compositionFor(layout: ReturnType<typeof resolveCreativeLayout>) {
+  if (layout === "spotlight") return "Use an editorial full-frame composition with the subject in the upper or middle-right area and calm negative space across the lower third for a premium spotlight overlay.";
+  if (layout === "editorial") return "Use an editorial composition with strong depth, the subject slightly right of centre, and a calm lower-left or lower-third area for a restrained text panel.";
+  if (layout === "data-grid") return "Keep the person or digital activity on the right two-thirds and leave a simple darker or neutral left zone for a data/digital information panel. Screens must not contain readable private data.";
+  if (layout === "cards") return "Keep the main action on the right half and preserve broad clean space on the left and lower-left for several compact benefit cards.";
+  if (layout === "faq") return "Use an approachable subject on the right half with simple negative space on the left for a question-and-answer treatment.";
+  return "Use a clean split composition: main subject and action on the right half, with genuine uncluttered negative space on the left for branded copy.";
+}
+
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
@@ -97,25 +107,27 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const cta = compact(input.cta || post.creativeCta || "Message MedMinds", 28);
     const preset = `${subjects[input.subject]} ${scenes[input.scene]} in ${settings[input.setting]}, appearing ${moods[input.mood]}, photographed as ${styles[input.style]}.`;
     const direction = compact(input.extraDirection || preset, 1800);
+    const layout = resolveCreativeLayout(post, "auto");
 
     const prompt = `Create a highly photorealistic premium advertising photograph for MedMinds Learning Centre in Zambia. ${direction}
 
-Match the visual character of the existing MedMinds Learning Centre Facebook feed. Compose a SQUARE 1:1 photograph intended for a 1080 x 1080 post. The scene must feel clean, academic-medical, calm and premium rather than busy. Use soft teal/blue-neutral environmental tones where natural, realistic daylight, shallow depth of field and restrained contrast.
+Match the visual quality of a polished medical-education Facebook feed. Compose a square 1:1 photograph intended for a 1080 x 1080 post. The scene must feel clean, academic-medical, contemporary and premium rather than busy. Use believable Southern African context, realistic daylight, natural skin texture, restrained contrast and shallow depth of field where appropriate.
 
-LAYOUT FOR THE MEDMINDS OVERLAY
-- Keep the main person, face and important action in the RIGHT 45% of the square frame.
-- Keep the LEFT 50% as genuine negative space for a white information card and navy headline.
-- Keep faces away from the canvas edges and away from the future text area.
-- Use one main subject whenever possible. A pair or small group must remain visually grouped on the right.
-- Use only the minimum props needed to explain the activity: at most one laptop/tablet and one notebook or simple teaching prop.
-- Keep the background softly blurred and simple. Avoid crowded desks, stacks of books, anatomy-poster clutter, charts, busy shelves, decorative wall text, bright signs and multiple competing objects.
+CONTENT-AWARE COMPOSITION
+${compositionFor(layout)}
+Do not force every MedMinds image into the same pose or left-panel arrangement. Vary camera distance, depth and subject placement to suit the selected layout while preserving readable overlay space.
+
+SCENE DISCIPLINE
+- Use one main subject whenever possible. Keep pairs or small groups visually coherent.
+- Use only the minimum props required to explain the activity: usually one laptop/tablet and one notebook or simple teaching prop.
+- Keep backgrounds softly simplified. Avoid stacks of books, anatomy-poster clutter, busy charts, decorative wall text, bright signs and competing objects.
+- For exam-preparation scenes, show revision and practice rather than an examination in progress.
 
 QUALITY AND PRIVACY
-- Use realistic Black African adults and natural expressions, skin texture and believable hands.
-- Use fictional people only; do not resemble public figures, real students, real clinicians or real patients.
+- Use fictional Black African adults only and natural expressions, skin texture and believable hands.
+- Do not resemble public figures, real students, real clinicians or real patients.
 - Do not include visible logos, watermarks, promotional typography, readable private records, patient information, student IDs, examination papers, answer keys or confidential assessment material.
-- For MedMinds Prep scenes, show revision activity rather than an examination in progress.
-- The raw photograph itself must contain no MedMinds branding because the consistent Facebook Page branding is added by the renderer afterward.`;
+- The raw photograph must contain no MedMinds branding because the consistent Page branding is added by the renderer afterward.`;
 
     const result = await generateImage({
       model: gateway.imageModel("openai/gpt-image-2"),
@@ -158,7 +170,8 @@ QUALITY AND PRIVACY
       photoUrl,
       imageModel: "openai/gpt-image-2",
       dimensions: "1080x1080",
-      visualSystem: "MedMinds Facebook house style"
+      resolvedLayout: layout,
+      visualSystem: "MedMinds variable Facebook house style"
     });
   } catch (error) {
     console.error("MedMinds realistic image generation failed", error);
