@@ -163,7 +163,7 @@ export async function saveContentPost(input: Partial<ContentPost> & Pick<Content
     objective: input.objective?.trim() || null,
     audience: input.audience?.trim() || null,
     body: input.body.trim(),
-    mediaUrl: input.mediaUrl?.trim() || null,
+    mediaUrl: input.mediaUrl === undefined ? (existing?.mediaUrl ?? null) : (input.mediaUrl?.trim() || null),
     status: input.status || existing?.status || "DRAFT",
     createdBy: existing?.createdBy || input.createdBy || "MedMinds Admin",
     approvedBy: input.approvedBy ?? existing?.approvedBy ?? null,
