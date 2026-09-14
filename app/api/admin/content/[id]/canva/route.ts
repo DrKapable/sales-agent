@@ -20,7 +20,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     postId:linked.postId,
     designId:linked.designId,
     updatedAt:linked.updatedAt,
-    openUrl:`/api/admin/canva/designs/${encodeURIComponent(linked.designId)}/open?state=${encodeURIComponent(`p-${id}`)}&returnTo=${encodeURIComponent(`/admin/content/${id}/canva`)}`,
+    openUrl:`/api/admin/canva/designs/${encodeURIComponent(linked.designId)}/open?returnTo=${encodeURIComponent(`/admin/content/${id}/canva`)}`,
     accessible:null as boolean|null,
     title:null as string|null,
     thumbnail:null as {width?:number;height?:number;url?:string}|null,
