@@ -54,13 +54,15 @@ export async function getCanvaDesign(designId:string){
   return data.design;
 }
 
-export function prepareCanvaEditUrl(editUrl:string,correlationState?:string){
-  const url=new URL(editUrl);
-  if(correlationState){
-    const safe=correlationState.replace(/[^A-Za-z0-9._~-]/g,"-").slice(0,50);
-    if(safe)url.searchParams.set("correlation_state",safe);
+export function prepareCanvaEditUrl(editUrl:string){
+  const raw=editUrl.trim();
+  let parsed:URL;
+  try{parsed=new URL(raw);}catch{throw new CanvaApiError("Canva returned an invalid editing URL.",502,"invalid_edit_url");}
+  const host=parsed.hostname.toLowerCase();
+  if(parsed.protocol!=="https:"||(host!=="www.canva.com"&&host!=="canva.com")||!parsed.pathname.startsWith("/api/design/")){
+    throw new CanvaApiError("Canva returned an unexpected editing URL.",502,"invalid_edit_url");
   }
-  const appId=process.env.CANVA_APP_ID?.trim();
-  if(appId)url.searchParams.set("app_id",appId);
-  return url.toString();
+  // Important: Canva's temporary edit URL is capability-bearing and must be used exactly as returned.
+  // Do not reconstruct it or append app_id/correlation_state here; doing so can invalidate the URL.
+  return raw;
 }
