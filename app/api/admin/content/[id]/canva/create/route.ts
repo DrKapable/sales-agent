@@ -92,10 +92,10 @@ export async function POST(request:Request,context:{params:Promise<{id:string}>}
     });
     if(!data.design?.id||!data.design.urls?.edit_url)throw new CanvaApiError("Canva created no usable editing link for the design.",502,"missing_edit_url");
 
-    const linked=await saveCanvaContentDesign({postId:id,designId:data.design.id,editUrl:data.design.urls.edit_url,viewUrl:data.design.urls.view_url||null});
+    const linked=await saveCanvaContentDesign({postId:id,designId:data.design.id});
     const returnTo=`/admin/content/${id}/canva`;
     const openUrl=`/api/admin/canva/designs/${encodeURIComponent(data.design.id)}/open?state=${encodeURIComponent(`p-${id}`)}&returnTo=${encodeURIComponent(returnTo)}`;
-    return NextResponse.json({design:{...linked,openUrl}});
+    return NextResponse.json({design:{postId:linked.postId,designId:linked.designId,updatedAt:linked.updatedAt,openUrl}});
   }catch(error){
     const status=error instanceof CanvaApiError?error.status:400;
     const code=error instanceof CanvaApiError?error.code:null;
