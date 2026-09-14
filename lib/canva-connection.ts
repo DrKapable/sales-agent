@@ -50,7 +50,31 @@ function normalizeEnvCredential(value:string|undefined){
   return trimmed;
 }
 
-export function getCanvaConfig(){const clientId=normalizeEnvCredential(process.env.CANVA_CLIENT_ID);const clientSecret=normalizeEnvCredential(process.env.CANVA_CLIENT_SECRET);return {clientId,clientSecret,oauthConfigured:Boolean(clientId&&clientSecret),scopes:["design:content:read","design:content:write","design:meta:read","brandtemplate:meta:read","brandtemplate:content:read","profile:read"]};}
+export function getCanvaConfig(){
+  const clientId=normalizeEnvCredential(process.env.CANVA_CLIENT_ID);
+  const clientSecret=normalizeEnvCredential(process.env.CANVA_CLIENT_SECRET);
+  return {
+    clientId,
+    clientSecret,
+    oauthConfigured:Boolean(clientId&&clientSecret),
+    scopes:[
+      "asset:read",
+      "asset:write",
+      "brandtemplate:content:read",
+      "brandtemplate:content:write",
+      "brandtemplate:meta:read",
+      "comment:read",
+      "comment:write",
+      "design:content:read",
+      "design:content:write",
+      "design:meta:read",
+      "folder:permission:write",
+      "folder:read",
+      "folder:write",
+      "profile:read"
+    ]
+  };
+}
 export function canvaPublicOrigin(request:Request){return process.env.PUBLIC_URL?.trim().replace(/\/+$/,"")||new URL(request.url).origin;}
 
 export async function validateCanvaCredentials():Promise<CanvaCredentialCheck>{
