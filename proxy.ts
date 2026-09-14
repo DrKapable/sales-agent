@@ -7,7 +7,7 @@ function contentSecurityPolicy(nonce: string, embeddable = false) {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    "img-src 'self' data: https://document-export.canva.com https://*.canva.com https://*.canvausercontent.com",
     "font-src 'self'",
     connectSource,
     "object-src 'none'",
