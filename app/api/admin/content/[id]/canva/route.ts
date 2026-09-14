@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getContentPost } from "@/lib/content-studio";
-import { CanvaApiError, getCanvaDesign } from "@/lib/canva-api";
+import { CanvaApiError, canvaJson, getCanvaDesign } from "@/lib/canva-api";
 import { getCanvaConnectionStatus } from "@/lib/canva-connection";
 import { getCanvaContentDesign, getCanvaContentExport } from "@/lib/canva-content-designs";
+
+type ExportFormats=Record<string,{page_numbers?:number[]}>;
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -24,14 +26,28 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     thumbnail:null as {width?:number;height?:number;url?:string}|null,
     pageCount:null as number|null,
     designTypes:[] as string[],
+    exportFormats:{} as ExportFormats,
     error:null as string|null,
     errorCode:null as string|null
   }:null;
 
   if(canva.connected&&linked){
     try{
-      const live=await getCanvaDesign(linked.designId);
-      design={...design!,accessible:true,title:live.title||null,thumbnail:live.thumbnail||null,pageCount:live.page_count||null,designTypes:live.design_types||[],error:null,errorCode:null};
+      const [live,formatResult]=await Promise.all([
+        getCanvaDesign(linked.designId),
+        canvaJson<{formats?:ExportFormats}>(`/designs/${encodeURIComponent(linked.designId)}/export-formats`)
+      ]);
+      design={
+        ...design!,
+        accessible:true,
+        title:live.title||null,
+        thumbnail:live.thumbnail||null,
+        pageCount:live.page_count||null,
+        designTypes:live.design_types||[],
+        exportFormats:formatResult.formats||{},
+        error:null,
+        errorCode:null
+      };
     }catch(error){
       design={...design!,accessible:false,error:error instanceof Error?error.message:"Unable to access the linked Canva design.",errorCode:error instanceof CanvaApiError?error.code:null};
     }
