@@ -15,7 +15,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   ]);
 
   let design=linked?{
-    ...linked,
+    postId:linked.postId,
+    designId:linked.designId,
+    updatedAt:linked.updatedAt,
     openUrl:`/api/admin/canva/designs/${encodeURIComponent(linked.designId)}/open?state=${encodeURIComponent(`p-${id}`)}&returnTo=${encodeURIComponent(`/admin/content/${id}/canva`)}`,
     accessible:null as boolean|null,
     title:null as string|null,
