@@ -42,10 +42,29 @@ function safe(output: GeneratedContentOutput): GeneratedContentOutput {
   };
 }
 
+function comparable(value: string) {
+  return value
+    .replace(/\p{Extended_Pictographic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function removeExactHeadlineEcho(caption: string, headline: string) {
+  const headlineKey = comparable(headline);
+  if (headlineKey.length < 6) return caption;
+  const lines = caption.replace(/\r\n?/g, "\n").split("\n");
+  const firstIndex = lines.findIndex((line) => line.trim() && !/^https?:\/\//i.test(line.trim()) && !line.trim().startsWith("#"));
+  if (firstIndex < 0 || comparable(lines[firstIndex]) !== headlineKey) return caption;
+  lines.splice(firstIndex, 1);
+  return lines.join("\n").replace(/^\s+/, "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export function finalizeGeneratedContent(output: GeneratedContentOutput, input: ContentGenerationInput) {
   const normalized = safe(output);
   const format = (caption: string) => {
-    const human = natural(caption);
+    const human = removeExactHeadlineEcho(natural(caption), normalized.headline);
     const cleaned = removeLegacyMedMindsUrls(human);
     const destination = destinationForGeneratedContent(input, cleaned);
     const linked = input.cta === "none" ? cleaned : ensureDestinationInCaption(cleaned, destination);

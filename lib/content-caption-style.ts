@@ -4,7 +4,6 @@ type CaptionStyleInput = {
   audience?: string | null;
 };
 
-const EMOJI = /\p{Extended_Pictographic}/u;
 const URL_LINE = /^https?:\/\//i;
 const BULLET = /^(?:[-•]|✅|✓|✔|👉|📌|🎯|📚|🧠|🩺|🔬|📊|💻|✨)\s*/u;
 
@@ -91,20 +90,27 @@ function groupLines(lines: string[]) {
   return blocks.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-export function formatPremiumCaption(value: string, input: CaptionStyleInput = {}) {
+function capHashtags(value: string) {
+  let count = 0;
+  return value
+    .replace(/#[A-Za-z0-9_]+/g, (tag) => {
+      count += 1;
+      return count <= 3 ? tag : "";
+    })
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function formatPremiumCaption(value: string, _input: CaptionStyleInput = {}) {
   let lines = makeScannable(normalizeBlocks(value));
   if (!lines.length) return "";
 
-  const firstIndex = lines.findIndex((line) => !URL_LINE.test(line) && !line.startsWith("#"));
-  if (firstIndex >= 0 && !EMOJI.test(lines[firstIndex])) {
-    lines[firstIndex] = `${captionLeadEmoji(input)} ${lines[firstIndex]}`;
-  }
-
-  lines = lines.map((line, index) => {
-    if (index === firstIndex) return line;
+  lines = lines.map((line) => {
     if (/^[-•]\s+/.test(line)) return `✅ ${line.replace(/^[-•]\s+/, "")}`;
     return line;
   });
 
-  return groupLines(lines);
+  return capHashtags(groupLines(lines));
 }
