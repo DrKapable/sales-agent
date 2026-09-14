@@ -6,6 +6,7 @@ import { getCanvaContentDesign, saveCanvaContentExport } from "@/lib/canva-conte
 function sleep(ms:number){return new Promise(resolve=>setTimeout(resolve,ms));}
 function publicOrigin(request:Request){return process.env.PUBLIC_URL?.trim().replace(/\/+$/,"")||new URL(request.url).origin;}
 type ExportJob={id?:string;status?:string;urls?:string[];error?:{message?:string;code?:string}};
+type ExportFormats=Record<string,{page_numbers?:number[]}>;
 
 async function parseCanvaFailure(response:Response,fallback:string){
   const data=await response.json().catch(()=>({})) as {message?:string;code?:string};
@@ -20,7 +21,15 @@ export async function POST(request:Request,context:{params:Promise<{id:string}>}
     const linked=await getCanvaContentDesign(id);
     if(!linked)return NextResponse.json({error:"Create or link a Canva design first."},{status:409});
 
-    await getCanvaDesign(linked.designId);
+    const [,formatResult]=await Promise.all([
+      getCanvaDesign(linked.designId),
+      canvaJson<{formats?:ExportFormats}>(`/designs/${encodeURIComponent(linked.designId)}/export-formats`)
+    ]);
+    if(!formatResult.formats?.png){
+      const available=Object.keys(formatResult.formats||{});
+      throw new CanvaApiError(`This Canva design cannot be imported as PNG.${available.length?` Available export formats: ${available.join(", ")}.`:""} Use a social/custom Canva design for the Sales Agent image.`,409,"png_not_supported");
+    }
+
     const created=await canvaJson<{job?:ExportJob}>("/exports",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
