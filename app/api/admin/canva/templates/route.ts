@@ -1,16 +1,30 @@
 import { NextResponse } from "next/server";
-import { getCanvaConnectionSecret } from "@/lib/canva-connection";
+import { CanvaApiError, canvaJson } from "@/lib/canva-api";
+
+type BrandTemplate={
+  id:string;
+  title:string;
+  create_url?:string;
+  view_url?:string;
+  created_at?:number;
+  updated_at?:number;
+  thumbnail?:{width?:number;height?:number;url?:string};
+};
 
 export async function GET(request:Request){
   try{
-    const connection=await getCanvaConnectionSecret();
-    if(!connection)return NextResponse.json({error:"Connect Canva before loading templates."},{status:409});
-    const query=new URL(request.url).searchParams.get("q")?.trim()||"";
-    const url=new URL("https://api.canva.com/rest/v1/brand-templates");
-    if(query)url.searchParams.set("query",query);
-    const response=await fetch(url,{headers:{Authorization:`Bearer ${connection.accessToken}`},cache:"no-store"});
-    const data=await response.json().catch(()=>({})) as {items?:unknown[];continuation?:string;message?:string};
-    if(!response.ok)return NextResponse.json({error:data.message||"Unable to load Canva Brand Templates."},{status:response.status});
+    const input=new URL(request.url).searchParams;
+    const query=input.get("q")?.trim()||"";
+    const continuation=input.get("continuation")?.trim()||"";
+    const params=new URLSearchParams();
+    if(query)params.set("query",query.slice(0,255));
+    if(continuation)params.set("continuation",continuation);
+    const suffix=params.size?`?${params.toString()}`:"";
+    const data=await canvaJson<{items?:BrandTemplate[];continuation?:string}>(`/brand-templates${suffix}`);
     return NextResponse.json({items:Array.isArray(data.items)?data.items:[],continuation:data.continuation||null});
-  }catch(error){return NextResponse.json({error:error instanceof Error?error.message:"Unable to load Canva templates."},{status:400});}
+  }catch(error){
+    const status=error instanceof CanvaApiError?error.status:400;
+    const code=error instanceof CanvaApiError?error.code:null;
+    return NextResponse.json({error:error instanceof Error?error.message:"Unable to load Canva templates.",code},{status});
+  }
 }
