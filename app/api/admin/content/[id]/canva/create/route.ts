@@ -94,7 +94,7 @@ export async function POST(request:Request,context:{params:Promise<{id:string}>}
 
     const linked=await saveCanvaContentDesign({postId:id,designId:data.design.id});
     const returnTo=`/admin/content/${id}/canva`;
-    const openUrl=`/api/admin/canva/designs/${encodeURIComponent(data.design.id)}/open?state=${encodeURIComponent(`p-${id}`)}&returnTo=${encodeURIComponent(returnTo)}`;
+    const openUrl=`/api/admin/canva/designs/${encodeURIComponent(data.design.id)}/open?returnTo=${encodeURIComponent(returnTo)}`;
     return NextResponse.json({design:{postId:linked.postId,designId:linked.designId,updatedAt:linked.updatedAt,openUrl}});
   }catch(error){
     const status=error instanceof CanvaApiError?error.status:400;
