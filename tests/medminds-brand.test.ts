@@ -45,4 +45,25 @@ describe("MedMinds brand rules", () => {
     expect(quality.blockers.some((item) => item.includes("AI-like marketing wording"))).toBe(true);
     expect(quality.checks.find((check) => check.label === "Natural, non-formulaic wording")?.ok).toBe(false);
   });
+
+  it("warns when the caption repeats the creative title or opens generically", () => {
+    const quality = assessMedMindsContent({
+      title: "Good exam revision is more than reading notes repeatedly",
+      contentType: "MedMinds Prep / exam preparation",
+      body: "Good exam revision is more than reading notes repeatedly.\n\nExplore the platform to learn more.",
+      cta: "try"
+    });
+    expect(quality.warnings.some((item) => item.includes("Strengthen the opening"))).toBe(true);
+    expect(quality.warnings.some((item) => item.includes("repeats the working/creative title"))).toBe(true);
+    expect(quality.warnings.some((item) => item.includes("more direct call to action"))).toBe(true);
+  });
+
+  it("requires verification for numerical or popularity-style proof language", () => {
+    const quality = assessMedMindsContent({
+      title: "Exam practice",
+      contentType: "MedMinds Prep / exam preparation",
+      body: "Still unsure whether you are ready? Join hundreds of students using MedMinds Prep before your next exam."
+    });
+    expect(quality.warnings.some((item) => item.includes("Verify any student count"))).toBe(true);
+  });
 });

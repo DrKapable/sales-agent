@@ -21,7 +21,7 @@ const schema = z.object({
   length: z.enum(["short", "medium", "long"]).default("medium"),
   cta: z.enum(["message", "learn", "enrol", "try", "book", "comment", "none"]).default("message"),
   notes: z.string().trim().max(1800).optional().default(""),
-  brandVoice: z.string().trim().max(1000).optional().default("Premium, credible, practical and academically grounded. Sound like an experienced MedMinds educator: warm, confident and concise, with polished mobile-first formatting and purposeful emoji cues where they improve scanning."),
+  brandVoice: z.string().trim().max(1000).optional().default("Credible, practical, academically grounded, warm and concise. Sound like an experienced MedMinds educator who understands the reader's immediate problem. Use polished mobile-first formatting only when it improves scanning."),
   existingBody: z.string().trim().max(10000).optional().default(""),
   action: z.enum(["generate", "humanise", "strengthen-hook", "shorten"]).default("generate"),
   variationCount: z.number().int().min(1).max(3).default(3)
@@ -44,10 +44,10 @@ function parseOutput(text: string, wanted: number): GeneratedContentOutput {
 }
 
 function actionGuide(input: ContentInput) {
-  if (input.action === "humanise") return `Rewrite this caption so it sounds premium, natural, specific and human while preserving factual claims:\n${normalizeMedMindsBranding(input.existingBody)}`;
-  if (input.action === "strengthen-hook") return `Give this caption a stronger, premium opening without clickbait, then improve the mobile readability:\n${normalizeMedMindsBranding(input.existingBody)}`;
-  if (input.action === "shorten") return `Shorten this caption into a clean, highly scannable Facebook version without losing important information:\n${normalizeMedMindsBranding(input.existingBody)}`;
-  return "Create new premium Facebook content from the brief.";
+  if (input.action === "humanise") return `Rewrite this caption so it sounds like a real MedMinds staff member. Keep the facts, remove brochure-like wording, lead with practical value and preserve a clear next step:\n${normalizeMedMindsBranding(input.existingBody)}`;
+  if (input.action === "strengthen-hook") return `Replace the opening with a specific audience problem, question, tension or desired outcome. Avoid clickbait and generic truths, then improve mobile readability:\n${normalizeMedMindsBranding(input.existingBody)}`;
+  if (input.action === "shorten") return `Cut repetition and non-essential feature wording. Keep the strongest hook, practical benefit, necessary proof and one clear CTA in a mobile-scannable Facebook version:\n${normalizeMedMindsBranding(input.existingBody)}`;
+  return "Create new mobile-first, benefit-led Facebook content from the brief.";
 }
 
 function generationContext(input: ContentInput) {
@@ -62,12 +62,12 @@ function generationContext(input: ContentInput) {
 }
 
 function fallback(input: ContentInput) {
-  const base = `${normalizeMedMindsBranding(input.objective)}\n\n✅ Clear, focused support designed for ${normalizeMedMindsBranding(input.audience)}.\n\n📚 MedMinds keeps the next step practical and easy to follow.`;
+  const base = `${normalizeMedMindsBranding(input.objective)}\n\nUse the post to make the practical value clear for ${normalizeMedMindsBranding(input.audience)}.\n\nChoose one useful next step and keep it specific.`;
   return finalizeGeneratedContent({
     body: base,
     alternatives: [base],
     headline: normalizeMedMindsBranding(input.objective).slice(0, 76),
-    imageBrief: "Premium MedMinds Facebook creative with strong hierarchy, generous whitespace and a content-appropriate layout in navy, teal, green, cream and white."
+    imageBrief: "Prefer an actual MedMinds product screenshot, question, approved real photo or Canva editorial asset. Use an AI-generated scene only when an authentic asset is unavailable."
   }, generationContext(input));
 }
 
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
           destination: destinationForGeneratedContent(generationContext(input), output.body),
           model,
           mode: "agent",
-          style: "premium-facebook"
+          style: "marketing-review-v1"
         });
       }
     } catch (error) {
@@ -121,6 +121,6 @@ export async function POST(request: Request) {
     ...output,
     destination: destinationForGeneratedContent(generationContext(input), output.body),
     mode: "fallback",
-    style: "premium-facebook"
+    style: "marketing-review-v1"
   });
 }
