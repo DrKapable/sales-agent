@@ -103,9 +103,22 @@ VALUES ('primary',$1,$2,$3,NOW(),NOW()) ON CONFLICT (connection_key) DO UPDATE S
 
 async function readStored():Promise<StoredCanvaConnection|null>{const db=database();if(!db)return memory;await ensureTable(db);const rows=await db.query(`SELECT access_token_cipher,refresh_token_cipher,expires_at,connected_at FROM medminds_canva_connection WHERE connection_key='primary' LIMIT 1`);if(!rows[0])return null;const row=rows[0] as Record<string,unknown>;return {accessToken:decrypt(String(row.access_token_cipher)),refreshToken:decrypt(String(row.refresh_token_cipher)),expiresAt:new Date(String(row.expires_at)).toISOString(),connectedAt:new Date(String(row.connected_at)).toISOString()};}
 
-async function refreshConnection(item:StoredCanvaConnection){const config=getCanvaConfig();if(!config.oauthConfigured)throw new Error("Canva OAuth is not configured.");const response=await fetch("https://api.canva.com/rest/v1/oauth/token",{method:"POST",headers:{Authorization:`Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64")}`,"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"refresh_token",refresh_token:item.refreshToken}),cache:"no-store"});const data=await response.json().catch(()=>({})) as {access_token?:string;refresh_token?:string;expires_in?:number;message?:string};if(!response.ok||!data.access_token)throw new Error(data.message||"Canva access expired. Reconnect Canva.");return saveCanvaConnection({accessToken:data.access_token,refreshToken:data.refresh_token||item.refreshToken,expiresIn:Number(data.expires_in||14400)});}
+async function refreshConnection(item:StoredCanvaConnection){
+  const config=getCanvaConfig();
+  if(!config.oauthConfigured)throw new Error("Canva OAuth is not configured.");
+  const response=await fetch("https://api.canva.com/rest/v1/oauth/token",{
+    method:"POST",
+    headers:{Authorization:`Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64")}`,"Content-Type":"application/x-www-form-urlencoded"},
+    body:new URLSearchParams({grant_type:"refresh_token",refresh_token:item.refreshToken}),
+    cache:"no-store"
+  });
+  const data=await response.json().catch(()=>({})) as {access_token?:string;refresh_token?:string;expires_in?:number;message?:string};
+  if(!response.ok||!data.access_token)throw new Error(data.message||"Canva access expired. Reconnect Canva.");
+  return saveCanvaConnection({accessToken:data.access_token,refreshToken:data.refresh_token||item.refreshToken,expiresIn:Number(data.expires_in||14400)});
+}
 
 export async function getCanvaConnectionSecret(){const item=await readStored();if(!item)return null;if(new Date(item.expiresAt).getTime()<=Date.now()+60_000)return refreshConnection(item);return item;}
+export async function refreshCanvaConnectionNow(){const item=await readStored();if(!item)return null;return refreshConnection(item);}
 export async function getCanvaConnectionStatus():Promise<CanvaConnectionStatus>{const config=getCanvaConfig();const item=await readStored().catch(()=>null);return {configured:config.oauthConfigured,connected:Boolean(item),connectedAt:item?.connectedAt||null,expiresAt:item?.expiresAt||null};}
 export async function deleteCanvaConnection(){memory=null;const db=database();if(!db)return true;await ensureTable(db);await db.query(`DELETE FROM medminds_canva_connection WHERE connection_key='primary'`);return true;}
 
