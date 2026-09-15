@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getContentPost, saveContentPhoto, saveContentPost } from "@/lib/content-studio";
 import {
   contentVisualPrompt,
+  hasContentVisualSignature,
   MAX_CONTENT_VISUAL_BYTES,
   normalizeContentVisualKind,
   resolveContentVisualMime,
@@ -39,6 +40,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const kind = normalizeContentVisualKind(form.get("kind"));
     const bytes = Buffer.from(await value.arrayBuffer());
+    if (!hasContentVisualSignature(bytes, mimeType)) {
+      return NextResponse.json({ error: "The selected file does not contain a valid supported image." }, { status: 415 });
+    }
+
     const photoVersion = Math.max(1, (post.photoVersion || 1) + 1);
     const creativeVersion = Math.max(1, (post.creativeVersion || 1) + 1);
     const previewUrl = `/api/content/creative/${post.id}?v=${creativeVersion}`;
