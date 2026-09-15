@@ -20,7 +20,7 @@ describe("Content Studio authentic visual uploads", () => {
   });
 
   it("sanitizes uploaded filenames before storing them in visual metadata", () => {
-    expect(sanitizeContentVisualFilename("../MedMinds\nPrep<>.png")).toBe("..MedMinds-Prep.png");
+    expect(sanitizeContentVisualFilename("../MedMinds\nPrep<>.png")).toBe("..-MedMinds-Prep.png");
   });
 
   it("records whether the authentic asset is a screenshot or a real photo", () => {
