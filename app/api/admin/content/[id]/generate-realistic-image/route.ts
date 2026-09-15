@@ -17,6 +17,7 @@ const schema = z.object({
   headline: z.string().trim().max(500).optional(),
   supportingText: z.string().trim().max(1200).optional(),
   cta: z.string().trim().max(160).optional(),
+  hideCta: z.boolean().optional(),
   extraDirection: z.string().trim().max(4000).optional().default("")
 });
 
@@ -104,7 +105,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const input = parsed.data;
     const headline = compact(input.headline || post.creativeHeadline || post.title || "MedMinds", 54);
     const supportingText = compact(input.supportingText || post.creativeSupportingText || cleanSupport(post.body), 140);
-    const cta = compact(input.cta || post.creativeCta || "Message MedMinds", 28);
+    const hideCta = input.hideCta ?? post.creativeCtaHidden ?? false;
+    const cta = hideCta ? "" : compact(input.cta || post.creativeCta || "Message MedMinds", 28);
     const preset = `${subjects[input.subject]} ${scenes[input.scene]} in ${settings[input.setting]}, appearing ${moods[input.mood]}, photographed as ${styles[input.style]}.`;
     const direction = compact(input.extraDirection || preset, 1800);
     const layout = resolveCreativeLayout(post, "auto");
@@ -150,7 +152,8 @@ QUALITY AND PRIVACY
       creativeVisualMode: "photo",
       creativeHeadline: headline,
       creativeSupportingText: supportingText,
-      creativeCta: cta,
+      creativeCta: cta || null,
+      creativeCtaHidden: hideCta,
       creativeGeneratedAt: new Date().toISOString(),
       creativeVersion,
       photoPrompt: prompt,
