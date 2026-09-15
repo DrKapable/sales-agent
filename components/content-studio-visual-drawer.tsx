@@ -30,6 +30,12 @@ type Asset = {
   updatedAt: string;
   imageUrl: string;
 };
+type Props = {
+  activePostId?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showLauncher?: boolean;
+};
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const ACCEPTED = new Set(["image/png", "image/jpeg", "image/webp"]);
@@ -54,8 +60,14 @@ function sourceLabel(post: Post | null) {
   return "Existing creative";
 }
 
-export function ContentStudioVisualDrawer() {
-  const [open, setOpen] = useState(false);
+export function ContentStudioVisualDrawer({ activePostId = "", open: controlledOpen, onOpenChange, showLauncher = true }: Props = {}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = useCallback((next: boolean) => {
+    if (controlledOpen === undefined) setInternalOpen(next);
+    onOpenChange?.(next);
+  }, [controlledOpen, onOpenChange]);
+
   const [posts, setPosts] = useState<Post[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -64,6 +76,7 @@ export function ContentStudioVisualDrawer() {
   const [assetTitle, setAssetTitle] = useState("");
   const [assetAlt, setAssetAlt] = useState("");
   const [assetTags, setAssetTags] = useState("");
+  const [permissionConfirmed, setPermissionConfirmed] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"ALL" | Category>("ALL");
   const [previewNonce, setPreviewNonce] = useState(Date.now());
@@ -75,6 +88,7 @@ export function ContentStudioVisualDrawer() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(() => posts.find((post) => post.id === selectedId) || null, [posts, selectedId]);
+  const isSensitiveCategory = category === "testimonial" || category === "student-photo";
   const visibleAssets = useMemo(() => {
     const query = search.trim().toLowerCase();
     return assets.filter((asset) => {
@@ -92,13 +106,17 @@ export function ContentStudioVisualDrawer() {
       if (!response.ok) throw new Error(data.error || "Unable to load saved content.");
       const items = Array.isArray(data.posts) ? data.posts as Post[] : [];
       setPosts(items);
-      setSelectedId((current) => current && items.some((item) => item.id === current) ? current : items[0]?.id || "");
+      setSelectedId((current) => {
+        if (activePostId && items.some((item) => item.id === activePostId)) return activePostId;
+        if (current && items.some((item) => item.id === current)) return current;
+        return "";
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load saved content.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activePostId]);
 
   const loadLibrary = useCallback(async () => {
     setLibraryLoading(true);
@@ -113,6 +131,11 @@ export function ContentStudioVisualDrawer() {
       setLibraryLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (activePostId) setSelectedId(activePostId);
+    else setSelectedId("");
+  }, [activePostId]);
 
   useEffect(() => {
     if (open) void Promise.all([loadPosts(), loadLibrary()]);
@@ -139,14 +162,14 @@ export function ContentStudioVisualDrawer() {
     if (!assetTitle.trim()) setAssetTitle(next.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "));
   }
 
-  async function applyAsset(assetId: string, quiet = false) {
+  async function applyAsset(assetId: string) {
     if (!selectedId) {
-      setError("Save the caption as a draft first, then select it here.");
+      setError("Save this post first, then choose its visual.");
       return false;
     }
     setBusy(true);
     setError("");
-    if (!quiet) setNotice("");
+    setNotice("");
     try {
       const response = await fetch(`/api/admin/content/${selectedId}/use-library-asset`, {
         method: "POST",
@@ -157,7 +180,7 @@ export function ContentStudioVisualDrawer() {
       if (!response.ok) throw new Error(data.error || "Unable to use this media asset.");
       setPreviewNonce(Date.now());
       await Promise.all([loadPosts(), loadLibrary()]);
-      if (!quiet) setNotice(`“${data.mediaAsset?.title || "Media asset"}” is now the active visual for this post.`);
+      setNotice(`“${data.mediaAsset?.title || "Media asset"}” is now the active visual for ${selected?.title || "this post"}.`);
       return true;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to use this media asset.");
@@ -170,6 +193,10 @@ export function ContentStudioVisualDrawer() {
   async function uploadAsset() {
     if (!file) {
       setError("Choose an image first.");
+      return;
+    }
+    if (isSensitiveCategory && !permissionConfirmed) {
+      setError("Confirm that MedMinds has permission to publish this testimonial or student photo.");
       return;
     }
     setBusy(true);
@@ -191,6 +218,7 @@ export function ContentStudioVisualDrawer() {
       setAssetTitle("");
       setAssetAlt("");
       setAssetTags("");
+      setPermissionConfirmed(false);
       if (inputRef.current) inputRef.current.value = "";
       await loadLibrary();
 
@@ -204,7 +232,7 @@ export function ContentStudioVisualDrawer() {
         if (!useResponse.ok) throw new Error(useData.error || "The asset was saved, but could not be applied to this post.");
         setPreviewNonce(Date.now());
         await Promise.all([loadPosts(), loadLibrary()]);
-        setNotice(`“${newAsset.title}” was saved to the media library and applied to this post.`);
+        setNotice(`“${newAsset.title}” was saved and applied to ${selected?.title || "this post"}.`);
       } else {
         setNotice(`“${newAsset.title}” was saved to the MedMinds media library.`);
       }
@@ -236,18 +264,18 @@ export function ContentStudioVisualDrawer() {
   const preview = selected?.mediaUrl ? `/api/content/creative/${selected.id}?v=${selected.creativeVersion}&library=${previewNonce}` : "";
 
   return <>
-    <button className={styles.launcher} onClick={() => setOpen(true)} aria-label="Open MedMinds media library">
+    {showLauncher && <button className={styles.launcher} onClick={() => setOpen(true)} aria-label="Open MedMinds media library">
       <span>Visuals</span>
       <strong>Media library</strong>
-    </button>
+    </button>}
 
     {open && <div className={styles.backdrop} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setOpen(false); }}>
       <aside className={styles.drawer} role="dialog" aria-modal="true" aria-label="MedMinds media library">
         <header className={styles.header}>
           <div>
-            <span className={styles.eyebrow}>Marketing review · phase 3</span>
+            <span className={styles.eyebrow}>Authentic visual workflow</span>
             <h2>Media library</h2>
-            <p>Upload approved MedMinds assets once, reuse them across campaigns, and keep AI imagery as the final fallback.</p>
+            <p>Choose the visual for the post you are working on. Reuse approved MedMinds assets first, then Canva, with AI imagery only as a fallback.</p>
           </div>
           <button className={styles.close} onClick={() => setOpen(false)} aria-label="Close media library">×</button>
         </header>
@@ -255,17 +283,20 @@ export function ContentStudioVisualDrawer() {
         {(error || notice) && <div className={error ? styles.error : styles.notice}>{error || notice}</div>}
 
         <div className={styles.priority}>
-          <div className={styles.priorityItem}><b>1</b><span><strong>MedMinds media library</strong><small>Reuse approved screenshots, testimonials, student/team photos and campaign assets.</small></span></div>
-          <div className={styles.priorityItem}><b>2</b><span><strong>Canva</strong><small>Refine a real asset or use approved editorial library material with the Brand Kit.</small></span></div>
-          <div className={`${styles.priorityItem} ${styles.fallback}`}><b>3</b><span><strong>AI image</strong><small>Use synthetic photography only when a suitable authentic asset is unavailable.</small></span></div>
+          <div className={styles.priorityItem}><b>1</b><span><strong>MedMinds media</strong><small>Approved screenshots, testimonials and real photos.</small></span></div>
+          <div className={styles.priorityItem}><b>2</b><span><strong>Canva</strong><small>Crop, refine or apply Brand Kit treatment.</small></span></div>
+          <div className={`${styles.priorityItem} ${styles.fallback}`}><b>3</b><span><strong>AI fallback</strong><small>Only when no suitable authentic asset exists.</small></span></div>
         </div>
 
         <section className={styles.section}>
-          <div className={styles.sectionTitle}><div><span>01</span><h3>Select saved content</h3></div><button onClick={() => void loadPosts()} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</button></div>
+          <div className={styles.sectionTitle}><div><span>01</span><h3>Post</h3></div><button onClick={() => void loadPosts()} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</button></div>
+          {activePostId && selected?.id === activePostId && <div className={styles.contextBanner}><span>Current editor post</span><strong>{selected.title}</strong><small>{selected.status.toLowerCase()} · {sourceLabel(selected)}</small></div>}
+          {!activePostId && <div className={styles.contextBanner}><span>No saved post selected</span><strong>Save the caption before applying a visual</strong><small>You can still browse or add reusable media.</small></div>}
           {posts.length ? <select value={selectedId} onChange={(event) => { setSelectedId(event.target.value); setNotice(""); setError(""); }}>
+            <option value="">Choose a saved post</option>
             {posts.map((post) => <option key={post.id} value={post.id}>{post.title} · {post.status.toLowerCase()}</option>)}
-          </select> : <div className={styles.empty}>No saved content yet. Save a caption as a draft in Content Studio, then return here.</div>}
-          {selected && <div className={styles.selectedMeta}><span>{selected.contentType}</span><b>{sourceLabel(selected)}</b></div>}
+          </select> : <div className={styles.empty}>No saved content yet. Save a caption in Content Studio, then return here.</div>}
+          {selected && selected.id !== activePostId && <div className={styles.selectionWarning}>You selected a different saved post: <strong>{selected.title}</strong>. Visual actions below will affect this post.</div>}
         </section>
 
         <section className={styles.section}>
@@ -284,9 +315,9 @@ export function ContentStudioVisualDrawer() {
               <div className={styles.assetBody}>
                 <span className={styles.assetCategory}>{categoryLabel(asset.category)}</span>
                 <strong title={asset.title}>{asset.title}</strong>
-                <small>{asset.usageCount} use{asset.usageCount === 1 ? "" : "s"}{asset.tags.length ? ` · ${asset.tags.slice(0, 2).join(", ")}` : ""}</small>
+                <small>{asset.usageCount} application{asset.usageCount === 1 ? "" : "s"}{asset.tags.length ? ` · ${asset.tags.slice(0, 2).join(", ")}` : ""}</small>
                 <div className={styles.assetActions}>
-                  <button className={styles.useAsset} onClick={() => void applyAsset(asset.id)} disabled={!selectedId || busy}>Use</button>
+                  <button className={styles.useAsset} onClick={() => void applyAsset(asset.id)} disabled={!selectedId || busy}>Use on selected post</button>
                   <button className={styles.deleteAsset} onClick={() => void deleteAsset(asset)} disabled={busy}>Delete</button>
                 </div>
               </div>
@@ -297,7 +328,7 @@ export function ContentStudioVisualDrawer() {
         <section className={styles.section}>
           <div className={styles.sectionTitle}><div><span>03</span><h3>Add approved asset</h3></div></div>
           <div className={styles.categoryRow}>
-            {categoryOptions.map((item) => <button key={item.value} className={category === item.value ? styles.categoryActive : ""} onClick={() => setCategory(item.value)}>{item.label}</button>)}
+            {categoryOptions.map((item) => <button key={item.value} className={category === item.value ? styles.categoryActive : ""} onClick={() => { setCategory(item.value); setPermissionConfirmed(false); }}>{item.label}</button>)}
           </div>
 
           <div className={styles.assetFields}>
@@ -306,24 +337,26 @@ export function ContentStudioVisualDrawer() {
             <label className={styles.fullField}>Alt text<input value={assetAlt} onChange={(event) => setAssetAlt(event.target.value)} placeholder="Short accessible description of the visual" /></label>
           </div>
 
+          {isSensitiveCategory && <label className={styles.permissionCheck}><input type="checkbox" checked={permissionConfirmed} onChange={(event) => setPermissionConfirmed(event.target.checked)} /><span>I confirm MedMinds has permission to publish this {category === "testimonial" ? "testimonial" : "student photo"}.</span></label>}
+
           <input ref={inputRef} className={styles.hiddenInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => chooseFile(event.target.files?.[0] || null)} />
           <button className={styles.dropzone} onClick={() => inputRef.current?.click()} disabled={busy}>
             <span className={styles.uploadIcon}>↑</span>
             <strong>{file ? file.name : "Choose PNG, JPG or WebP"}</strong>
             <small>{file ? `${(file.size / 1024 / 1024).toFixed(2)} MB selected` : "Upload once and reuse. Maximum 8 MB."}</small>
           </button>
-          <p className={styles.safetyNote}>Only add material MedMinds has permission to publish. For testimonials and student photos, confirm permission before upload. Do not store patient information, confidential records, student IDs, private chats without consent, protected examination material or answer keys.</p>
-          <button className={styles.uploadButton} onClick={() => void uploadAsset()} disabled={!file || busy}>{busy ? "Saving…" : selectedId ? "Save to library & use now" : "Save to media library"}</button>
+          <p className={styles.safetyNote}>Do not store patient information, confidential records, student IDs, private chats without consent, protected examination material or answer keys.</p>
+          <button className={styles.uploadButton} onClick={() => void uploadAsset()} disabled={!file || busy || (isSensitiveCategory && !permissionConfirmed)}>{busy ? "Saving…" : selectedId ? "Save & use on selected post" : "Save to media library"}</button>
         </section>
 
         {selected && <section className={styles.section}>
           <div className={styles.sectionTitle}><div><span>04</span><h3>Preview and refine</h3></div></div>
-          {preview ? <div className={styles.preview}><img src={preview} alt={`Current visual for ${selected.title}`} /></div> : <div className={styles.empty}>Choose a library asset, upload a new one, or generate a visual to preview it here.</div>}
+          {preview ? <div className={styles.preview}><img src={preview} alt={`Current visual for ${selected.title}`} /></div> : <div className={styles.empty}>Choose a library asset or add a new one to preview it here.</div>}
           <div className={styles.actions}>
-            <Link className={styles.canva} href={`/admin/content/${selected.id}/canva`}>Open in Canva</Link>
+            <Link className={styles.canva} href={`/admin/content/${selected.id}/canva`}>Refine in Canva</Link>
             <Link href={`/admin/content/${selected.id}/image-editor`}>Manual editor</Link>
           </div>
-          <p className={styles.helper}>The library keeps reusable originals. Applying an asset creates a stable post snapshot, so later library cleanup does not break published or scheduled creatives.</p>
+          <p className={styles.helper}>Applying an asset creates a stable post snapshot, so later library cleanup does not break published or scheduled creatives.</p>
         </section>}
       </aside>
     </div>}
