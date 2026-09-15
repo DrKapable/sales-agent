@@ -22,6 +22,7 @@ export type ContentPost = {
   creativeHeadline: string | null;
   creativeSupportingText: string | null;
   creativeCta: string | null;
+  creativeCtaHidden: boolean;
   creativeGeneratedAt: string | null;
   creativeVersion: number;
   photoPrompt: string | null;
@@ -74,6 +75,7 @@ async function ensureTables(db: NeonQueryFunction<false, false>) {
       creative_headline TEXT,
       creative_supporting_text TEXT,
       creative_cta TEXT,
+      creative_cta_hidden BOOLEAN NOT NULL DEFAULT FALSE,
       creative_generated_at TIMESTAMPTZ,
       creative_version INTEGER NOT NULL DEFAULT 1,
       photo_prompt TEXT,
@@ -87,6 +89,7 @@ async function ensureTables(db: NeonQueryFunction<false, false>) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+    await db.query(`ALTER TABLE medminds_content_posts ADD COLUMN IF NOT EXISTS creative_cta_hidden BOOLEAN NOT NULL DEFAULT FALSE`);
     await db.query(`CREATE TABLE IF NOT EXISTS medminds_content_photos (
       post_id UUID PRIMARY KEY REFERENCES medminds_content_posts(id) ON DELETE CASCADE,
       image_base64 TEXT NOT NULL,
@@ -101,7 +104,7 @@ async function ensureTables(db: NeonQueryFunction<false, false>) {
 }
 
 const COLUMNS = `id,title,content_type,objective,audience,body,media_url,status,created_by,approved_by,
-  creative_template,creative_visual_mode,creative_headline,creative_supporting_text,creative_cta,
+  creative_template,creative_visual_mode,creative_headline,creative_supporting_text,creative_cta,creative_cta_hidden,
   creative_generated_at,creative_version,photo_prompt,photo_scene,photo_subject,photo_setting,
   photo_mood,photo_style,photo_generated_at,photo_version,created_at,updated_at`;
 
@@ -122,6 +125,7 @@ function mapRow(row: Record<string, unknown>): ContentPost {
     creativeHeadline: row.creative_headline ? String(row.creative_headline) : null,
     creativeSupportingText: row.creative_supporting_text ? String(row.creative_supporting_text) : null,
     creativeCta: row.creative_cta ? String(row.creative_cta) : null,
+    creativeCtaHidden: Boolean(row.creative_cta_hidden),
     creativeGeneratedAt: row.creative_generated_at ? new Date(String(row.creative_generated_at)).toISOString() : null,
     creativeVersion: Number(row.creative_version || 1),
     photoPrompt: row.photo_prompt ? String(row.photo_prompt) : null,
@@ -172,6 +176,7 @@ export async function saveContentPost(input: Partial<ContentPost> & Pick<Content
     creativeHeadline: input.creativeHeadline ?? existing?.creativeHeadline ?? null,
     creativeSupportingText: input.creativeSupportingText ?? existing?.creativeSupportingText ?? null,
     creativeCta: input.creativeCta ?? existing?.creativeCta ?? null,
+    creativeCtaHidden: input.creativeCtaHidden ?? existing?.creativeCtaHidden ?? false,
     creativeGeneratedAt: input.creativeGeneratedAt ?? existing?.creativeGeneratedAt ?? null,
     creativeVersion: input.creativeVersion ?? existing?.creativeVersion ?? 1,
     photoPrompt: input.photoPrompt ?? existing?.photoPrompt ?? null,
@@ -194,23 +199,23 @@ export async function saveContentPost(input: Partial<ContentPost> & Pick<Content
   await ensureTables(db);
   const rows = await db.query(`INSERT INTO medminds_content_posts (
       id,title,content_type,objective,audience,body,media_url,status,created_by,approved_by,
-      creative_template,creative_visual_mode,creative_headline,creative_supporting_text,creative_cta,
+      creative_template,creative_visual_mode,creative_headline,creative_supporting_text,creative_cta,creative_cta_hidden,
       creative_generated_at,creative_version,photo_prompt,photo_scene,photo_subject,photo_setting,
       photo_mood,photo_style,photo_generated_at,photo_version,created_at,updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
     ON CONFLICT (id) DO UPDATE SET
       title=EXCLUDED.title,content_type=EXCLUDED.content_type,objective=EXCLUDED.objective,audience=EXCLUDED.audience,
       body=EXCLUDED.body,media_url=EXCLUDED.media_url,status=EXCLUDED.status,approved_by=EXCLUDED.approved_by,
       creative_template=EXCLUDED.creative_template,creative_visual_mode=EXCLUDED.creative_visual_mode,
       creative_headline=EXCLUDED.creative_headline,creative_supporting_text=EXCLUDED.creative_supporting_text,
-      creative_cta=EXCLUDED.creative_cta,creative_generated_at=EXCLUDED.creative_generated_at,
+      creative_cta=EXCLUDED.creative_cta,creative_cta_hidden=EXCLUDED.creative_cta_hidden,creative_generated_at=EXCLUDED.creative_generated_at,
       creative_version=EXCLUDED.creative_version,photo_prompt=EXCLUDED.photo_prompt,photo_scene=EXCLUDED.photo_scene,
       photo_subject=EXCLUDED.photo_subject,photo_setting=EXCLUDED.photo_setting,photo_mood=EXCLUDED.photo_mood,
       photo_style=EXCLUDED.photo_style,photo_generated_at=EXCLUDED.photo_generated_at,
       photo_version=EXCLUDED.photo_version,updated_at=EXCLUDED.updated_at RETURNING ${COLUMNS}`,
     [post.id, post.title, post.contentType, post.objective, post.audience, post.body, post.mediaUrl, post.status,
       post.createdBy, post.approvedBy, post.creativeTemplate, post.creativeVisualMode, post.creativeHeadline,
-      post.creativeSupportingText, post.creativeCta, post.creativeGeneratedAt, post.creativeVersion,
+      post.creativeSupportingText, post.creativeCta, post.creativeCtaHidden, post.creativeGeneratedAt, post.creativeVersion,
       post.photoPrompt, post.photoScene, post.photoSubject, post.photoSetting, post.photoMood, post.photoStyle,
       post.photoGeneratedAt, post.photoVersion, post.createdAt, post.updatedAt]);
   return mapRow(rows[0] as Record<string, unknown>);
