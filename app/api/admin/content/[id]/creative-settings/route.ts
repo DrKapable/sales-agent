@@ -10,6 +10,7 @@ const schema = z.object({
   headline: z.string().trim().max(120).optional(),
   supportingText: z.string().trim().max(320).optional(),
   cta: z.string().trim().max(60).optional(),
+  hideCta: z.boolean().optional(),
   textScale: z.number().min(0.75).max(1.25).optional(),
   supportLines: z.number().int().min(0).max(3).optional(),
   photoX: z.number().int().min(0).max(100).optional(),
@@ -56,7 +57,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       creativeTemplate: input.template || post.creativeTemplate,
       creativeHeadline: input.headline !== undefined ? normalizeMedMindsBranding(input.headline) : post.creativeHeadline,
       creativeSupportingText: input.supportingText !== undefined ? normalizeMedMindsBranding(input.supportingText) : post.creativeSupportingText,
-      creativeCta: input.cta !== undefined ? normalizeMedMindsBranding(input.cta) : post.creativeCta,
+      creativeCta: input.cta !== undefined ? (normalizeMedMindsBranding(input.cta) || null) : post.creativeCta,
+      creativeCtaHidden: input.hideCta ?? post.creativeCtaHidden,
       creativeGeneratedAt: new Date().toISOString(),
       creativeVersion: version,
       mediaUrl: `${originFor(request)}${previewUrl}`
