@@ -8,7 +8,8 @@ const schema = z.object({
   template: z.enum(["promo-clean", "education-card", "faq-notice"]).optional(),
   headline: z.string().trim().max(500).optional(),
   supportingText: z.string().trim().max(1200).optional(),
-  cta: z.string().trim().max(160).optional()
+  cta: z.string().trim().max(160).optional(),
+  hideCta: z.boolean().optional()
 });
 
 function compact(value: string, max: number) {
@@ -54,7 +55,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const template = input.template || post.creativeTemplate || deriveTemplate(post.contentType);
   const headline = compact(input.headline || post.creativeHeadline || post.title, 54);
   const supportingText = compact(input.supportingText || post.creativeSupportingText || deriveSupport(post.body), 155);
-  const cta = compact(input.cta || post.creativeCta || deriveCta(post.contentType), 28);
+  const hideCta = input.hideCta ?? post.creativeCtaHidden ?? false;
+  const cta = hideCta ? "" : compact(input.cta || post.creativeCta || deriveCta(post.contentType), 28);
   const previewUrl = `/api/content/creative/${post.id}?v=${version}`;
   const mediaUrl = `${publicOrigin(request)}${previewUrl}`;
 
@@ -65,7 +67,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     creativeTemplate: template,
     creativeHeadline: headline,
     creativeSupportingText: supportingText,
-    creativeCta: cta,
+    creativeCta: cta || null,
+    creativeCtaHidden: hideCta,
     creativeGeneratedAt: new Date().toISOString(),
     creativeVersion: version
   });
