@@ -22,6 +22,7 @@ type Post = {
   creativeHeadline: string | null;
   creativeSupportingText: string | null;
   creativeCta: string | null;
+  creativeCtaHidden?: boolean;
   creativeVersion: number;
   photoScene: string | null;
   photoSubject: string | null;
@@ -52,15 +53,9 @@ type FormState = {
 
 type CreativeState = { template: Template; headline: string; supportingText: string; cta: string };
 type PhotoState = { scene: string; subject: string; setting: string; mood: string; style: string; extraDirection: string };
-
-type QuickBrief = {
-  title: string;
-  contentType: string;
-  objective: string;
-  cta?: string;
-  template?: Template;
-  photoScene?: string;
-};
+type Props = { onActivePostChange?: (postId: string) => void; onOpenMediaLibrary?: () => void };
+type QuickBrief = { title: string; contentType: string; objective: string; cta?: string; template?: Template; photoScene?: string };
+type LibrarySort = "updated" | "oldest" | "title";
 
 const defaultVoice = "Credible, practical, academically grounded, warm and concise. Sound like an experienced MedMinds educator and research-support professional. Use clear Zambian English where appropriate, avoid hype, and make every post useful before it becomes promotional.";
 const defaultAudience = "Medical students, nurses, postgraduate students, health professionals and researchers in Zambia and beyond";
@@ -110,8 +105,19 @@ function ctaLabel(value: string) {
   if (value === "try") return "Try MedMinds Prep";
   if (value === "book") return "Book a consultation";
   if (value === "comment") return "Join the conversation";
-  if (value === "none") return "Learn more";
+  if (value === "none") return "";
   return "Message MedMinds";
+}
+
+function ctaMode(post: Post) {
+  if (post.creativeCtaHidden) return "none";
+  const value = String(post.creativeCta || "").toLowerCase();
+  if (value.includes("try medminds prep")) return "try";
+  if (value.includes("enrol")) return "enrol";
+  if (value.includes("book")) return "book";
+  if (value.includes("conversation") || value.includes("comment")) return "comment";
+  if (value.includes("learn")) return "learn";
+  return "message";
 }
 
 function supportFromBody(body: string) {
@@ -119,7 +125,7 @@ function supportFromBody(body: string) {
   return clean.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 2).join(" ").slice(0, 210);
 }
 
-export function MedMindsContentStudio() {
+export function MedMindsContentStudio({ onActivePostChange, onOpenMediaLibrary }: Props = {}) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [creative, setCreative] = useState<CreativeState>(emptyCreative);
@@ -128,12 +134,16 @@ export function MedMindsContentStudio() {
   const [alternatives, setAlternatives] = useState<string[]>([]);
   const [imageBrief, setImageBrief] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
+  const [currentStatus, setCurrentStatus] = useState<Status>("DRAFT");
   const [busy, setBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"ALL" | Status>("ALL");
+  const [libraryQuery, setLibraryQuery] = useState("");
+  const [libraryType, setLibraryType] = useState("ALL");
+  const [librarySort, setLibrarySort] = useState<LibrarySort>("updated");
 
   const load = useCallback(async () => {
     try {
@@ -156,12 +166,26 @@ export function MedMindsContentStudio() {
   }, []);
   useEffect(() => { window.localStorage.setItem("medminds-content-brand-voice", brandVoice); }, [brandVoice]);
 
-  const visiblePosts = useMemo(() => posts.filter((post) => filter === "ALL" || post.status === filter), [posts, filter]);
+  const visiblePosts = useMemo(() => {
+    const query = libraryQuery.trim().toLowerCase();
+    const filtered = posts.filter((post) => {
+      if (filter !== "ALL" && post.status !== filter) return false;
+      if (libraryType !== "ALL" && post.contentType !== libraryType) return false;
+      if (!query) return true;
+      return `${post.title} ${post.contentType} ${post.body}`.toLowerCase().includes(query);
+    });
+    return filtered.sort((a, b) => {
+      if (librarySort === "oldest") return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      if (librarySort === "title") return a.title.localeCompare(b.title);
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }, [posts, filter, libraryQuery, librarySort, libraryType]);
   const counts = useMemo(() => ({ draft: posts.filter((post) => post.status === "DRAFT").length, review: posts.filter((post) => post.status === "REVIEW").length, approved: posts.filter((post) => post.status === "APPROVED").length }), [posts]);
   const quality = useMemo(() => assessMedMindsContent({ title: form.title, body: form.body, contentType: form.contentType, cta: form.cta }), [form.title, form.body, form.contentType, form.cta]);
+  const readinessPassed = quality.checks.filter((check) => check.ok).length;
   const liveHeadline = normalizeMedMindsBranding(creative.headline.trim() || form.title.trim() || "MedMinds");
   const liveSupport = normalizeMedMindsBranding(creative.supportingText.trim() || supportFromBody(form.body) || "Medical learning, research support and practical digital tools for students and professionals.");
-  const liveCta = normalizeMedMindsBranding(creative.cta.trim() || ctaLabel(form.cta));
+  const liveCta = form.cta === "none" ? "" : normalizeMedMindsBranding(creative.cta.trim() || ctaLabel(form.cta));
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) { setForm((current) => ({ ...current, [key]: value })); }
 
@@ -179,8 +203,10 @@ export function MedMindsContentStudio() {
     setAlternatives([]);
     setImageBrief("");
     setPreviewUrl("");
+    setCurrentStatus("DRAFT");
     setNotice("");
     setError("");
+    onActivePostChange?.("");
   }
 
   async function generate(action: "generate" | "humanise" | "strengthen-hook" | "shorten" = "generate") {
@@ -202,14 +228,14 @@ export function MedMindsContentStudio() {
       if (!form.title.trim() && data.headline) update("title", normalizeMedMindsBranding(String(data.headline).slice(0, 120)));
       setCreative((current) => ({ ...current, headline: normalizeMedMindsBranding(String(data.headline || current.headline).slice(0, 100)), cta: ctaLabel(form.cta) }));
       setPreviewUrl("");
-      setNotice(`${options.length} caption option${options.length === 1 ? "" : "s"} created. Review the facts and quality checks before approval.`);
+      setNotice(`${options.length} caption option${options.length === 1 ? "" : "s"} created. Review facts and readiness checks before approval.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to generate content.");
     } finally { setBusy(false); }
   }
 
-  async function save(status: Status = "DRAFT") {
-    if (!form.title.trim() || !form.body.trim()) { setError("A working title and caption are required."); return null; }
+  async function save(status: Status = currentStatus) {
+    if (!form.title.trim() || !form.body.trim()) { setError("An internal post name and caption are required."); return null; }
     if (status === "APPROVED" && quality.blockers.length) { setError(quality.blockers[0]); return null; }
     setBusy(true); setError("");
     try {
@@ -221,9 +247,11 @@ export function MedMindsContentStudio() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to save content.");
       setForm((current) => ({ ...current, id: data.id, title: data.title || current.title, contentType: data.contentType || current.contentType, objective: data.objective || current.objective, body: data.body || current.body }));
+      setCurrentStatus(status);
+      onActivePostChange?.(data.id);
       if (data.previewUrl) setPreviewUrl(data.previewUrl);
       await load();
-      setNotice(status === "APPROVED" ? "Content approved after brand and quality checks." : status === "REVIEW" ? "Content moved to review." : "Draft saved.");
+      setNotice(status === "APPROVED" ? "Content approved after readiness checks." : status === "REVIEW" ? "Content moved to review." : "Draft saved.");
       return data as Post;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save content.");
@@ -232,55 +260,58 @@ export function MedMindsContentStudio() {
   }
 
   async function generateGraphic() {
-    if (!form.body.trim() || !form.title.trim()) { setError("Create the caption and working title first."); return; }
+    if (!form.body.trim() || !form.title.trim()) { setError("Create the caption and internal post name first."); return; }
     setImageBusy(true); setError(""); setNotice("");
     try {
-      const saved = await save("DRAFT");
+      const saved = await save(currentStatus);
       if (!saved) return;
       const response = await fetch(`/api/admin/content/${saved.id}/generate-image`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template: creative.template, headline: liveHeadline, supportingText: liveSupport, cta: liveCta })
+        body: JSON.stringify({ template: creative.template, headline: liveHeadline, supportingText: liveSupport, cta: liveCta, hideCta: form.cta === "none" })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to generate branded graphic.");
-      setCreative({ template: data.creativeTemplate || creative.template, headline: normalizeMedMindsBranding(data.creativeHeadline || liveHeadline), supportingText: normalizeMedMindsBranding(data.creativeSupportingText || liveSupport), cta: normalizeMedMindsBranding(data.creativeCta || liveCta) });
+      setCreative({ template: data.creativeTemplate || creative.template, headline: normalizeMedMindsBranding(data.creativeHeadline || liveHeadline), supportingText: normalizeMedMindsBranding(data.creativeSupportingText || liveSupport), cta: data.creativeCtaHidden ? "" : normalizeMedMindsBranding(data.creativeCta || liveCta) });
       setPreviewUrl(data.previewUrl || `/api/content/creative/${saved.id}?v=${data.creativeVersion || Date.now()}`);
       await load();
-      setNotice("MedMinds branded graphic generated with the official logo.");
+      setNotice(`Branded graphic generated. Post status remains ${currentStatus.toLowerCase()}.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to generate branded graphic.");
     } finally { setImageBusy(false); }
   }
 
   async function generatePhoto() {
-    if (!form.body.trim() || !form.title.trim()) { setError("Create the caption and working title first."); return; }
+    if (!form.body.trim() || !form.title.trim()) { setError("Create the caption and internal post name first."); return; }
     setImageBusy(true); setError(""); setNotice("");
     try {
-      const saved = await save("DRAFT");
+      const saved = await save(currentStatus);
       if (!saved) return;
       const response = await fetch(`/api/admin/content/${saved.id}/generate-realistic-image`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...photo, extraDirection: photo.extraDirection || imageBrief, headline: liveHeadline, supportingText: liveSupport, cta: liveCta })
+        body: JSON.stringify({ ...photo, extraDirection: photo.extraDirection || imageBrief, headline: liveHeadline, supportingText: liveSupport, cta: liveCta, hideCta: form.cta === "none" })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to generate realistic image.");
       setPreviewUrl(data.previewUrl || `/api/content/creative/${saved.id}?v=${data.creativeVersion || Date.now()}`);
       await load();
-      setNotice("Realistic MedMinds campaign image generated with the official branded overlay.");
+      setNotice(`AI fallback image generated. Post status remains ${currentStatus.toLowerCase()}.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to generate realistic image.");
     } finally { setImageBusy(false); }
   }
 
   function edit(post: Post) {
-    setForm({ ...emptyForm, id: post.id, title: normalizeMedMindsBranding(post.title), contentType: normalizeMedMindsBranding(post.contentType), objective: normalizeMedMindsBranding(post.objective || ""), audience: normalizeMedMindsBranding(post.audience || defaultAudience), body: normalizeMedMindsBranding(post.body) });
-    setCreative({ template: post.creativeTemplate || "promo-clean", headline: normalizeMedMindsBranding(post.creativeHeadline || post.title), supportingText: normalizeMedMindsBranding(post.creativeSupportingText || ""), cta: normalizeMedMindsBranding(post.creativeCta || "Message MedMinds") });
+    const mode = ctaMode(post);
+    setForm({ ...emptyForm, id: post.id, title: normalizeMedMindsBranding(post.title), contentType: normalizeMedMindsBranding(post.contentType), objective: normalizeMedMindsBranding(post.objective || ""), audience: normalizeMedMindsBranding(post.audience || defaultAudience), cta: mode, body: normalizeMedMindsBranding(post.body) });
+    setCreative({ template: post.creativeTemplate || "promo-clean", headline: normalizeMedMindsBranding(post.creativeHeadline || post.title), supportingText: normalizeMedMindsBranding(post.creativeSupportingText || ""), cta: post.creativeCtaHidden ? "" : normalizeMedMindsBranding(post.creativeCta || ctaLabel(mode)) });
     setPhoto({ ...emptyPhoto, scene: post.photoScene || emptyPhoto.scene, subject: post.photoSubject || emptyPhoto.subject, setting: post.photoSetting || emptyPhoto.setting, mood: post.photoMood || emptyPhoto.mood, style: post.photoStyle || emptyPhoto.style });
     setAlternatives([normalizeMedMindsBranding(post.body)]);
     setPreviewUrl(post.mediaUrl ? `/api/content/creative/${post.id}?v=${post.creativeVersion}` : "");
     setImageBrief("");
+    setCurrentStatus(post.status);
+    onActivePostChange?.(post.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -308,7 +339,7 @@ export function MedMindsContentStudio() {
         <Link className={styles.back} href="/admin">← Sales Agent dashboard</Link>
         <span className={styles.eyebrow}>MedMinds marketing workspace</span>
         <h1>Content Studio</h1>
-        <p>Create credible MedMinds social content, generate branded graphics or realistic campaign images, and keep reviewed content in one workspace.</p>
+        <p>Create the message, choose an authentic visual, review it, then schedule from one connected workflow.</p>
       </div>
       <div className={styles.heroStats}>
         <div><span>Drafts</span><strong>{counts.draft}</strong></div>
@@ -319,34 +350,40 @@ export function MedMindsContentStudio() {
 
     {(error || notice) && <div className={error ? styles.error : styles.notice}>{error || notice}</div>}
 
-    <section className={styles.workspace}>
+    <section className={styles.workspace} id="content-create">
       <div className={styles.editor}>
-        <div className={styles.sectionHeading}><div><span>01</span><h2>Content brief</h2></div><button className={styles.textButton} onClick={reset} disabled={busy || imageBusy}>New post</button></div>
+        <div className={styles.sectionHeading}><div><span>01</span><h2>Brief</h2></div><div className={styles.headingActions}>{form.id && <b className={`${styles.statusChip} ${styles[currentStatus.toLowerCase()]}`}>{currentStatus}</b>}<button className={styles.textButton} onClick={reset} disabled={busy || imageBusy}>New post</button></div></div>
 
         <div className={styles.quickBriefs}>{quickBriefs.map((item) => <button key={item.title} onClick={() => applyQuickBrief(item)} disabled={busy || imageBusy}>{item.title}</button>)}</div>
 
         <div className={styles.formGrid}>
           <label className={styles.full}>Objective<textarea value={form.objective} onChange={(event) => update("objective", event.target.value)} placeholder="What should this post achieve?" /></label>
           <label>Content type<select value={form.contentType} onChange={(event) => update("contentType", event.target.value)}>{contentTypes.map((item) => <option key={item}>{item}</option>)}</select></label>
-          <label>Tone<select value={form.tone} onChange={(event) => update("tone", event.target.value)}><option>professional</option><option>friendly</option><option>educational</option><option>conversational</option><option>authoritative</option><option>community</option><option>urgent</option></select></label>
-          <label>Angle<select value={form.angle} onChange={(event) => update("angle", event.target.value)}><option value="auto">Auto</option><option value="direct">Direct</option><option value="story">Story</option><option value="problem-solution">Problem → solution</option><option value="myth-fact">Myth vs fact</option><option value="checklist">Checklist</option><option value="faq">FAQ</option><option value="educational">Educational</option><option value="community">Community</option></select></label>
-          <label>Length<select value={form.length} onChange={(event) => update("length", event.target.value)}><option value="short">Short</option><option value="medium">Medium</option><option value="long">Long</option></select></label>
           <label>Call to action<select value={form.cta} onChange={(event) => { update("cta", event.target.value); setCreative((current) => ({ ...current, cta: ctaLabel(event.target.value) })); }}><option value="message">Message MedMinds</option><option value="learn">Learn more</option><option value="enrol">Enrol</option><option value="try">Try MedMinds Prep</option><option value="book">Book consultation</option><option value="comment">Comment / engage</option><option value="none">No CTA</option></select></label>
           <label className={styles.full}>Audience<input value={form.audience} onChange={(event) => update("audience", event.target.value)} /></label>
-          <label className={styles.full}>Extra instructions<textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} placeholder="Optional details, campaign dates, service emphasis, link or constraint." /></label>
-          <details className={`${styles.voice} ${styles.full}`}><summary>Brand voice</summary><textarea value={brandVoice} onChange={(event) => setBrandVoice(event.target.value)} /></details>
+          <details className={`${styles.advanced} ${styles.full}`}>
+            <summary>Advanced options <span>Tone, angle, length, instructions and brand voice</span></summary>
+            <div className={styles.advancedGrid}>
+              <label>Tone<select value={form.tone} onChange={(event) => update("tone", event.target.value)}><option>professional</option><option>friendly</option><option>educational</option><option>conversational</option><option>authoritative</option><option>community</option><option>urgent</option></select></label>
+              <label>Angle<select value={form.angle} onChange={(event) => update("angle", event.target.value)}><option value="auto">Auto</option><option value="direct">Direct</option><option value="story">Story</option><option value="problem-solution">Problem → solution</option><option value="myth-fact">Myth vs fact</option><option value="checklist">Checklist</option><option value="faq">FAQ</option><option value="educational">Educational</option><option value="community">Community</option></select></label>
+              <label>Length<select value={form.length} onChange={(event) => update("length", event.target.value)}><option value="short">Short</option><option value="medium">Medium</option><option value="long">Long</option></select></label>
+              <label className={styles.full}>Extra instructions<textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} placeholder="Campaign dates, service emphasis, link or constraint." /></label>
+              <label className={styles.full}>Brand voice<textarea value={brandVoice} onChange={(event) => setBrandVoice(event.target.value)} /></label>
+            </div>
+          </details>
         </div>
         <button className={styles.primary} onClick={() => void generate()} disabled={busy || imageBusy}>{busy ? "Working…" : "Generate 3 caption options"}</button>
 
-        <div className={styles.sectionHeading}><div><span>02</span><h2>Caption editor</h2></div><button className={styles.textButton} onClick={() => void copyCaption()} disabled={!form.body}>Copy caption</button></div>
+        <div className={styles.sectionHeading}><div><span>02</span><h2>Caption</h2></div><button className={styles.textButton} onClick={() => void copyCaption()} disabled={!form.body}>Copy caption</button></div>
         {alternatives.length > 1 && <div className={styles.variations}>{alternatives.map((option, index) => <button key={`${index}-${option.slice(0, 20)}`} className={form.body === option ? styles.activeVariation : ""} onClick={() => update("body", option)}>Option {index + 1}</button>)}</div>}
-        <label className={styles.captionLabel}>Working title<input value={form.title} onChange={(event) => update("title", event.target.value)} placeholder="Internal title / creative headline" /></label>
+        <label className={styles.captionLabel}>Internal post name <small>Used to find this post in the workspace. The graphic headline is edited separately.</small><input value={form.title} onChange={(event) => update("title", event.target.value)} placeholder="e.g. NMCZ revision - September campaign" /></label>
         <div className={styles.captionMeta}><span>Caption</span><span>{form.body.length.toLocaleString()} characters</span></div>
         <label className={styles.captionLabel}><textarea className={styles.caption} value={form.body} onChange={(event) => update("body", event.target.value)} placeholder="Generated or manually written caption" /></label>
-        <div className={styles.refineRow}><button onClick={() => void generate("humanise")} disabled={busy || imageBusy}>Humanise</button><button onClick={() => void generate("strengthen-hook")} disabled={busy || imageBusy}>Strengthen hook</button><button onClick={() => void generate("shorten")} disabled={busy || imageBusy}>Shorten</button></div>
+        <div className={styles.refineRow}><button onClick={() => void generate("humanise")} disabled={busy || imageBusy}>Humanise</button><button onClick={() => void generate("strengthen-hook")} disabled={busy || imageBusy}>Fix opening hook</button><button onClick={() => void generate("shorten")} disabled={busy || imageBusy}>Shorten for mobile</button></div>
 
         <div className={styles.qualityCard}>
-          <div className={styles.qualityTop}><div><span className={styles.micro}>Pre-publication check</span><strong>Content quality</strong></div><b className={quality.score >= 80 ? styles.qualityGood : quality.score >= 60 ? styles.qualityWarn : styles.qualityBad}>{quality.score}%</b></div>
+          <div className={styles.qualityTop}><div><span className={styles.micro}>Pre-publish checks</span><strong>Content readiness</strong></div><b className={quality.blockers.length === 0 && quality.score >= 80 ? styles.qualityGood : quality.score >= 60 ? styles.qualityWarn : styles.qualityBad}>{readinessPassed}/{quality.checks.length}</b></div>
+          <p className={styles.readinessNote}>These are practical checks, not a prediction of marketing performance.</p>
           <div className={styles.qualityChecks}>{quality.checks.map((check) => <span key={check.label} className={check.ok ? styles.checkOk : styles.checkBad}>{check.ok ? "✓" : "!"} {check.label}</span>)}</div>
           {quality.blockers.map((item) => <p key={item} className={styles.blocker}>{item}</p>)}
           {quality.warnings.map((item) => <p key={item} className={styles.warning}>{item}</p>)}
@@ -356,38 +393,54 @@ export function MedMindsContentStudio() {
       </div>
 
       <aside className={styles.creativePanel}>
-        <div className={styles.sectionHeading}><div><span>03</span><h2>Creative generator</h2></div></div>
+        <div className={styles.sectionHeading}><div><span>03</span><h2>Visual</h2></div></div>
+        <div className={styles.visualPriority}>
+          <strong>Use authentic MedMinds media first</strong>
+          <p>Choose an approved screenshot, testimonial or real photo. Canva is the second step for refinement; AI photography stays as fallback.</p>
+          <button className={styles.mediaButton} onClick={onOpenMediaLibrary}>Choose from Media Library</button>
+        </div>
         <div className={styles.preview}>
-          {previewUrl ? <img src={previewUrl} alt="Generated MedMinds social media creative" /> : <div className={styles.previewPlaceholder}><img className={styles.previewLogo} src="/medminds-logo.png" alt="MedMinds Learning Centre" /><strong>{liveHeadline}</strong><p>{liveSupport}</p><span>{liveCta}</span></div>}
+          {previewUrl ? <img src={previewUrl} alt="Current MedMinds social media creative" /> : <div className={styles.previewPlaceholder}><img className={styles.previewLogo} src="/medminds-logo.png" alt="MedMinds Learning Centre" /><strong>{liveHeadline}</strong><p>{liveSupport}</p>{liveCta && <span>{liveCta}</span>}</div>}
         </div>
 
         <div className={styles.creativeFields}>
-          <label>Headline<input value={creative.headline} onChange={(event) => setCreative((current) => ({ ...current, headline: event.target.value }))} placeholder={form.title || "Creative headline"} /></label>
+          <label>Graphic headline<input value={creative.headline} onChange={(event) => setCreative((current) => ({ ...current, headline: event.target.value }))} placeholder={form.title || "Graphic headline"} /></label>
           <label>Supporting text<textarea value={creative.supportingText} onChange={(event) => setCreative((current) => ({ ...current, supportingText: event.target.value }))} placeholder={supportFromBody(form.body) || "Supporting line"} /></label>
-          <label>CTA<input value={creative.cta} onChange={(event) => setCreative((current) => ({ ...current, cta: event.target.value }))} /></label>
+          {form.cta !== "none" && <label>Graphic CTA<input value={creative.cta} onChange={(event) => setCreative((current) => ({ ...current, cta: event.target.value }))} /></label>}
           <label>Graphic template<select value={creative.template} onChange={(event) => setCreative((current) => ({ ...current, template: event.target.value as Template }))}><option value="promo-clean">Promotion</option><option value="education-card">Educational card</option><option value="faq-notice">FAQ / notice</option></select></label>
         </div>
-        <button className={styles.primary} onClick={() => void generateGraphic()} disabled={imageBusy || busy}>{imageBusy ? "Generating…" : "Generate branded graphic"}</button>
-
-        <div className={styles.photoBox}>
-          <div><span className={styles.micro}>AI photography</span><h3>Realistic MedMinds image</h3><p>Generate a fictional, privacy-safe African medical, research, MedMinds Prep or student scene and apply the official MedMinds overlay.</p></div>
-          <div className={styles.photoGrid}>
-            <label>Scene<select value={photo.scene} onChange={(event) => setPhoto((current) => ({ ...current, scene: event.target.value }))}><option value="research-work">Research work</option><option value="clinical-learning">Clinical learning</option><option value="student-study">Student study</option><option value="exam-prep">MedMinds Prep / exam revision</option><option value="data-analysis">Data analysis</option><option value="teaching">Teaching</option><option value="digital-health">Digital health</option><option value="neutral-portrait">Portrait</option></select></label>
-            <label>Subject<select value={photo.subject} onChange={(event) => setPhoto((current) => ({ ...current, subject: event.target.value }))}><option value="woman">Woman</option><option value="man">Man</option><option value="mixed-pair">Mixed pair</option><option value="small-group">Small group</option><option value="clinician">Clinician</option><option value="student">Student</option></select></label>
-            <label>Setting<select value={photo.setting} onChange={(event) => setPhoto((current) => ({ ...current, setting: event.target.value }))}><option value="modern-office">Modern office</option><option value="university">University</option><option value="clinical-classroom">Clinical classroom</option><option value="library">Library</option><option value="workspace">Workspace</option><option value="urban-outdoor">Urban outdoor</option></select></label>
-            <label>Mood<select value={photo.mood} onChange={(event) => setPhoto((current) => ({ ...current, mood: event.target.value }))}><option value="focused">Focused</option><option value="confident">Confident</option><option value="approachable">Approachable</option><option value="curious">Curious</option><option value="warm">Warm</option></select></label>
-            <label>Style<select value={photo.style} onChange={(event) => setPhoto((current) => ({ ...current, style: event.target.value }))}><option value="editorial">Editorial</option><option value="lifestyle">Lifestyle</option><option value="premium">Premium</option><option value="documentary">Documentary</option></select></label>
-          </div>
-          <label>Custom visual direction<textarea value={photo.extraDirection} onChange={(event) => setPhoto((current) => ({ ...current, extraDirection: event.target.value }))} placeholder={imageBrief || "Optional: describe the exact scene. The generated image brief is used automatically when this is blank."} /></label>
-          {imageBrief && <div className={styles.imageBrief}><strong>Suggested visual:</strong> {imageBrief}</div>}
-          <button className={styles.photoButton} onClick={() => void generatePhoto()} disabled={imageBusy || busy}>{imageBusy ? "Generating photo…" : "Generate realistic image"}</button>
+        <div className={styles.visualActions}>
+          <button className={styles.secondaryAction} onClick={() => void generateGraphic()} disabled={imageBusy || busy}>{imageBusy ? "Generating…" : "Generate branded graphic"}</button>
+          {form.id ? <Link href={`/admin/content/${form.id}/canva`}>Refine in Canva</Link> : <button disabled>Save first for Canva</button>}
         </div>
+
+        <details className={styles.aiFallback}>
+          <summary>AI image fallback <span>Use only when no suitable real asset is available</span></summary>
+          <div className={styles.photoBox}>
+            <p>Generate a fictional, privacy-safe African medical, research, MedMinds Prep or student scene, then apply the official MedMinds overlay.</p>
+            <div className={styles.photoGrid}>
+              <label>Scene<select value={photo.scene} onChange={(event) => setPhoto((current) => ({ ...current, scene: event.target.value }))}><option value="research-work">Research work</option><option value="clinical-learning">Clinical learning</option><option value="student-study">Student study</option><option value="exam-prep">MedMinds Prep / exam revision</option><option value="data-analysis">Data analysis</option><option value="teaching">Teaching</option><option value="digital-health">Digital health</option><option value="neutral-portrait">Portrait</option></select></label>
+              <label>Subject<select value={photo.subject} onChange={(event) => setPhoto((current) => ({ ...current, subject: event.target.value }))}><option value="woman">Woman</option><option value="man">Man</option><option value="mixed-pair">Mixed pair</option><option value="small-group">Small group</option><option value="clinician">Clinician</option><option value="student">Student</option></select></label>
+              <label>Setting<select value={photo.setting} onChange={(event) => setPhoto((current) => ({ ...current, setting: event.target.value }))}><option value="modern-office">Modern office</option><option value="university">University</option><option value="clinical-classroom">Clinical classroom</option><option value="library">Library</option><option value="workspace">Workspace</option><option value="urban-outdoor">Urban outdoor</option></select></label>
+              <label>Mood<select value={photo.mood} onChange={(event) => setPhoto((current) => ({ ...current, mood: event.target.value }))}><option value="focused">Focused</option><option value="confident">Confident</option><option value="approachable">Approachable</option><option value="curious">Curious</option><option value="warm">Warm</option></select></label>
+              <label>Style<select value={photo.style} onChange={(event) => setPhoto((current) => ({ ...current, style: event.target.value }))}><option value="editorial">Editorial</option><option value="lifestyle">Lifestyle</option><option value="premium">Premium</option><option value="documentary">Documentary</option></select></label>
+            </div>
+            <label>Custom visual direction<textarea value={photo.extraDirection} onChange={(event) => setPhoto((current) => ({ ...current, extraDirection: event.target.value }))} placeholder={imageBrief || "Optional: describe the exact scene."} /></label>
+            {imageBrief && <div className={styles.imageBrief}><strong>Suggested visual:</strong> {imageBrief}</div>}
+            <button className={styles.photoButton} onClick={() => void generatePhoto()} disabled={imageBusy || busy}>{imageBusy ? "Generating photo…" : "Generate AI fallback image"}</button>
+          </div>
+        </details>
       </aside>
     </section>
 
-    <section className={styles.library}>
-      <div className={styles.libraryHeader}><div><span className={styles.eyebrow}>Content library</span><h2>Saved MedMinds content</h2></div><div className={styles.filters}>{(["ALL", "DRAFT", "REVIEW", "APPROVED"] as const).map((item) => <button key={item} className={filter === item ? styles.activeFilter : ""} onClick={() => setFilter(item)}>{item === "ALL" ? "All" : item.toLowerCase()}</button>)}</div></div>
-      {loading ? <p className={styles.empty}>Loading content…</p> : visiblePosts.length === 0 ? <p className={styles.empty}>No saved content in this view yet.</p> : <div className={styles.libraryGrid}>{visiblePosts.map((post) => <article key={post.id}>
+    <section className={styles.library} id="saved-content">
+      <div className={styles.libraryHeader}><div><span className={styles.eyebrow}>Review</span><h2>Saved MedMinds content</h2></div><div className={styles.filters}>{(["ALL", "DRAFT", "REVIEW", "APPROVED"] as const).map((item) => <button key={item} className={filter === item ? styles.activeFilter : ""} onClick={() => setFilter(item)}>{item === "ALL" ? "All" : item.toLowerCase()}</button>)}</div></div>
+      <div className={styles.libraryTools}>
+        <input value={libraryQuery} onChange={(event) => setLibraryQuery(event.target.value)} placeholder="Search title, caption or content type" />
+        <select value={libraryType} onChange={(event) => setLibraryType(event.target.value)}><option value="ALL">All content types</option>{contentTypes.map((item) => <option key={item}>{item}</option>)}</select>
+        <select value={librarySort} onChange={(event) => setLibrarySort(event.target.value as LibrarySort)}><option value="updated">Recently updated</option><option value="oldest">Oldest updated</option><option value="title">Title A-Z</option></select>
+      </div>
+      {loading ? <p className={styles.empty}>Loading content…</p> : visiblePosts.length === 0 ? <p className={styles.empty}>No saved content matches this view.</p> : <div className={styles.libraryGrid}>{visiblePosts.map((post) => <article key={post.id}>
         <div className={styles.postTop}><span>{normalizeMedMindsBranding(post.contentType)}</span><b className={`${styles.status} ${styles[post.status.toLowerCase()]}`}>{post.status}</b></div>
         {post.mediaUrl && <img src={`/api/content/creative/${post.id}?v=${post.creativeVersion}`} alt={`${post.title} MedMinds creative`} />}
         <h3>{normalizeMedMindsBranding(post.title)}</h3><p>{normalizeMedMindsBranding(post.body).slice(0, 220)}{post.body.length > 220 ? "…" : ""}</p>
