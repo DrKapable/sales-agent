@@ -1,8 +1,8 @@
 const LEGACY_MIN_REPLY_TARGET_MS = 6000;
 const LEGACY_MAX_REPLY_TARGET_MS = 15000;
-const MIN_REPLY_TARGET_MS = 15000;
-const MAX_REPLY_TARGET_MS = 120000;
-const CHARACTERS_TO_MAX_DELAY = 800;
+const MIN_REPLY_TARGET_MS = 8000;
+const MAX_REPLY_TARGET_MS = 30000;
+const CHARACTERS_TO_MAX_DELAY = 600;
 
 // Retained for older deterministic tests and any legacy callers.
 export function humanReplyDelayMs(elapsedMs: number, randomValue?: number) {
@@ -12,8 +12,9 @@ export function humanReplyDelayMs(elapsedMs: number, randomValue?: number) {
   return Math.max(0, targetMs - Math.max(0, elapsedMs));
 }
 
-// Mary's live WhatsApp response delay. Short replies target roughly 15-30 seconds,
-// medium replies roughly 30-75 seconds, and long replies roughly 1-2 minutes.
+// Mary's live WhatsApp cadence should feel human without making the agent appear offline.
+// Short replies target roughly 8-15 seconds, medium replies roughly 15-25 seconds,
+// and long replies are capped at about 30 seconds.
 export function humanTextReplyDelayMs(text: string, elapsedMs = 0, randomValue = Math.random()) {
   const length = text.trim().replace(/\s+/g, " ").length;
   const boundedRandom = Math.min(1, Math.max(0, randomValue));
@@ -26,7 +27,7 @@ export function humanTextReplyDelayMs(text: string, elapsedMs = 0, randomValue =
 }
 
 // Existing WhatsApp send code calls this immediately before Mary's message is sent.
-// Keep that integration point but use the new 15-120 second length-based cadence.
+// Keep that integration point but cap the visible typing delay so live chats stay responsive.
 export function humanTextTypingDelayMs(text: string, randomValue = Math.random()) {
   return humanTextReplyDelayMs(text, 0, randomValue);
 }
