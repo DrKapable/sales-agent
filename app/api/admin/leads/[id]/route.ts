@@ -2,11 +2,13 @@ import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { notifyConversationClosed } from "@/lib/closure-summary";
+import { referralRecipients } from "@/lib/referrals";
 import { leadPriorities, leadStatuses, type LeadPatch } from "@/lib/types";
 import { staffNames } from "@/lib/team-directory";
 import { listLeads, updateLead } from "@/lib/store";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
+const INTERNAL_DIRECTOR_TEST_PHONE = referralRecipients.mustafa.phone;
 
 const schema = z.object({
   status: z.enum(leadStatuses).optional(),
@@ -24,7 +26,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!parsed.success) return NextResponse.json({ error: "Invalid lead update." }, { status: 400 });
 
   const patch: LeadPatch = { ...parsed.data };
-  if (parsed.data.aiPaused === true) {
+  const isDirectorTestConversation = Boolean(INTERNAL_DIRECTOR_TEST_PHONE) && lead.phone === INTERNAL_DIRECTOR_TEST_PHONE;
+
+  if (isDirectorTestConversation && parsed.data.aiPaused === true) {
+    patch.aiPaused = false;
+    patch.handoffReason = null;
+    patch.assignedTo = null;
+  } else if (parsed.data.aiPaused === true) {
     const existingReason = lead.handoffReason?.replace(/^\[HUMAN TAKEOVER]\s*/, "").trim();
     patch.handoffReason = existingReason ? `${HUMAN_TAKEOVER_PREFIX} ${existingReason}` : HUMAN_TAKEOVER_PREFIX;
   }
