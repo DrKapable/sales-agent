@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { humanMessageContent, replyWindow } from "@/lib/conversation";
 import { decorateMessagesForAdmin, recordOutgoingMessageAccepted } from "@/lib/message-delivery";
+import { referralRecipients } from "@/lib/referrals";
 import { staffNames } from "@/lib/team-directory";
 import { addMessage, getConversation, listLeads, updateLead } from "@/lib/store";
 import { sendWhatsAppText } from "@/lib/whatsapp";
+
+const INTERNAL_DIRECTOR_TEST_PHONE = referralRecipients.mustafa.phone;
 
 const sendSchema = z.object({
   text: z.string().trim().min(1).max(4000),
@@ -30,7 +33,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!parsed.success) return NextResponse.json({ error: "Enter a valid reply and staff member." }, { status: 400 });
   const state = await leadAndMessages(id);
   if (!state) return NextResponse.json({ error: "Lead not found." }, { status: 404 });
-  if (!state.lead.aiPaused) return NextResponse.json({ error: "Take over this conversation before sending a human reply." }, { status: 409 });
+  const isDirectorTestConversation = Boolean(INTERNAL_DIRECTOR_TEST_PHONE) && state.lead.phone === INTERNAL_DIRECTOR_TEST_PHONE;
+  if (!state.lead.aiPaused && !isDirectorTestConversation) return NextResponse.json({ error: "Take over this conversation before sending a human reply." }, { status: 409 });
   const window = replyWindow(state.messages);
   if (state.lead.source === "whatsapp" && !window.open) {
     return NextResponse.json({ error: "The 24-hour WhatsApp reply window has closed. Use an approved Meta template to reopen the conversation." }, { status: 409 });
@@ -51,7 +55,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   await addMessage(state.lead.phone, "assistant", humanMessageContent(parsed.data.sender, parsed.data.text), externalId);
   if (externalId) await recordOutgoingMessageAccepted({ messageId: externalId, phone: state.lead.phone }).catch((error) => console.warn("Unable to record admin WhatsApp acceptance", { leadId: state.lead.id, error }));
-  const lead = await updateLead(state.lead.phone, { aiPaused: true, assignedTo: parsed.data.sender, status: "HUMAN ASSISTANCE REQUIRED" });
+  const lead = await updateLead(state.lead.phone, isDirectorTestConversation
+    ? { aiPaused: false, handoffReason: null, assignedTo: null }
+    : { aiPaused: true, assignedTo: parsed.data.sender, status: "HUMAN ASSISTANCE REQUIRED" });
   const storedMessages = await getConversation(state.lead.phone, 100);
   const messages = await decorateMessagesForAdmin(storedMessages);
   return NextResponse.json({ lead, messages, replyWindow: replyWindow(storedMessages), delivery });
