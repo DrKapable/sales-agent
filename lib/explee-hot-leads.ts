@@ -1,11 +1,11 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { addMessage, getOrCreateLead, listLeads, updateLead } from "@/lib/store";
 
 const EXPLEE_BASE_URL = "https://api.explee.com";
 const DEFAULT_PROJECT_ID = 39070;
 const PAGE_SIZE = 200;
 const MAX_PAGES = 50;
-const INITIAL_LOOKBACK_MS = 15 * 60 * 1000;
+const INITIAL_LOOKBACK_MS = 15 * 60 * 1000;\n\ntype Database = NeonQueryFunction<false, false>;
 
 type ExpleeCampaign = {
   id: number;
@@ -121,7 +121,7 @@ function newestTimestamp(leads: ExpleeHotLead[]) {
   return newest;
 }
 
-async function ensureIntegrationTables(db: ReturnType<typeof neon>) {
+async function ensureIntegrationTables(db: Database) {
   await db.query(`CREATE TABLE IF NOT EXISTS integration_sync_state (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
@@ -141,18 +141,18 @@ async function ensureIntegrationTables(db: ReturnType<typeof neon>) {
     ON explee_hot_lead_imports(campaign_id, became_hot_at DESC)`);
 }
 
-async function existingPhoneForEmail(db: ReturnType<typeof neon>, email: string | null) {
+async function existingPhoneForEmail(db: Database, email: string | null) {
   if (!email) return null;
   const rows = await db.query(`SELECT phone FROM leads WHERE LOWER(email)=LOWER($1) ORDER BY updated_at DESC LIMIT 1`, [email]);
   return rows[0]?.phone ? String(rows[0].phone) : null;
 }
 
-async function alreadyImported(db: ReturnType<typeof neon>, externalKey: string) {
+async function alreadyImported(db: Database, externalKey: string) {
   const rows = await db.query(`SELECT 1 FROM explee_hot_lead_imports WHERE external_key=$1 LIMIT 1`, [externalKey]);
   return rows.length > 0;
 }
 
-async function importLead(db: ReturnType<typeof neon>, hotLead: ExpleeHotLead) {
+async function importLead(db: Database, hotLead: ExpleeHotLead) {
   const externalKey = `${hotLead.campaign_id}:${hotLead.person_id}`;
   if (await alreadyImported(db, externalKey)) return { imported: false, duplicate: true };
 
