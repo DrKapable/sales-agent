@@ -28,11 +28,12 @@ describe("approved service catalogue", () => {
     expect(JSON.stringify(offerSeeds)).not.toContain("—");
   });
 
-  it("keeps Prep memberships on the membership checkout instead of research payment instructions", () => {
+  it("keeps Prep purchases out of personal and Research Portal payment instructions", () => {
     const prepOffers = offerSeeds.filter((offer) => offer.category === "MedMinds Prep" && (offer.priceZmw ?? 0) > 0);
     expect(prepOffers.length).toBeGreaterThan(0);
-    expect(prepOffers.every((offer) => offer.paymentInstructions?.includes("membership"))).toBe(true);
-    expect(prepOffers.every((offer) => !offer.paymentInstructions?.includes("Research Portal payment request") || offer.paymentInstructions?.includes("Do not create"))).toBe(true);
+    expect(prepOffers.every((offer) => !offer.paymentInstructions?.includes("0977259132"))).toBe(true);
+    expect(prepOffers.every((offer) => !offer.paymentInstructions?.includes("Juma Phiri"))).toBe(true);
+    expect(prepOffers.every((offer) => !offer.paymentInstructions?.startsWith("Review research pricing"))).toBe(true);
   });
 
   it("retains the approved account instructions for other directly-paid catalogue services", () => {
