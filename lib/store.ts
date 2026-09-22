@@ -9,7 +9,7 @@ type MemoryStore = {
   offers: Map<string, Offer>;
 };
 
-const CATALOGUE_VERSION = 3;
+const CATALOGUE_VERSION = 4;
 const AI_PROPOSAL_COURSE_VERSION = 3;
 
 declare global {

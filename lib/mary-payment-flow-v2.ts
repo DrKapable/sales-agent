@@ -17,7 +17,8 @@ const PAID_INTENT = /\b(i(?:'|’)ve paid|i have paid|paid already|payment (?:is
 const COURSE_CONTEXT = /\b(ai[- ]enhanced research writing|ai[- ]assisted research proposal writing|research writing course|proposal writing course|research course|self[- ]directed|self[- ]paced)\b/i;
 const EMAIL = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const PHONE = /(?:\+?260|0)\d{9}\b/;
-const PAYMENT_CONTINUATION = /\b(secure sampay payment|payment request|payment link|mobile money number|official receipt|approved invoice|calendar date|proposal due)\b/i;
+const SOCIAL_ONLY = /^\s*(?:hi+|hello+|hey+|good morning|good afternoon|good evening|thanks|thank you|ok|okay)\s*[!.?]*\s*$/i;
+const SHORT_PAYMENT_CONFIRMATION = /^\s*(?:yes|yes please|please do|proceed|go ahead|send it|send the link|send me the link)\s*[!.?]*\s*$/i;
 const RESEARCH_SERVICE = /\b(research proposal|proposal writing|proposal)\b/i;
 const PROGRAMME = /\b(phd|doctorate|doctoral|masters?|master['’]?s|msc|mph|mmed|postgraduate|undergraduate|bachelors?|bachelor['’]?s|degree|bsc|mbchb|diploma)\b/i;
 const INSTITUTION = /\b(UNZA|University of Zambia|UNILUS|University of Lusaka|Cavendish(?: University)?(?: Zambia)?)\b/i;
@@ -61,15 +62,32 @@ function inferResearchService(text: string) {
   return null;
 }
 
-function paymentJourneyIsActive(input: {
+function expectedPaymentReply(latest: string, assistantText: string) {
+  const answer = latest.trim();
+  if (!answer || SOCIAL_ONLY.test(answer)) return false;
+
+  if (/what full name|full name should i put/i.test(assistantText)) return answer.length >= 2 && answer.length <= 120;
+  if (/what email address/i.test(assistantText)) return EMAIL.test(answer);
+  if (/mobile money number/i.test(assistantText)) return PHONE.test(answer);
+  if (/which research service/i.test(assistantText)) return answer.length >= 3;
+  if (/academic level/i.test(assistantText)) return PROGRAMME.test(answer);
+  if (/what deadline|deadline are you working/i.test(assistantText)) return ABSOLUTE_DATE.test(answer) || RELATIVE_DEADLINE.test(answer);
+  if (SHORT_PAYMENT_CONFIRMATION.test(answer) && /\b(?:create|send|proceed|payment|checkout|link)\b/i.test(assistantText)) return true;
+
+  return false;
+}
+
+export function paymentJourneyIsActive(input: {
   latest: string;
   leadStatus: string | null | undefined;
   recentClientText: string;
   recentAssistantText: string;
 }) {
   if (PAYMENT_TOPIC.test(input.latest) || PAID_INTENT.test(input.latest) || CREATE_INTENT.test(input.latest)) return true;
-  if (input.leadStatus === "PAYMENT PENDING") return true;
-  return CREATE_INTENT.test(input.recentClientText) && PAYMENT_CONTINUATION.test(input.recentAssistantText);
+  if (SOCIAL_ONLY.test(input.latest)) return false;
+  if (input.leadStatus !== "PAYMENT PENDING") return false;
+  return CREATE_INTENT.test(input.recentClientText)
+    && expectedPaymentReply(input.latest, input.recentAssistantText);
 }
 
 async function reply(phone: string, body: string) {
@@ -87,7 +105,7 @@ export async function handleMaryPaymentFlowV2(input: {
   const history = await getConversation(input.phone, 80).catch(() => []);
   const recent = history.slice(-14);
   const recentClientText = recent.filter((m) => m.role === "user").map((m) => m.content).join("\n");
-  const recentAssistantText = recent.filter((m) => m.role === "assistant").map((m) => m.content).join("\n");
+  const recentAssistantText = recent.filter((m) => m.role === "assistant").at(-1)?.content || "";
 
   if (!paymentJourneyIsActive({ latest, leadStatus: lead.status, recentClientText, recentAssistantText })) return null;
 
@@ -190,6 +208,26 @@ export async function handleMaryPaymentFlowV2(input: {
     }
     service = pricing.offer.name;
     amount = Number(pricing.amountZmw);
+  }
+
+  const existingToken = await latestPaymentTokenForLead(lead);
+  if (existingToken) {
+    try {
+      const checked = await checkResearchPayment(existingToken);
+      if (checked.checked) {
+        const existing = checked.payment;
+        const sameService = existing.title.trim().toLowerCase() === service.trim().toLowerCase();
+        const sameAmount = Math.abs(Number(existing.amount) - amount) <= 0.01;
+        if (sameService && sameAmount && (existing.status === "unpaid" || existing.status === "pending")) {
+          return reply(input.phone, `You already have an active secure Sampay payment request for ${service}: ${money(amount)}. I won't create a duplicate. You can use the same link here:\n\n${existing.link}\n\nAfter payment, tell me here and I'll verify it before confirming your receipt.`);
+        }
+        if (sameService && sameAmount && existing.status === "paid") {
+          return reply(input.phone, `The latest MedMinds payment request for ${service} is already recorded as paid, so I won't create another payment link for the same service. If this is a new request, tell me what you want to purchase next.`);
+        }
+      }
+    } catch (error) {
+      console.error("Existing Mary payment request lookup failed", { phoneSuffix: input.phone.slice(-4), error });
+    }
   }
 
   try {
