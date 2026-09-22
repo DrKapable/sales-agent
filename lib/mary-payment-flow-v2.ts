@@ -17,7 +17,6 @@ const PAID_INTENT = /\b(i(?:'|’)ve paid|i have paid|paid already|payment (?:is
 const COURSE_CONTEXT = /\b(ai[- ]enhanced research writing|ai[- ]assisted research proposal writing|research writing course|proposal writing course|research course|self[- ]directed|self[- ]paced)\b/i;
 const EMAIL = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const PHONE = /(?:\+?260|0)\d{9}\b/;
-const PAYMENT_CONTINUATION = /\b(secure sampay payment|payment request|payment link|mobile money number|official receipt|approved invoice|calendar date|proposal due)\b/i;
 const SOCIAL_ONLY = /^\s*(?:hi+|hello+|hey+|good morning|good afternoon|good evening|thanks|thank you|ok|okay)\s*[!.?]*\s*$/i;
 const SHORT_PAYMENT_CONFIRMATION = /^\s*(?:yes|yes please|please do|proceed|go ahead|send it|send the link|send me the link)\s*[!.?]*\s*$/i;
 const RESEARCH_SERVICE = /\b(research proposal|proposal writing|proposal)\b/i;
@@ -88,7 +87,6 @@ export function paymentJourneyIsActive(input: {
   if (SOCIAL_ONLY.test(input.latest)) return false;
   if (input.leadStatus !== "PAYMENT PENDING") return false;
   return CREATE_INTENT.test(input.recentClientText)
-    && PAYMENT_CONTINUATION.test(input.recentAssistantText)
     && expectedPaymentReply(input.latest, input.recentAssistantText);
 }
 
