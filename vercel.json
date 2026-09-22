@@ -6,6 +6,7 @@
     { "path": "/api/cron/follow-ups", "schedule": "0 14 * * *" },
     { "path": "/api/cron/follow-ups", "schedule": "0 18 * * *" },
     { "path": "/api/cron/daily-brief", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/content-publisher", "schedule": "*/10 * * * *" }
+    { "path": "/api/cron/content-publisher", "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/explee-hot-leads", "schedule": "*/10 * * * *" }
   ]
 }
