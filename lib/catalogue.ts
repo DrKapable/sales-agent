@@ -14,6 +14,13 @@ const PREP_MEDICAL = CURRENT_CONTENT_DESTINATIONS["prep-medical-students"].url;
 const PREP_PG_IM = CURRENT_CONTENT_DESTINATIONS["prep-pg-internal-medicine"].url;
 const RESEARCH_PORTAL = CURRENT_CONTENT_DESTINATIONS["research-portal"].url;
 const ZATAFA_MEDSTATS = CURRENT_CONTENT_DESTINATIONS["zatafa-medstats"].url;
+const MEMBERSHIP_ZAMBIA = "https://www.medmindslc.online/membership?market=zm";
+const MEMBERSHIP_INTERNATIONAL = "https://www.medmindslc.online/membership/international";
+const EXAM_PREP_PAGE = "https://www.medmindslc.online/exam-prep";
+const NMCZ_PAGE = "https://www.medmindslc.online/nmcz";
+const PLAB_MLA_PAGE = "https://www.medmindslc.online/plab-mla";
+const INTERNATIONAL_QBANK = "https://www.medmindslc.online/international/qbank";
+const CLINICALLY_EQUIPPED_GIVEAWAY = "https://www.medmindslc.online/giveaway/clinically-equipped";
 const AI_PROPOSAL_COURSE_PAYMENT = "AI-Assisted Research Proposal Writing course payment: Airtel Money 0977259132 (Juma Phiri) or MTN Money 0969152364 (Musonda Mupeta). After payment, send proof of payment and your email address for account activation. Create your account at https://medmindslc.online/user-account/.";
 
 type ResearchPrice = {
@@ -113,77 +120,99 @@ const courseOffers: OfferSeed[] = [
 const medMindsPrepOffers: OfferSeed[] = [
   {
     slug: "pa-gym",
-    name: "MedMinds Prep QBank and Past Papers Theory",
+    name: "MedMinds Prep QBank, 30 Days",
     category: "MedMinds Prep",
-    description: "Undergraduate medical exam preparation with QBank practice, Past Papers Theory and linked clinical revision.",
-    features: ["Internal Medicine", "Paediatrics", "Obstetrics and Gynaecology", "Surgery", "2-day free trial", `Current medical-student landing page: ${PREP_MEDICAL}`],
+    description: "Focused question-bank access with interactive revision tools for 30 days.",
+    features: ["MedMinds Prep QBank", "Interactive Notes", "Weak-Spot Rx", "30 days of access", "Standard Zambia price: K100", `Medical-student campaign page: ${PREP_MEDICAL}`],
     priceZmw: 100,
     rushPriceZmw: 100,
-    paymentInstructions: `Start with the current medical-student landing page at ${PREP_MEDICAL}. The landing page shows the current plan options after the 2-day free trial. ${PAYMENT_DETAILS}.`,
+    paymentInstructions: `Use the secure Zambia membership checkout: ${MEMBERSHIP_ZAMBIA}. Do not create a Research Portal payment request for this membership.`,
     active: true
   },
   {
     slug: "pa-gym-osce",
-    name: "MedMinds Prep OSCE Clinical Skills",
+    name: "MedMinds Exam Prep, 30 Days",
     category: "MedMinds Prep",
-    description: "Undergraduate medical OSCE and clinical-skills preparation.",
-    features: ["Undergraduate medical students", "OSCE Clinical Skills", "2-day free trial", `Current medical-student landing page: ${PREP_MEDICAL}`],
-    priceZmw: 100,
-    rushPriceZmw: 100,
-    paymentInstructions: `Start at ${PREP_MEDICAL}. The landing page includes the current medical-student plan options after the 2-day free trial. ${PAYMENT_DETAILS}.`,
+    description: "Theory Past Papers and Clinical/OSCE preparation in one 30-day plan.",
+    features: ["Theory Past Papers", "MCQ and written practice", "Interactive OSCE stations", "Exam circuits", "AI-supported practice", "Standard Zambia price: K150", `Exam Prep information: ${EXAM_PREP_PAGE}`],
+    priceZmw: 150,
+    rushPriceZmw: 150,
+    paymentInstructions: `Use the secure Zambia membership checkout: ${MEMBERSHIP_ZAMBIA}. Do not create a Research Portal payment request for this membership.`,
     active: true
   },
   {
     slug: "pa-gym-combined",
-    name: "MedMinds Prep QBank, Past Papers Theory and OSCE Clinical Skills",
+    name: "MedMinds Complete, 30 Days",
     category: "MedMinds Prep",
-    description: "Undergraduate medical access covering QBank practice, Past Papers Theory and OSCE Clinical Skills.",
-    features: ["QBank", "Past Papers Theory", "OSCE Clinical Skills", "2-day free trial", `Current medical-student landing page: ${PREP_MEDICAL}`],
+    description: "QBank, Theory Past Papers and Clinical/OSCE preparation together for 30 days.",
+    features: ["Everything in Exam Prep", "MedMinds Prep QBank", "Interactive Notes", "Weak-Spot Rx", "Standard Zambia price: K200"],
     priceZmw: 200,
     rushPriceZmw: 200,
-    paymentInstructions: `Start at ${PREP_MEDICAL}. Use the plan information shown on the current landing page after the 2-day free trial. ${PAYMENT_DETAILS}.`,
+    paymentInstructions: `Use the secure Zambia membership checkout: ${MEMBERSHIP_ZAMBIA}. Do not create a Research Portal payment request for this membership.`,
+    active: true
+  },
+  {
+    slug: "prep-complete-60-days",
+    name: "MedMinds Complete, 60 Days",
+    category: "MedMinds Prep",
+    description: "Two months of QBank, Theory and Clinical/OSCE access in one membership.",
+    features: ["60 days of Complete access", "Current price: K250", "Standard comparison: K400", "Current saving: K150", "Best-value standard offer"],
+    priceZmw: 250,
+    rushPriceZmw: 250,
+    paymentInstructions: `Use the secure Zambia membership checkout: ${MEMBERSHIP_ZAMBIA}. Do not create a Research Portal payment request for this membership.`,
+    active: true
+  },
+  {
+    slug: "prep-complete-90-days",
+    name: "MedMinds Complete, 90 Days",
+    category: "MedMinds Prep",
+    description: "Three months of Complete access in one payment.",
+    features: ["90 days of Complete access", "Current price: K500", "Standard comparison: K600", "Current saving: K100"],
+    priceZmw: 500,
+    rushPriceZmw: 500,
+    paymentInstructions: `Use the secure Zambia membership checkout: ${MEMBERSHIP_ZAMBIA}. A separate campaign-only K250/90-day offer must never be given without verified campaign eligibility.`,
     active: true
   },
   {
     slug: "pa-gym-preclinical",
-    name: "MedMinds Prep Preclinical",
+    name: "MedMinds Prep Preclinical QBank",
     category: "MedMinds Prep",
     description: "Focused QBank practice for foundational and preclinical medical sciences.",
-    features: ["Preclinical student access", "Foundational medical sciences", "2-day free trial", `Current preclinical landing page: ${PREP_PRECLINICAL}`],
-    priceZmw: null,
-    rushPriceZmw: null,
-    paymentInstructions: `View the current preclinical trial and plans at ${PREP_PRECLINICAL}.`,
+    features: ["Preclinical student access", "Foundational medical sciences", "2-day campaign trial where available", "QBank standard plan: K100 for 30 days", `Current preclinical landing page: ${PREP_PRECLINICAL}`],
+    priceZmw: 100,
+    rushPriceZmw: 100,
+    paymentInstructions: `Start at ${PREP_PRECLINICAL} or use the secure Zambia membership checkout at ${MEMBERSHIP_ZAMBIA}.`,
     active: true
   },
   {
     slug: "pa-gym-nmcz",
-    name: "MedMinds Prep NMCZ Nursing Preparation",
+    name: "MedMinds NMCZ Premium, 90 Days",
     category: "MedMinds Prep",
-    description: "Practice for nurses preparing for the NMCZ competence examination.",
-    features: ["NMCZ competence-exam preparation", "2-day free trial", `Current NMCZ landing page: ${PREP_NMCZ}`],
-    priceZmw: null,
-    rushPriceZmw: null,
-    paymentInstructions: `View the current NMCZ trial and plan options at ${PREP_NMCZ}.`,
+    description: "Independent preparation for the NMCZ competence examination.",
+    features: ["NMCZ competence-exam preparation", "90 days of access", "Current offer: K200", "Displayed comparison: K300", "2-day free trial where available", `Current NMCZ page: ${NMCZ_PAGE}`],
+    priceZmw: 200,
+    rushPriceZmw: 200,
+    paymentInstructions: `Use the current NMCZ page at ${NMCZ_PAGE} or the tracked campaign page at ${PREP_NMCZ}. Do not imply NMCZ affiliation or endorsement.`,
     active: true
   },
   {
     slug: "pa-gym-pg-internal-medicine",
-    name: "MedMinds Prep STP/MMed Internal Medicine",
+    name: "MedMinds Exam Prep, STP/MMed Internal Medicine",
     category: "MedMinds Prep",
-    description: "Postgraduate Internal Medicine revision with past papers, written practice and OSCE preparation.",
-    features: ["STP Internal Medicine", "MMed Internal Medicine", "Past papers", "Written practice", "OSCE preparation", "2-day free trial", `Current postgraduate Internal Medicine landing page: ${PREP_PG_IM}`],
-    priceZmw: null,
-    rushPriceZmw: null,
-    paymentInstructions: `View the current STP/MMed Internal Medicine trial and plan options at ${PREP_PG_IM}.`,
+    description: "Postgraduate Internal Medicine Theory Past Papers, written practice and Clinical/OSCE preparation.",
+    features: ["STP Internal Medicine", "MMed Internal Medicine", "Theory Past Papers", "Written practice", "Clinical/OSCE preparation", "Exam Prep standard plan: K150 for 30 days", "2-day campaign trial where available", `Current postgraduate Internal Medicine landing page: ${PREP_PG_IM}`],
+    priceZmw: 150,
+    rushPriceZmw: 150,
+    paymentInstructions: `Start at ${PREP_PG_IM} or use the secure Zambia membership checkout at ${MEMBERSHIP_ZAMBIA}.`,
     active: true
   },
   {
     slug: "pa-gym-free-pass",
     name: "MedMinds Prep 2-Day Free Trial",
     category: "MedMinds Prep",
-    description: "A 2-day trial. Use the programme-specific landing page rather than a legacy generic registration page.",
+    description: "A programme-specific 2-day trial available through current campaign landing pages.",
     features: [
-      "2-day trial",
+      "2-day campaign trial",
       `NMCZ: ${PREP_NMCZ}`,
       `Preclinical: ${PREP_PRECLINICAL}`,
       `Medical students: ${PREP_MEDICAL}`,
@@ -191,7 +220,39 @@ const medMindsPrepOffers: OfferSeed[] = [
     ],
     priceZmw: 0,
     rushPriceZmw: 0,
-    paymentInstructions: `Choose the programme-specific current landing page: NMCZ ${PREP_NMCZ}; Preclinical ${PREP_PRECLINICAL}; Medical students ${PREP_MEDICAL}; STP/MMed Internal Medicine ${PREP_PG_IM}.`,
+    paymentInstructions: `Choose the programme-specific current landing page. Do not describe the separate 7-day giveaway as the standard trial.`,
+    active: true
+  },
+  {
+    slug: "prep-clinically-equipped-giveaway",
+    name: "Clinically Equipped x MedMinds 7-Day Giveaway",
+    category: "MedMinds Prep",
+    description: "Campaign-specific 7-day free Clinical Question Bank access.",
+    features: ["7 days free", "Clinical Question Bank", "Campaign eligibility required", `Giveaway page: ${CLINICALLY_EQUIPPED_GIVEAWAY}`],
+    priceZmw: 0,
+    rushPriceZmw: 0,
+    paymentInstructions: `Use only for eligible giveaway users: ${CLINICALLY_EQUIPPED_GIVEAWAY}. Do not offer this campaign universally.`,
+    active: true
+  },
+  {
+    slug: "prep-international",
+    name: "MedMinds Prep International Plans",
+    category: "MedMinds Prep",
+    description: "International recurring subscriptions in USD through secure Whop checkout.",
+    features: [
+      "QBank: USD 9.99 every 30 days",
+      "Exam Prep: USD 14.99 every 30 days",
+      "Complete: USD 19.99 every 30 days",
+      "Complete 60 days: USD 34.99 every 60 days",
+      "Complete 90 days: USD 44.99 every 90 days",
+      "Subscriptions renew automatically until cancelled",
+      `International checkout: ${MEMBERSHIP_INTERNATIONAL}`,
+      `PLAB / MLA pathway: ${PLAB_MLA_PAGE}`,
+      `International QBank: ${INTERNATIONAL_QBANK}`
+    ],
+    priceZmw: null,
+    rushPriceZmw: null,
+    paymentInstructions: `Use the secure international membership page at ${MEMBERSHIP_INTERNATIONAL} and Whop checkout. The USD prices in this offer's features are authoritative. Do not convert them into ZMW or create a Research Portal payment request.`,
     active: true
   }
 ];
