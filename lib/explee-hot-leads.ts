@@ -106,8 +106,7 @@ function noteFor(lead: ExpleeHotLead) {
     `Explee campaign ID: ${lead.campaign_id}`,
     `Explee person ID: ${lead.person_id}`,
     lead.became_hot_at ? `Became hot: ${lead.became_hot_at}` : null
-  ].filter(Boolean).join("
-"), 1950);
+  ].filter(Boolean).join("\\n"), 1950);
 }
 
 function newestTimestamp(leads: ExpleeHotLead[]) {
