@@ -5,7 +5,9 @@ const EXPLEE_BASE_URL = "https://api.explee.com";
 const DEFAULT_PROJECT_ID = 39070;
 const PAGE_SIZE = 200;
 const MAX_PAGES = 50;
-const INITIAL_LOOKBACK_MS = 15 * 60 * 1000;\n\ntype Database = NeonQueryFunction<false, false>;
+const INITIAL_LOOKBACK_MS = 15 * 60 * 1000;
+
+type Database = NeonQueryFunction<false, false>;
 
 type ExpleeCampaign = {
   id: number;
@@ -104,7 +106,8 @@ function noteFor(lead: ExpleeHotLead) {
     `Explee campaign ID: ${lead.campaign_id}`,
     `Explee person ID: ${lead.person_id}`,
     lead.became_hot_at ? `Became hot: ${lead.became_hot_at}` : null
-  ].filter(Boolean).join("\n"), 1950);
+  ].filter(Boolean).join("
+"), 1950);
 }
 
 function newestTimestamp(leads: ExpleeHotLead[]) {
@@ -178,7 +181,8 @@ async function importLead(db: Database, hotLead: ExpleeHotLead) {
   });
 
   if (hotLead.why_hot?.trim()) {
-    await addMessage(contactKey, "user", `[Explee interested reply]\n${hotLead.why_hot.trim()}`, `explee-hot:${externalKey}`);
+    await addMessage(contactKey, "user", `[Explee interested reply]
+${hotLead.why_hot.trim()}`, `explee-hot:${externalKey}`);
   }
 
   await db.query(
