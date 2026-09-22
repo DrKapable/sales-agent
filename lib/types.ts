@@ -31,7 +31,7 @@ export type Lead = {
   internalNote: string | null;
   priority: LeadPriority;
   followUpAt: string | null;
-  source: "whatsapp" | "simulator";
+  source: "whatsapp" | "simulator" | "explee";
   createdAt: string;
   updatedAt: string;
   lastMessageAt: string | null;

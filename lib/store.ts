@@ -132,6 +132,11 @@ export async function getOrCreateLead(phone: string, source: Lead["source"]): Pr
         memory.leads.set(phone, promoted);
         return withMemoryLastMessage(promoted);
       }
+      if (source === "explee" && existing.source === "simulator") {
+        const promoted = { ...existing, source: "explee" as const };
+        memory.leads.set(phone, promoted);
+        return withMemoryLastMessage(promoted);
+      }
       return withMemoryLastMessage(existing);
     }
     const now = new Date().toISOString();
@@ -141,7 +146,11 @@ export async function getOrCreateLead(phone: string, source: Lead["source"]): Pr
   }
   const rows = await db.query(`INSERT INTO leads (id, phone, status, source) VALUES ($1,$2,'NEW LEAD',$3)
     ON CONFLICT (phone) DO UPDATE SET
-      source = CASE WHEN EXCLUDED.source='whatsapp' THEN 'whatsapp' ELSE leads.source END,
+      source = CASE
+        WHEN leads.source='whatsapp' OR EXCLUDED.source='whatsapp' THEN 'whatsapp'
+        WHEN EXCLUDED.source='explee' AND leads.source='simulator' THEN 'explee'
+        ELSE leads.source
+      END,
       updated_at = leads.updated_at
     RETURNING leads.*, (SELECT MAX(m.created_at) FROM messages m WHERE m.phone=leads.phone) AS last_message_at`, [crypto.randomUUID(), phone, source]);
   return mapLead(rows[0] as Record<string, unknown>);
