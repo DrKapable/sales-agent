@@ -18,6 +18,8 @@ import { buildAttachmentReviewNotification, classifyIncomingAttachmentForReview 
 import { forwardAttachmentToReviewers } from "@/lib/team-attachment-forwarding";
 import { referralRecipients } from "@/lib/referrals";
 
+import { forwardWalimaDeliveryReceipts } from "@/lib/walima-delivery-forwarding";
+
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 
 export async function GET(request: NextRequest) {
@@ -35,6 +37,9 @@ export async function POST(request: NextRequest) {
   try { payload = JSON.parse(rawBody); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
   const messages = parseIncomingMessages(payload);
   const deliveryReceipts = parseDeliveryReceipts(payload);
+
+  // Runs independently, preserving existing Sales message processing.
+  after(() => forwardWalimaDeliveryReceipts(deliveryReceipts));
 
   after(async () => {
     for (const receipt of deliveryReceipts) {
