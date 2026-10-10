@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
-import { staffSessionOpen, staffTemplateStatus, ensureStaffNotificationTemplate, sendStaffAlert } from "@/lib/team-alert-transport";
+import { staffSessionOpen, staffTemplateStatus, ensureStaffNotificationTemplate, sendStaffAlert, allStaffTemplateStatuses, ensureAllStaffNotificationTemplates } from "@/lib/team-alert-transport";
 import { referralRecipients } from "@/lib/referrals";
 import { getBusinessSnapshot } from "@/lib/business-ops";
 
@@ -10,6 +10,9 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   if (!isAuthorizedCronRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
+    if (new URL(request.url).searchParams.get("templates") === "all") {
+      return NextResponse.json({ templates: await allStaffTemplateStatuses() });
+    }
     const [template, directorSessionOpen] = await Promise.all([staffTemplateStatus(), staffSessionOpen(referralRecipients.mustafa.phone!)]);
     // Loading the snapshot also reconciles assignments previously held by removed staff.
     const snapshot = await getBusinessSnapshot();
@@ -23,6 +26,7 @@ export async function POST(request: Request) {
   if (!isAuthorizedCronRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const input = await request.json().catch(() => ({}));
+    if (input.action === "ensure_all") return NextResponse.json({ templates: await ensureAllStaffNotificationTemplates() });
     if (input.action === "test_director") {
       const result = await sendStaffAlert({ phone: referralRecipients.mustafa.phone!, name: referralRecipients.mustafa.name,
         heading: "Mary Kaunda notification setup", body: "Your number is configured for new clients, hot clients, daily management summaries and copies of marketing referrals. Monica and Counsel Chisha Chomba have been removed from active routing." });

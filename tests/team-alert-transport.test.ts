@@ -5,6 +5,7 @@ vi.mock("@/lib/meta-templates", () => ({ getApprovedMetaTemplateInventory: mocks
 vi.mock("@/lib/message-delivery", () => ({ recordOutgoingMessageAccepted: mocks.accepted }));
 vi.mock("@/lib/whatsapp", () => ({ sendWhatsAppText: mocks.text, sanitizeWhatsAppApiError: vi.fn() }));
 import { sendStaffAlert, STAFF_NOTIFICATION_TEMPLATE } from "../lib/team-alert-transport";
+import { STAFF_ALERT_TEMPLATES } from "../lib/team-alert-templates";
 const input = { phone: "260977259132", name: "Dr. Mustafa Juma Phiri", heading: "Daily summary", body: "New clients: 3\nHot clients: 2" };
 beforeEach(() => { vi.clearAllMocks(); mocks.accepted.mockResolvedValue(undefined); mocks.template.mockResolvedValue({ messageId: "template-accepted" }); mocks.text.mockResolvedValue({ messageId: "text-accepted" }); mocks.inventory.mockResolvedValue({ templates: [{ name: STAFF_NOTIFICATION_TEMPLATE, language: "en_US" }] }); });
 describe("staff WhatsApp alert transport", () => {
@@ -32,5 +33,30 @@ describe("staff WhatsApp alert transport", () => {
     mocks.getConversation.mockResolvedValue([]); mocks.inventory.mockResolvedValue({ templates: [] });
     await expect(sendStaffAlert(input)).rejects.toThrow("requires Meta approval");
     expect(mocks.text).not.toHaveBeenCalled(); expect(mocks.accepted).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["New client alert", "new_client"],
+    ["Hot MedMinds lead", "hot_client"],
+    ["MedMinds daily management brief", "daily_summary"],
+    ["Client referral (CC)", "marketing_copy"]
+  ] as const)("uses the dedicated template for %s", async (heading, kind) => {
+    mocks.getConversation.mockResolvedValue([]);
+    mocks.inventory.mockResolvedValue({ templates: [
+      { name: STAFF_NOTIFICATION_TEMPLATE, language: "en_US" },
+      { name: STAFF_ALERT_TEMPLATES[kind].name, language: "en_US" }
+    ] });
+    await sendStaffAlert({ ...input, heading });
+    expect(mocks.template).toHaveBeenCalledWith(expect.objectContaining({ name: STAFF_ALERT_TEMPLATES[kind].name }));
+  });
+  it("falls back to an approved staff template while a dedicated template is pending", async () => {
+    mocks.getConversation.mockResolvedValue([]);
+    await sendStaffAlert({ ...input, heading: "New client alert" });
+    expect(mocks.template).toHaveBeenCalledWith(expect.objectContaining({ name: STAFF_NOTIFICATION_TEMPLATE }));
+  });
+  it("can test template delivery without relying on an open staff session", async () => {
+    mocks.getConversation.mockResolvedValue([{ role: "user", createdAt: new Date().toISOString() }]);
+    await sendStaffAlert({ ...input, forceTemplate: true });
+    expect(mocks.text).not.toHaveBeenCalled();
+    expect(mocks.template).toHaveBeenCalled();
   });
 });
