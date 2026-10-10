@@ -1,11 +1,19 @@
 import { referralRecipients } from "@/lib/referrals";
 import { sendStaffAlert } from "@/lib/team-alert-transport";
+import { staffAlertKind } from "@/lib/team-alert-templates";
 import type { Lead } from "@/lib/types";
 
 export type TeamNotificationKind = "new_client" | "conversation_closed";
 export type TeamCopyRecipient = { name: string; phone: string | null };
 
 type CopyLabel = "PRIMARY" | "CC";
+
+export const staffAlertRecipients: TeamCopyRecipient[] = [
+  referralRecipients.mustafa,
+  referralRecipients.kanyembo,
+  referralRecipients.zabibu,
+  referralRecipients.conrad
+];
 
 const defaultCcRecipients: TeamCopyRecipient[] = [
   referralRecipients.mustafa,
@@ -99,7 +107,10 @@ export async function sendTeamCopies(input: {
 }) {
   const recipients = buildRecipients(
     input.primary,
-    input.cc || [],
+    [
+      ...(input.cc || []),
+      ...(staffAlertKind(input.heading) === "staff" ? [] : staffAlertRecipients)
+    ],
     input.includeDefaultCc !== false
   );
   const results = await Promise.allSettled(recipients.map(async (recipient) => {

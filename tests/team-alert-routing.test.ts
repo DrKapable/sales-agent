@@ -5,11 +5,13 @@ import { sendTeamCopies, sendTeamNotification, sendSalesPipelineCopies } from ".
 import { referralRecipients } from "../lib/referrals";
 import { staffNames } from "../lib/team-directory";
 
-describe("director alert routing", () => {
+const expectedPhones = ["260977259132", "260974634555", "260975352801", "260979235018"].sort();
+
+describe("staff alert routing", () => {
   beforeEach(() => sendStaffAlert.mockClear());
-  it("copies the director once even when default copies are disabled", async () => {
+  it("copies all four staff once for marketing referrals even when default copies are disabled", async () => {
     await sendTeamCopies({ heading: "Marketing referral", body: "A client wants advertising help.", primary: referralRecipients.conrad, includeDefaultCc: false });
-    expect(sendStaffAlert.mock.calls.map(([input]) => input.phone)).toEqual(["260979235018", "260977259132"]);
+    expect(sendStaffAlert.mock.calls.map(([input]) => input.phone).sort()).toEqual(expectedPhones);
   });
   it("includes the director on new and hot client alerts", async () => {
     await sendTeamNotification({ kind: "new_client", body: "New client details" });
@@ -19,6 +21,14 @@ describe("director alert routing", () => {
   it("does not duplicate the director when he is the primary recipient", async () => {
     await sendTeamCopies({ heading: "Daily summary", body: "Today's totals", primary: referralRecipients.mustafa, cc: [referralRecipients.mustafa] });
     expect(sendStaffAlert.mock.calls.filter(([input]) => input.phone === "260977259132")).toHaveLength(1);
+  });
+  it.each(["New client alert", "Hot MedMinds lead", "MedMinds daily management brief", "Client referral"])("includes all four staff exactly once for %s", async (heading) => {
+    await sendTeamCopies({ heading, body: "Operational details", primary: referralRecipients.kanyembo, cc: [referralRecipients.mustafa, referralRecipients.conrad], includeDefaultCc: false });
+    expect(sendStaffAlert.mock.calls.map(([input]) => input.phone).sort()).toEqual(expectedPhones);
+  });
+  it("keeps other sensitive direct alerts with their explicitly selected recipients", async () => {
+    await sendTeamCopies({ heading: "Payment proof received", body: "Verification required", primary: referralRecipients.mustafa, cc: [referralRecipients.kanyembo], includeDefaultCc: false });
+    expect(sendStaffAlert.mock.calls.map(([input]) => input.phone).sort()).toEqual(["260974634555", "260977259132"]);
   });
   it("removes Monica and Counsel Chisha from selectable staff and phone routes", () => {
     expect(staffNames).not.toContain("Dr. Monica");
