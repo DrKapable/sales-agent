@@ -95,19 +95,33 @@ export function buildReferralMessage(input: {
   lead: Lead;
   reason: string;
   summary: string;
+  action?: string;
 }) {
   const { lead } = input;
   const contact = lead.phone.startsWith("+") ? lead.phone : `+${lead.phone}`;
+  const concise = (value: string, limit: number) => {
+    const text = value.replace(/\s+/g, " ").trim().replaceAll("—", ",");
+    if (text.length <= limit) return text;
+    const cut = text.slice(0, limit - 1);
+    const boundary = cut.lastIndexOf(" ");
+    return `${cut.slice(0, boundary > limit * 0.6 ? boundary : cut.length)}…`;
+  };
+  const deadline = lead.deadline
+    ?.split(/\n|(?<=[.!?])\s+|\s+but\s+/i)[0]
+    .replace(/\b(\d{1,2})\s+(st|nd|rd|th)\b/gi, "$1$2")
+    .replace(/^(?:the\s+)?(?:assignment|project|work|proposal|dissertation|thesis)\s+(?:is\s+)?due\s+(?:on\s+)?/i, "")
+    .trim();
+  const defaultAction = /(?:no|not|unavailable|missing|custom).{0,65}(?:price|pricing|quotation|quote)|(?:price|pricing).{0,65}(?:unavailable|not available|not approved)/i.test(`${input.reason} ${input.summary}`)
+    ? "Confirm a custom quotation and contact the client."
+    : /lead is tagged hot|high need \+ high urgency/i.test(input.reason)
+      ? "Contact the client promptly and confirm the best approach."
+      : input.reason;
   return [
-    "New MedMinds client referral",
-    `Assigned to: ${input.recipientName}`,
-    `Client name: ${lead.name || "Not provided"}`,
-    `Client contact: ${contact}`,
-    `Service: ${lead.serviceInterest || lead.packageName || "Not established"}`,
-    `Programme: ${lead.programme || "Not provided"}`,
-    `Institution: ${lead.institution || "Not provided"}`,
-    `Deadline: ${lead.deadline || "Not provided"}`,
-    `Referral reason: ${input.reason}`,
-    `Summary: ${input.summary}`
-  ].join("\n").replaceAll("—", ",");
+    `Client: ${concise(lead.name || "Unnamed client", 60)} | ${contact}`,
+    `Assigned: ${concise(input.recipientName, 70)}${lead.priority === "HOT" ? " | HOT" : ""}`,
+    `Service: ${concise(lead.serviceInterest || lead.packageName || input.summary, 240)}`,
+    lead.programme ? `Programme: ${concise(lead.programme, 100)}` : null,
+    deadline ? `Due: ${concise(deadline, 80)}` : null,
+    `Action: ${concise(input.action || defaultAction, 160)}`
+  ].filter(Boolean).join("\n");
 }

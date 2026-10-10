@@ -13,6 +13,7 @@ export async function prepareSpecialistHandoff(input: {
   latestText: string;
   reason?: string;
   summary?: string;
+  action?: string;
 }): Promise<SalesAgentResult | null> {
   const lead = await getOrCreateLead(input.phone, input.source);
   const history = await getConversation(input.phone, 128);
@@ -29,20 +30,14 @@ export async function prepareSpecialistHandoff(input: {
     handoffReason: `${SPECIALIST_HANDOFF_PREFIX} ${reason}`,
     aiPaused: false
   });
-  const context = history.slice(-8).map((message) => `${message.role === "user" ? "Client" : "Mary"}: ${message.content}`).join("\n");
-  const body = [
-    buildReferralMessage({ recipientName: recipient.name, lead: saved, reason, summary: input.summary || input.latestText }),
-    `Trigger: ${input.trigger === "hot" ? "HOT lead" : "Complex custom question Mary cannot answer"}`,
-    `Priority: ${saved.priority}`,
-    `Latest client request: ${input.latestText}`,
-    "Client has been told to expect personal contact shortly from +260974634555.",
-    "Action: Review the shared requirements and timeline; contact the client personally and map out the approach. Coordinate specialist review where needed.",
-    context ? `Recent conversation:\n${context}` : null
-  ].filter(Boolean).join("\n");
+  const body = buildReferralMessage({
+    recipientName: recipient.name, lead: saved, reason,
+    summary: input.summary || input.latestText, action: input.action
+  });
   return {
     reply: SPECIALIST_HANDOFF_MESSAGE,
     referralNotification: input.source === "whatsapp" || /^\d{8,15}$/.test(input.phone)
-      ? { phone: recipient.phone!, recipientName: recipient.name, body, heading: "MedMinds specialist handoff referral" }
+      ? { phone: recipient.phone!, recipientName: recipient.name, body, heading: "MedMinds handoff" }
       : null,
     documentIds: []
   };

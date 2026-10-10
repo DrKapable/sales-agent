@@ -57,17 +57,18 @@ describe("referral notifications", () => {
     expect(recipientForReferral("general", "Please connect me with Dr Monica").name).toBe("Dr. Mustafa Juma Phiri");
   });
 
-  it("includes client identity, contact and case summary", () => {
+  it("includes essential client details and the action without duplicate summaries", () => {
     const message = buildReferralMessage({
       recipientName: "Dr. Mustafa Juma Phiri",
       lead,
       reason: "Discount request",
       summary: "Client requests a discount for a research proposal required in 14 days."
     });
-    expect(message).toContain("Client name: Amina Banda");
-    expect(message).toContain("Client contact: +260970000000");
+    expect(message).toContain("Client: Amina Banda | +260970000000");
     expect(message).toContain("Service: Research proposal");
-    expect(message).toContain("Summary: Client requests a discount");
+    expect(message).toContain("Action: Discount request");
+    expect(message).toContain("Due: 14 days");
+    expect(message).not.toContain("Summary:");
     expect(message).not.toContain("—");
   });
 });

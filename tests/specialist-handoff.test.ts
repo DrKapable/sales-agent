@@ -52,7 +52,8 @@ describe("dedicated specialist handoff", () => {
     });
     const result = await replyToClient(phone, "Can you design my custom statistical model?", "whatsapp");
     expect(result.reply).toBe(SPECIALIST_HANDOFF_MESSAGE);
-    expect(result.referralNotification?.body).toContain("Complex custom question Mary cannot answer");
+    expect(result.referralNotification?.body).toContain("Action: Custom methodology needs specialist review");
+    expect(result.referralNotification?.body).not.toContain("Recent conversation:");
     expect((await getOrCreateLead(phone, "whatsapp")).assignedTo).toBe("Dr Kanyembo Ng'andwe");
   });
 
@@ -66,7 +67,8 @@ describe("dedicated specialist handoff", () => {
     const result = await replyToClient(phone, "My proposal is in progress, due tomorrow; I need help and can pay today", "whatsapp");
     expect(result.reply).toBe(SPECIALIST_HANDOFF_MESSAGE);
     expect((await getOrCreateLead(phone, "whatsapp")).priority).toBe("HOT");
-    expect(result.referralNotification?.body).toContain("Submission tomorrow");
+    expect(result.referralNotification?.body).toContain("| HOT");
+    expect(result.referralNotification?.body).toContain("Action: Contact the client promptly");
   });
 
   it("does not queue another alert for a repeated complex handoff", async () => {
