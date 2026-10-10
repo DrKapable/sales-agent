@@ -1,3 +1,4 @@
+import { SPECIALIST_HANDOFF_PREFIX } from "@/lib/specialist-handoff";
 import { referralRecipients } from "@/lib/referrals";
 import { listLeads } from "@/lib/store";
 import { sendSalesPipelineCopies } from "@/lib/team-notifications";
@@ -72,6 +73,7 @@ export async function notifyBusinessEvent(input: {
 
 export async function maybeNotifyHotLead(phone: string) {
   const lead = (await listLeads()).find((item) => item.phone === phone);
+  if (lead?.handoffReason?.startsWith(SPECIALIST_HANDOFF_PREFIX)) return;
   if (!lead || lead.status === "CONVERTED" || lead.status === "LOST LEAD") return;
   const { scoreLead } = await import("@/lib/business-ops");
   const score = await scoreLead(lead);

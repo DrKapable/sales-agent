@@ -115,7 +115,8 @@ function nextStatus(current: LeadStatus, analysis: SalesTurnAnalysis): LeadStatu
 
 function nextPriority(current: LeadPriority, analysis: SalesTurnAnalysis): LeadPriority {
   let target: LeadPriority = "STANDARD";
-  if (analysis.closerAttention || analysis.paymentConfirmation) target = "HOT";
+  // Buying signals merit closer attention; HOT requires all four qualifying facts.
+  if (analysis.closerAttention || analysis.paymentConfirmation) target = "WARM";
   else if (analysis.priceIntent || analysis.serviceNeed || analysis.objection) target = "WARM";
   return PRIORITY_STAGE[target] > PRIORITY_STAGE[current] ? target : current;
 }

@@ -1,3 +1,4 @@
+import { maybePrepareHotLeadHandoff, SPECIALIST_HANDOFF_MESSAGE } from "@/lib/specialist-handoff";
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { replyToClient, type SalesAgentResult } from "@/lib/ai/sales-agent";
@@ -33,7 +34,7 @@ async function sendReferralNotification(result: SalesAgentResult) {
   if (!result.referralNotification || !getSetupState().whatsappConfigured) return;
   try {
     await sendTeamCopies({
-      heading: "Client referral",
+      heading: result.referralNotification.heading || "Client referral",
       body: result.referralNotification.body,
       primary: {
         name: result.referralNotification.recipientName,
@@ -83,6 +84,13 @@ export async function POST(request: Request) {
     });
   };
 
+  const hotHandoff = await maybePrepareHotLeadHandoff(phone, parsed.data.message, "simulator");
+  if (hotHandoff) {
+    after(() => sendReferralNotification(hotHandoff));
+    queueNewClientAlert();
+    return NextResponse.json({ reply: hotHandoff.reply });
+  }
+
   const paymentResult = await handleMaryPaymentFlowV2({ phone, text: parsed.data.message, source: "simulator" }).catch((error) => {
     console.error("Website Sampay payment flow failed safely", { phoneSuffix: phone.slice(-4), error });
     return null;
@@ -100,11 +108,11 @@ export async function POST(request: Request) {
 
   const result = await generateWithFailover(phone, parsed.data.message);
   if (result) {
-    const safeReply = sanitizeMaryPaymentKnowledge(result.reply, parsed.data.message);
+    const safeReply = result.reply === SPECIALIST_HANDOFF_MESSAGE ? result.reply : sanitizeMaryPaymentKnowledge(result.reply, parsed.data.message);
     if (safeReply !== result.reply) {
       await rewriteLatestUnsentAssistantMessage({ phone, from: result.reply, to: safeReply }).catch(() => false);
     }
-    await sendReferralNotification(result);
+    after(() => sendReferralNotification(result));
     queueNewClientAlert();
     return NextResponse.json({ reply: safeReply });
   }

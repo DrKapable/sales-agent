@@ -1,3 +1,4 @@
+import { maybePrepareHotLeadHandoff, SPECIALIST_HANDOFF_MESSAGE } from "@/lib/specialist-handoff";
 import { handleIncomingClientAttachment } from "@/lib/client-attachment-referral";
 import { captureNaturalConversationFacts } from "@/lib/natural-conversation-memory";
 import { casualConversationFallback, isCasualConversationTurn } from "@/lib/conversation-smalltalk";
@@ -30,6 +31,8 @@ async function generateCasualWhatsAppReply(phone: string, text: string): Promise
 }
 
 export async function generateWhatsAppReplyWithRecovery(phone: string, text: string): Promise<SalesAgentResult> {
+  const hotHandoff = await maybePrepareHotLeadHandoff(phone, text, "whatsapp");
+  if (hotHandoff) return hotHandoff;
   const attachmentResult = await handleIncomingClientAttachment(phone, text);
   if (attachmentResult) return attachmentResult;
 
@@ -56,6 +59,7 @@ export async function generateWhatsAppReplyWithRecovery(phone: string, text: str
     const model = models[index];
     try {
       const result = await replyToClient(phone, text, "whatsapp", model);
+      if (result.reply === SPECIALIST_HANDOFF_MESSAGE) return result;
       const shaped = optimization
         ? shapeMaryReply(result.reply, text, optimization.analysis, recentAssistantReplies)
         : result.reply;

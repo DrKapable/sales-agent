@@ -1,3 +1,4 @@
+import { maybePrepareHotLeadHandoff } from "@/lib/specialist-handoff";
 import { after, NextRequest, NextResponse } from "next/server";
 import { clientDocumentChatContent, getClientDocumentForLead, markClientDocumentSent } from "@/lib/client-documents";
 import { sendClientWhatsAppDocument } from "@/lib/client-document-whatsapp";
@@ -186,7 +187,8 @@ export async function POST(request: NextRequest) {
           .then((typing) => console.info("WhatsApp typing indicator processed", { messageId: message.id, skipped: typing.skipped }))
           .catch((error) => console.warn("WhatsApp typing indicator failed; continuing with reply", { messageId: message.id, error }));
 
-        if (isPreparedQuotationRequest(message.text)) {
+        const hotHandoff = await maybePrepareHotLeadHandoff(message.phone, message.text, "whatsapp");
+        if (!hotHandoff && isPreparedQuotationRequest(message.text)) {
           const prepared = await getLatestPreparedQuotation(lead.id);
           if (prepared) {
             let reply: string;
@@ -217,7 +219,7 @@ export async function POST(request: NextRequest) {
           console.info("Prepared quotation requested but none is stored for this client", { messageId: message.id, leadId: lead.id });
         }
 
-        const result = await generateWhatsAppReplyWithRecovery(message.phone, message.text);
+        const result = hotHandoff || await generateWhatsAppReplyWithRecovery(message.phone, message.text);
         console.info("WhatsApp client reply prepared", { messageId: message.id, hasReferral: Boolean(result.referralNotification), queuedDocuments: result.documentIds.length });
 
         let deliveredDocuments = 0;
@@ -282,7 +284,7 @@ export async function POST(request: NextRequest) {
         if (result.referralNotification) {
           try {
             const copies = await sendTeamCopies({
-              heading: "Client referral",
+              heading: result.referralNotification.heading || "Client referral",
               body: result.referralNotification.body,
               primary: {
                 name: result.referralNotification.recipientName,

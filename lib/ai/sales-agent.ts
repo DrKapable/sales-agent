@@ -13,11 +13,12 @@ import { maybeNotifyHotLead, notifyBusinessEvent } from "@/lib/business-notifica
 import { assessLeadQualification, type LeadQualification } from "@/lib/lead-qualification";
 import { resolveCataloguePrice } from "@/lib/catalogue-pricing";
 import { getLatestPreparedQuotationForService, preparedQuotationPriceState } from "@/lib/prepared-quotation";
+import { maybePrepareHotLeadHandoff, prepareSpecialistHandoff, SPECIALIST_HANDOFF_MESSAGE, SPECIALIST_HANDOFF_PREFIX } from "@/lib/specialist-handoff";
 import { leadStatuses, type LeadPatch } from "@/lib/types";
 
 export type SalesAgentResult = {
   reply: string;
-  referralNotification: { phone: string; recipientName: string; body: string } | null;
+  referralNotification: { phone: string; recipientName: string; body: string; heading?: string } | null;
   documentIds: string[];
 };
 
@@ -35,10 +36,14 @@ function qualificationGuidance(qualification: LeadQualification) {
 export async function replyToClient(phone: string, text: string, source: "whatsapp" | "simulator", modelOverride?: string): Promise<SalesAgentResult> {
   await restoreChat(phone).catch(() => undefined);
   let lead = await getOrCreateLead(phone, source);
+  const hotHandoff = await maybePrepareHotLeadHandoff(phone, text, source);
+  if (hotHandoff) return hotHandoff;
   const history = await getConversation(phone);
+  let specialistRequest: { trigger: "hot" | "complex_custom"; reason: string; summary: string } | null = null;
   let referralNotification: SalesAgentResult["referralNotification"] = null;
   const queuedDocumentIds = new Set<string>();
 
+  const alreadyHandedOff = lead.handoffReason?.startsWith(SPECIALIST_HANDOFF_PREFIX) || history.some((message) => message.role === "assistant" && message.content === SPECIALIST_HANDOFF_MESSAGE);
   const qualification = assessLeadQualification({ lead, history, latestText: text });
   const canRevealCommercialTerms = qualification.qualified || qualification.priorPriceContext || lead.status === "PAYMENT PENDING" || lead.status === "CONVERTED";
 
@@ -197,10 +202,16 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const handoffTool = tool({
     description: "Assign genuine human fulfilment, specialist review or escalation to the most appropriate MedMinds team member. Preserve any explicitly requested staff member in the reason or summary. Routine qualification and ordinary sales questions should remain with Mary.",
     inputSchema: z.object({
+      trigger: z.enum(["standard", "complex_custom"]).default("standard"),
       referralType: z.enum(["payment", "discount", "sales", "research", "research_specialist", "operations", "customer_support", "dispute", "legal", "marketing", "administrative", "software", "business_automation", "web_development", "cybersecurity", "general"]),
       reason: z.string().min(3).max(500), summary: z.string().min(10).max(900)
     }),
-    execute: async ({ referralType, reason, summary }) => {
+    execute: async ({ referralType, reason, summary, trigger }) => {
+      if (trigger === "complex_custom") {
+        if (alreadyHandedOff) return { queued: false, instruction: "The dedicated specialist handoff already exists. Do not repeat the client promise or alert. Continue permitted coordination only." };
+        specialistRequest = { trigger, reason, summary };
+        return { queued: true, clientMessage: SPECIALIST_HANDOFF_MESSAGE, instruction: "Finish with this exact clientMessage. The human team alert will follow client delivery." };
+      }
       const recipient = recipientForReferral(referralType, `${reason} ${summary} ${lead.serviceInterest ?? ""}`);
       const alreadyAssigned = lead.status === "HUMAN ASSISTANCE REQUIRED" && lead.assignedTo === recipient.name;
       const savedLead = await updateLead(phone, { status: "HUMAN ASSISTANCE REQUIRED", handoffReason: reason, aiPaused: false, assignedTo: recipient.name });
@@ -216,6 +227,22 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
             ? `${recipient.name} has been assigned and notified. Continue handling permitted sales and coordination questions.`
             : `${recipient.name} has been assigned internally. Do not claim a WhatsApp notification was sent.`
       };
+    }
+  });
+
+  const tagHotLeadTool = tool({
+    description: "Tag a lead HOT only when the client has an active project, high need, high urgency and ability to pay. Give a specific client-provided fact for each criterion. A price enquiry, quotation request or generic interest alone is insufficient.",
+    inputSchema: z.object({
+      highNeedEvidence: z.string().min(3).max(300),
+      highUrgencyEvidence: z.string().min(3).max(300),
+      abilityToPayEvidence: z.string().min(3).max(300),
+      activeProjectEvidence: z.string().min(3).max(300)
+    }),
+    execute: async (evidence) => {
+      if (alreadyHandedOff) return { queued: false, instruction: "The dedicated specialist handoff already exists. Do not repeat it." };
+      lead = await updateLead(phone, { priority: "HOT" });
+      specialistRequest = { trigger: "hot", reason: "High need + high urgency + ability to pay + active project.", summary: Object.entries(evidence).map(([key, value]) => `${key}: ${value}`).join("\n") };
+      return { tagged: "HOT", clientMessage: SPECIALIST_HANDOFF_MESSAGE, instruction: "Finish with this exact clientMessage. The human team alert will follow client delivery." };
     }
   });
 
@@ -244,7 +271,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
   const model = modelOverride || getAiModel();
   const agent = new ToolLoopAgent({
     model: gateway(model),
-    instructions: `${SALES_AGENT_PROMPT}\n\nNATURAL CONVERSATION OVERRIDE\n- These rules override any earlier fixed or example wording. Do not use preset qualification questions or stock CRM-style responses.\n- Speak like a capable human sales representative having one continuous WhatsApp conversation. Use the client's own words and the immediate context.\n- CURRENT QUALIFICATION STATE is a business guardrail, not a script. Its missing field tells you what information is still needed; phrase any question naturally and differently according to the conversation.\n- Never tell the client internal labels such as qualified, missing, lead stage, route, state machine or qualification.\n- Interpret short replies in context. If you just asked when they need the work and they say \"2 weeks\", that is a timeframe. If you asked their academic level and they say \"Diploma\", that is the level.\n- If the client says \"yes please\", \"okay\", \"go ahead\" or similar after you offered a specific action such as preparing a quotation, treat it as acceptance of that action. Do not ask the same action question again.\n- Answer clarification questions directly. Do not force every message back into qualification.\n- Ask at most one useful question at a time, and only when a missing detail is genuinely needed for the next commercial step.\n- Do not repeat a question whose answer is already present in the transcript or lead record.\n- Natural small talk is allowed. Resume the sales journey only when the client returns to it.\n\nCOMMERCIAL GUARDRAILS\n- Do not reveal prices, payment instructions, quotation amounts or invoice amounts while CURRENT QUALIFICATION STATE says qualified=false unless priorPriceContext=true or the lead is already PAYMENT PENDING/CONVERTED.\n- When a qualified client asks for or clearly accepts an offer to prepare a quotation, use createClientCommercialDocument.\n- The createClientCommercialDocument tool is authoritative for price. It calculates the approved catalogue amount from the current service, programme and deadline. Never choose rush/standard pricing yourself and never invent or override the amount.\n- If the tool reports an existing same-service quotation at a different amount, do not create or promise another quotation. Explain briefly that the existing quotation needs human review and use human assistance when appropriate.\n- If the tool reuses an existing quotation, tell the client naturally that the existing quotation has been resent/reused; do not imply a new quotation was created.\n- A quotation is not proof of payment. An invoice created here is UNPAID. Official receipts may be sent only after verified payment.\n- Do not create repeated documents unless a genuine revised document has been approved by a human.\n\nCLIENT-ASSIGNED DOCUMENTS\n- Administrators can upload documents and assign them to a specific client. If a client asks for an assigned file, first use listAssignedClientDocuments, then send only a document returned for this client.\n- If no document is assigned, say so plainly and arrange human assistance if needed.\n\nRESEARCH SALES VS FULFILMENT\n- Mary may explain and sell research services, collect requirements naturally, recommend the best-fit approved service, retrieve approved prices after qualification, prepare quotations/invoices, explain payment terms and coordinate next steps.\n- Mary must not personally produce substantive research work. Routine fulfilment and advanced methodology/statistics/director-level research go to Dr. Mustafa Juma Phiri.\n- Do not refer a research client merely because they want hands-on proposal/dissertation support. Complete the sales conversation first unless the client explicitly asks for a human or a specialist-only issue arises.\n- A fulfilment referral does not end Mary's sales role.\n\nTEAM ROUTING\n- Dr. Mustafa Juma Phiri: Director, operations, routine and specialist research, dispute management review, payments/discounts, software, business automation, web development, cybersecurity and technical escalation.\n- Dr Kanyembo Ng'andwe: Sales Representative, marketing and preferred closer for lead conversion.\n- Dr Zabibu Nandazi: customer support and marketing.\n- Mr Conrad Mununkha Phiri: marketing, advertising, partnerships and secretary/administration.\n- Mr. Madalitso Masumbu is off duty and must not receive new referrals.\n\nRESEARCH PORTAL\n- Create an unassigned research task only after the client has clearly agreed to proceed with a concrete research service or an agreed deliverable needs operational follow-through. Do not create tasks for ordinary enquiries or price questions.\n- Do not invent research content to populate a task.\n\nCurrent lead record: ${JSON.stringify(lead)}.\nCURRENT QUALIFICATION STATE: ${JSON.stringify(qualificationForModel)}.\nTool output is authoritative for approved offers, prices, commercial documents, assigned documents and Research Portal actions.`,
+    instructions: `${SALES_AGENT_PROMPT}\n\nNATURAL CONVERSATION OVERRIDE\n- These rules override any earlier fixed or example wording. Do not use preset qualification questions or stock CRM-style responses.\n- Speak like a capable human sales representative having one continuous WhatsApp conversation. Use the client's own words and the immediate context.\n- CURRENT QUALIFICATION STATE is a business guardrail, not a script. Its missing field tells you what information is still needed; phrase any question naturally and differently according to the conversation.\n- Never tell the client internal labels such as qualified, missing, lead stage, route, state machine or qualification.\n- Interpret short replies in context. If you just asked when they need the work and they say \"2 weeks\", that is a timeframe. If you asked their academic level and they say \"Diploma\", that is the level.\n- If the client says \"yes please\", \"okay\", \"go ahead\" or similar after you offered a specific action such as preparing a quotation, treat it as acceptance of that action. Do not ask the same action question again.\n- Answer clarification questions directly. Do not force every message back into qualification.\n- Ask at most one useful question at a time, and only when a missing detail is genuinely needed for the next commercial step.\n- Do not repeat a question whose answer is already present in the transcript or lead record.\n- Natural small talk is allowed. Resume the sales journey only when the client returns to it.\n\nCOMMERCIAL GUARDRAILS\n- Do not reveal prices, payment instructions, quotation amounts or invoice amounts while CURRENT QUALIFICATION STATE says qualified=false unless priorPriceContext=true or the lead is already PAYMENT PENDING/CONVERTED.\n- When a qualified client asks for or clearly accepts an offer to prepare a quotation, use createClientCommercialDocument.\n- The createClientCommercialDocument tool is authoritative for price. It calculates the approved catalogue amount from the current service, programme and deadline. Never choose rush/standard pricing yourself and never invent or override the amount.\n- If the tool reports an existing same-service quotation at a different amount, do not create or promise another quotation. Explain briefly that the existing quotation needs human review and use human assistance when appropriate.\n- If the tool reuses an existing quotation, tell the client naturally that the existing quotation has been resent/reused; do not imply a new quotation was created.\n- A quotation is not proof of payment. An invoice created here is UNPAID. Official receipts may be sent only after verified payment.\n- Do not create repeated documents unless a genuine revised document has been approved by a human.\n\nCLIENT-ASSIGNED DOCUMENTS\n- Administrators can upload documents and assign them to a specific client. If a client asks for an assigned file, first use listAssignedClientDocuments, then send only a document returned for this client.\n- If no document is assigned, say so plainly and arrange human assistance if needed.\n\nRESEARCH SALES VS FULFILMENT\n- Mary may explain and sell research services, collect requirements naturally, recommend the best-fit approved service, retrieve approved prices after qualification, prepare quotations/invoices, explain payment terms and coordinate next steps.\n- Mary must not personally produce substantive research work. Routine fulfilment and advanced methodology/statistics/director-level research go to Dr. Mustafa Juma Phiri.\n- Do not refer a research client merely because they want hands-on proposal/dissertation support. Complete the sales conversation first unless the client explicitly asks for a human or a specialist-only issue arises.\n- A fulfilment referral does not end Mary's sales role.\n\nTEAM ROUTING\n- Dr. Mustafa Juma Phiri: Director, operations, routine and specialist research, dispute management review, payments/discounts, software, business automation, web development, cybersecurity and technical escalation.\n- Dr Kanyembo Ng'andwe: Sales Representative, marketing and preferred closer for lead conversion.\n- Dr Zabibu Nandazi: customer support and marketing.\n- Mr Conrad Mununkha Phiri: marketing, advertising, partnerships and secretary/administration.\n- Mr. Madalitso Masumbu is off duty and must not receive new referrals.\n\nRESEARCH PORTAL\n- Create an unassigned research task only after the client has clearly agreed to proceed with a concrete research service or an agreed deliverable needs operational follow-through. Do not create tasks for ordinary enquiries or price questions.\n- Do not invent research content to populate a task.\n\nDEDICATED SPECIALIST HANDOFF OVERRIDE\n- This instruction overrides ordinary sales-continuation and natural-wording rules for the handoff itself.\n- HOT means high need + high urgency + ability to pay + an active project. When all four are supported by the client conversation, call tagHotLead with the specific evidence; never invent budget, urgency or project facts.\n- If the client asks a complex custom question you cannot answer accurately from verified knowledge or approved tools, call requestHumanAssistance with trigger=complex_custom, a reason and a useful summary. Never guess a specialist answer. Routine sales questions and normal research-service enquiries alone do not qualify.\n- On either trigger, send exactly: ${SPECIALIST_HANDOFF_MESSAGE}\n- The server queues an internal human-team alert with the client details and context after the client response. Kanyembo at +260974634555 is the follow-up coordinator.\n- If the lead already has ${SPECIALIST_HANDOFF_PREFIX} or the exact message was already sent, do not repeat the handoff promise or alert. Answer only permitted coordination questions and leave the unresolved specialist question with the human team.\n\nCurrent lead record: ${JSON.stringify(lead)}.\nCURRENT QUALIFICATION STATE: ${JSON.stringify(qualificationForModel)}.\nTool output is authoritative for approved offers, prices, commercial documents, assigned documents and Research Portal actions.`,
     tools: {
       getApprovedOffers: approvedOffersTool,
       updateLead: updateLeadTool,
@@ -252,6 +279,7 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
       listAssignedClientDocuments: listAssignedDocumentsTool,
       sendAssignedClientDocument: sendAssignedDocumentTool,
       requestHumanAssistance: handoffTool,
+      tagHotLead: tagHotLeadTool,
       createResearchPortalTask: researchTaskTool
     }
   });
@@ -261,8 +289,10 @@ export async function replyToClient(phone: string, text: string, source: "whatsa
     .map((message) => `${message.role === "user" ? "Client" : "Agent"}: ${message.content}`)
     .join("\n");
   const result = await agent.generate({ prompt: `Conversation including the client's latest message:\n${transcript}\n\nReply only with the natural WhatsApp message to send. Do not expose internal reasoning, qualification labels or tool details.` });
-  const reply = (result.text.trim() || "I’ll make sure a MedMinds team member helps with that.").replaceAll("—", ",");
+  const dedicatedHandoff = specialistRequest ? await prepareSpecialistHandoff({ phone, source, latestText: text, ...specialistRequest as { trigger: "hot" | "complex_custom"; reason: string; summary: string } }) : null;
+  const reply = dedicatedHandoff?.reply || (result.text.trim() || "I’ll make sure a MedMinds team member helps with that.").replaceAll("—", ",");
   await addMessage(phone, "assistant", reply);
-  if (source === "whatsapp") await maybeNotifyHotLead(phone).catch((error) => console.error("Hot-lead notification check failed", { phoneSuffix: phone.slice(-4), error }));
+  if (source === "whatsapp" && !dedicatedHandoff) await maybeNotifyHotLead(phone).catch((error) => console.error("Hot-lead notification check failed", { phoneSuffix: phone.slice(-4), error }));
+  if (dedicatedHandoff) return dedicatedHandoff;
   return { reply, referralNotification: referralNotification as SalesAgentResult["referralNotification"], documentIds: [...queuedDocumentIds] };
 }
