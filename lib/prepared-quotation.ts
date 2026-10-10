@@ -1,5 +1,6 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import type { CommercialRecord } from "@/lib/commercial-document";
+import { MEDMINDS_BANK_TEXT, commercialPaymentAmount, quotationPaymentUrl } from "@/lib/medminds-payment-policy";
 
 let sql: NeonQueryFunction<false, false> | null = null;
 
@@ -67,5 +68,6 @@ export function preparedQuotationPriceState(record: Pick<CommercialRecord, "amou
 
 export function preparedQuotationFallbackText(record: CommercialRecord) {
   const amount = record.amount_zmw == null ? "Tailored quotation" : `K${Number(record.amount_zmw).toLocaleString()}`;
-  return `Here is your prepared MedMinds quotation:\n\nService: ${record.service}\nAmount: ${amount}\nDetails: ${record.details}\n\nPlease review it and let us know if you would like us to proceed or if you need any clarification.`;
+  const payable = commercialPaymentAmount(record);
+  return `Here is your prepared MedMinds quotation:\n\nService: ${record.service}\nAmount: ${amount}\nDetails: ${record.details}\n\n${MEDMINDS_BANK_TEXT}${payable ? `\n\nOpen Sampay link (K${payable.toLocaleString()}): ${quotationPaymentUrl(record.id)}\nNo email or phone is needed to create or open this link. Enter payer details at checkout.` : ""}\n\nPlease review it and let us know if you would like us to proceed or if you need any clarification.`;
 }

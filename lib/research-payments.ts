@@ -1,5 +1,8 @@
+import { createHash, createHmac } from "node:crypto";
 import type { Lead } from "@/lib/types";
 import { getConversation } from "@/lib/store";
+import { getLatestPreparedQuotation } from "@/lib/prepared-quotation";
+import { commercialPaymentAmount, quotationPaymentReference } from "@/lib/medminds-payment-policy";
 
 export const AI_RESEARCH_COURSE_URL = "https://www.medmindslc.online/courses/ai-enhanced-research-writing";
 export const AI_RESEARCH_COURSE_PRICE_ZMW = 350;
@@ -33,13 +36,12 @@ function config() {
 }
 
 export async function createResearchPaymentRequest(input: {
-  lead: Lead;
+  lead?: Pick<Lead, "id">;
   title: string;
   description?: string;
   amountZmw: number;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
+  customerName?: string;
+  sourceReference?: string;
   expiryDays?: number;
 }) {
   const { secret, url } = config();
@@ -52,11 +54,9 @@ export async function createResearchPaymentRequest(input: {
       title: input.title,
       description: input.description || `MedMinds payment for ${input.title}`,
       amount: input.amountZmw,
-      customerName: input.customerName,
-      customerEmail: input.customerEmail,
-      customerPhone: input.customerPhone,
+      openLink: true,
       expiryDays: input.expiryDays || 30,
-      sourceReference: `sales-lead:${input.lead.id}`,
+      sourceReference: input.sourceReference || (input.lead ? `sales-lead:${input.lead.id}:${createHash("sha256").update(input.title).digest("hex").slice(0, 16)}:${input.amountZmw.toFixed(2)}` : undefined),
     }),
   });
   const data = await response.json().catch(() => ({})) as { ok?: boolean; payment?: ResearchPayment; emailSent?: boolean; error?: string };
@@ -79,6 +79,14 @@ export async function checkResearchPayment(token: string) {
 }
 
 export async function latestPaymentTokenForLead(lead: Lead) {
+  const quote = await getLatestPreparedQuotation(lead.id).catch(() => null);
+  const amount = quote ? commercialPaymentAmount(quote) : null;
+  const secret = process.env.RESEARCH_ASSISTANT_SECRET;
+  if (quote && amount && secret) {
+    const token = createHmac("sha256", secret).update(`mary-payment:${quotationPaymentReference(quote, amount)}`).digest("hex").slice(0, 36);
+    const checked = await checkResearchPayment(token).catch(() => null);
+    if (checked?.checked) return token;
+  }
   const messages = await getConversation(lead.phone, 80).catch(() => []);
   for (const message of [...messages].reverse()) {
     const match = message.content.match(/https?:\/\/[^\s]+\/pay\/([a-f0-9]{36})\b/i);

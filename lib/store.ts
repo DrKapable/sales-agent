@@ -84,6 +84,8 @@ async function ensureDatabase() {
          WHERE offers.catalogue_version < $11`,
         [crypto.randomUUID(), offer.slug, offer.name, offer.category, offer.description, JSON.stringify(offer.features), offer.priceZmw, offer.rushPriceZmw, offer.paymentInstructions, offer.active, catalogueVersion]
       );
+      // Retire personal collection numbers without changing approved prices or scope.
+      await db.query(`UPDATE offers SET payment_instructions=$2,updated_at=NOW() WHERE slug=$1 AND (payment_instructions LIKE '%0977259132%' OR payment_instructions LIKE '%0969152364%' OR payment_instructions ILIKE '%registered to Juma%')`, [offer.slug, offer.paymentInstructions]);
     }
   })();
   await initialization;

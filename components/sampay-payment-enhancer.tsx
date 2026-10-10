@@ -45,8 +45,6 @@ export function SampayPaymentEnhancer() {
   const [client, setClient] = useState<ActiveClient | null>(null);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [momo, setMomo] = useState("");
   const [service, setService] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -72,7 +70,6 @@ export function SampayPaymentEnhancer() {
   useEffect(() => {
     if (!open || !client) return;
     setName(client.name);
-    setMomo(client.phone);
     setService(client.service || "Research support");
     setNotice("");
     setError("");
@@ -102,7 +99,7 @@ export function SampayPaymentEnhancer() {
       const response = await fetch("/api/admin/payment-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: client.phone, customerName: name, customerEmail: email, customerPhone: momo, service })
+        body: JSON.stringify({ phone: client.phone, service })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to create payment request.");
@@ -111,7 +108,7 @@ export function SampayPaymentEnhancer() {
         setNotice("Course checkout ready. Share the secure Sampay checkout with the client.");
       } else {
         setPayment(data.payment || null);
-        setNotice(data.emailSent ? "Secure Sampay link created and emailed to the client." : "Secure Sampay link created. Share it in WhatsApp; email delivery was not confirmed.");
+        setNotice("Open Sampay link created. Share it in WhatsApp or on the quotation; no email or phone is required.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create payment request.");
@@ -146,11 +143,9 @@ export function SampayPaymentEnhancer() {
             <p>Clients pay directly on the course checkout using Mobile Money or supported cards.</p>
           </div>
 
-          <div className="sampaySectionTitle"><strong>Tailored service payment</strong><small>Uses the approved quotation/catalogue amount. The amount cannot be typed manually.</small></div>
+          <div className="sampaySectionTitle"><strong>Tailored service payment</strong><small>Uses the approved amount: 50% deposit for task-based services. No client email or Mobile Money number is needed to create the open link.</small></div>
           <div className="sampayFields">
-            <label>Client name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" /></label>
-            <label>Email for link & receipt<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="client@example.com" /></label>
-            <label>Mobile Money number<input value={momo} onChange={(e) => setMomo(e.target.value)} inputMode="tel" placeholder="260..." /></label>
+            <label>Client name<input value={name} readOnly placeholder="Client" /></label>
             <label>Service<input value={service} onChange={(e) => setService(e.target.value)} placeholder="Research Proposal" /></label>
           </div>
 
@@ -167,7 +162,7 @@ export function SampayPaymentEnhancer() {
 
           <div className="sampayActions">
             <button type="button" className="secondary" disabled={busy} onClick={() => void checkStatus(client.phone)}>{busy ? "Checking…" : "Check payment"}</button>
-            <button type="button" className="primary" disabled={busy || !name.trim() || !email.trim() || !momo.trim() || !service.trim()} onClick={createPayment}>{busy ? "Working…" : "Create secure link"}</button>
+            <button type="button" className="primary" disabled={busy || !service.trim()} onClick={createPayment}>{busy ? "Working…" : "Create open payment link"}</button>
           </div>
           <p className="sampaySafety">Payment is confirmed only from the Research Portal/Sampay record. A screenshot or client message alone cannot mark a payment as paid. Official receipts are issued after verified payment.</p>
         </div>

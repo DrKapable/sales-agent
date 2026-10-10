@@ -10,12 +10,11 @@ import {
   createResearchPaymentRequest,
   latestPaymentTokenForLead,
 } from "@/lib/research-payments";
+import { commercialPaymentAmount, isTaskBasedService, quotationPaymentReference } from "@/lib/medminds-payment-policy";
 
 const postSchema = z.object({
   phone: z.string().min(8).max(40),
-  customerName: z.string().trim().min(2).max(120),
-  customerEmail: z.string().trim().email().max(180),
-  customerPhone: z.string().trim().min(8).max(40),
+  customerName: z.string().trim().max(120).optional(),
   service: z.string().trim().min(2).max(240).optional(),
 });
 
@@ -45,7 +44,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const parsed = postSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Name, valid email and Mobile Money number are required." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Select a valid client conversation and service." }, { status: 400 });
 
   const phone = normalizePhone(parsed.data.phone);
   const lead = await getOrCreateLead(phone, "simulator");
@@ -64,14 +63,14 @@ export async function POST(request: Request) {
 
   const quote = await getLatestPreparedQuotation(lead.id).catch(() => null);
   let service = quote?.service || requestedService;
-  let amount = quote?.amount_zmw == null ? null : Number(quote.amount_zmw);
+  let amount = quote ? commercialPaymentAmount(quote) : null;
   if (!(amount && Number.isFinite(amount) && amount > 0)) {
     const pricing = resolveCataloguePrice(await listOffers(true), { service, programme: lead.programme, deadline: lead.deadline });
     if (pricing.status !== "matched") {
       return NextResponse.json({ error: "An approved quotation or catalogue amount is required before creating a payment request." }, { status: 409 });
     }
     service = pricing.offer.name;
-    amount = Number(pricing.amountZmw);
+    amount = Math.round(Number(pricing.amountZmw) * (isTaskBasedService(service) ? 0.5 : 1) * 100) / 100;
   }
 
   try {
@@ -80,12 +79,10 @@ export async function POST(request: Request) {
       title: service,
       description: `Secure MedMinds Sampay payment request for ${service}.`,
       amountZmw: amount,
-      customerName: parsed.data.customerName,
-      customerEmail: parsed.data.customerEmail,
-      customerPhone: normalizePhone(parsed.data.customerPhone),
+      sourceReference: quote ? quotationPaymentReference(quote, amount) : undefined,
     });
     if (!created.created) return NextResponse.json({ error: created.reason }, { status: 503 });
-    await updateLead(phone, { email: parsed.data.customerEmail, serviceInterest: service, status: "PAYMENT PENDING" }).catch(() => undefined);
+    await updateLead(phone, { serviceInterest: service, status: "PAYMENT PENDING" }).catch(() => undefined);
     return NextResponse.json({ ok: true, directCheckout: false, payment: created.payment, emailSent: created.emailSent });
   } catch (error) {
     console.error("Admin Sampay payment request failed", { phoneSuffix: phone.slice(-4), error });

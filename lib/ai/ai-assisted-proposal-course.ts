@@ -66,9 +66,8 @@ TOOLS TAUGHT OR USED
 - AJOL.
 
 PAYMENT AND ENROLMENT FOR THIS COURSE
-- Airtel Money: 0977259132, Juma Phiri.
-- MTN Money: 0969152364, Musonda Mupeta.
-- After payment, ask the learner to send proof of payment and their email address for account activation.
+- Use the official Sampay course checkout: https://www.medmindslc.online/courses/ai-enhanced-research-writing.
+- Never collect course fees through personal mobile-money numbers. Confirm payment and access through the authorised course checkout.
 - Account creation link: https://medmindslc.online/user-account/
 - After logging in, the learner should find the course under Enrolled Courses.
 - A certificate is provided after successful completion of the course.

@@ -2,6 +2,7 @@ import { createCommercialPdf } from "@/lib/commercial-pdf";
 import { markQuoteAccepted } from "@/lib/quotation-delivery";
 import { sendWhatsAppPdfDocument } from "@/lib/whatsapp";
 import type { Lead } from "@/lib/types";
+import { commercialPaymentAmount, isTaskBasedService, quotationPaymentUrl } from "@/lib/medminds-payment-policy";
 
 export type CommercialRecord = {
   id: string;
@@ -24,13 +25,16 @@ export function buildCommercialPdf(lead: Pick<Lead, "name" | "phone">, record: C
   return createCommercialPdf({
     kind,
     documentNumber: commercialDocumentNumber(record),
-    clientName: lead.name || lead.phone,
+    clientName: lead.name || "Client",
     service: record.service,
     amountZmw: record.amount_zmw == null ? null : Number(record.amount_zmw),
     totalChargedZmw: record.total_charged_zmw == null ? undefined : Number(record.total_charged_zmw),
     amountPaidZmw: record.amount_paid_zmw == null ? undefined : Number(record.amount_paid_zmw),
     balanceZmw: record.balance_zmw == null ? undefined : Number(record.balance_zmw),
-    details: record.details,
+    details: record.details.split(/\n+/).filter((line) => !/0977259132|0969152364|registered to|send (?:money|payment) to|pay (?:to|on) (?:0|\+?260)/i.test(line)).join("\n"),
+    paymentUrl: commercialPaymentAmount(record) ? quotationPaymentUrl(record.id) : undefined,
+    paymentAmountZmw: commercialPaymentAmount(record),
+    deposit: record.status !== "INVOICE_UNPAID" && isTaskBasedService(record.service),
     issuedAt: record.created_at || undefined
   });
 }

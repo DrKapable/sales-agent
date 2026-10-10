@@ -1,11 +1,12 @@
 import type { Offer } from "@/lib/types";
 import { CURRENT_CONTENT_DESTINATIONS } from "@/lib/content-destinations";
+import { approvedPaymentInstructions } from "@/lib/medminds-payment-policy";
 
 export type OfferSeed = Omit<Offer, "id" | "updatedAt">;
 
 const RESEARCH_PRICING_URL = "https://www.medmindslc.online/pricing";
-const PAYMENT_DETAILS = "Submit payment to 0977259132, registered to Juma Phiri. Confirm payment with Dr. Mustafa Juma Phiri on 0977259132";
-const PAYMENT_AFTER_QUOTE = "Once the amount is approved, submit payment to 0977259132, registered to Juma Phiri, and confirm it with Dr. Mustafa Juma Phiri on 0977259132";
+const PAYMENT_DETAILS = approvedPaymentInstructions();
+const PAYMENT_AFTER_QUOTE = `Once the amount is approved, use the MedMinds bank account or the open custom Sampay link on the quotation. ${PAYMENT_DETAILS}`;
 const GENERAL_CONTACT = "Dr Kanyembo Ng'andwe on 0974634555";
 const RESEARCH_PAYMENT = `Review research pricing at ${RESEARCH_PRICING_URL}. ${PAYMENT_DETAILS}. For other enquiries, contact ${GENERAL_CONTACT}.`;
 const PREP_NMCZ = CURRENT_CONTENT_DESTINATIONS["prep-nmcz"].url;
@@ -21,7 +22,7 @@ const NMCZ_PAGE = "https://www.medmindslc.online/nmcz";
 const PLAB_MLA_PAGE = "https://www.medmindslc.online/plab-mla";
 const INTERNATIONAL_QBANK = "https://www.medmindslc.online/international/qbank";
 const CLINICALLY_EQUIPPED_GIVEAWAY = "https://www.medmindslc.online/giveaway/clinically-equipped";
-const AI_PROPOSAL_COURSE_PAYMENT = "AI-Assisted Research Proposal Writing course payment: Airtel Money 0977259132 (Juma Phiri) or MTN Money 0969152364 (Musonda Mupeta). After payment, send proof of payment and your email address for account activation. Create your account at https://medmindslc.online/user-account/.";
+const AI_PROPOSAL_COURSE_PAYMENT = "AI-Enhanced Research Writing course: use the secure Sampay course checkout at https://www.medmindslc.online/courses/ai-enhanced-research-writing. Do not pay a personal mobile-money number. Payment and access are verified through the course checkout.";
 
 type ResearchPrice = {
   slug: string;

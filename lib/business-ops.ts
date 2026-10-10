@@ -269,6 +269,14 @@ export async function createQuote(input: { leadId: string; service: string; amou
   return rows[0];
 }
 
+export async function getPayableQuote(id: string) {
+  await ensureTables();
+  const database = db();
+  if (!database) return null;
+  const rows = await database.query(`SELECT * FROM sales_quotes WHERE id=$1 AND status IN ('QUOTATION','INVOICE_UNPAID') LIMIT 1`, [id]);
+  return rows[0] || null;
+}
+
 export async function recordFeedback(input: { leadId: string; rating?: number; comment?: string; reviewRequested?: boolean }) {
   await ensureTables();
   const database = db();

@@ -36,9 +36,10 @@ describe("approved service catalogue", () => {
     expect(prepOffers.every((offer) => !offer.paymentInstructions?.startsWith("Review research pricing"))).toBe(true);
   });
 
-  it("retains the approved account instructions for other directly-paid catalogue services", () => {
+  it("uses the company bank account or approved course checkout for directly-paid services", () => {
     const directPaid = offerSeeds.filter((offer) => offer.category !== "MedMinds Prep" && (offer.priceZmw ?? 0) > 0);
     expect(directPaid.length).toBeGreaterThan(0);
-    expect(directPaid.every((offer) => offer.paymentInstructions?.includes("0977259132") || offer.slug === "course-ai-research-writing")).toBe(true);
+    expect(directPaid.every((offer) => offer.paymentInstructions?.includes("63226093902") || offer.slug === "course-ai-research-writing")).toBe(true);
+    expect(directPaid.every((offer) => !/0977259132|0969152364/.test(offer.paymentInstructions || ""))).toBe(true);
   });
 });

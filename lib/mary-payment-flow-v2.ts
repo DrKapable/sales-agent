@@ -10,6 +10,7 @@ import {
   latestPaymentTokenForLead,
 } from "@/lib/research-payments";
 import type { SalesAgentResult } from "@/lib/ai/sales-agent";
+import { MEDMINDS_BANK_TEXT, commercialPaymentAmount, isTaskBasedService, quotationPaymentReference } from "@/lib/medminds-payment-policy";
 
 const PAYMENT_TOPIC = /\b(pay|payment|payment link|checkout|sampay|mobile money|momo|bank card|debit card|credit card|card payment|pay by card|pay with card|payment method)\b/i;
 const CREATE_INTENT = /\b(ready to pay|want to pay|make payment|proceed with payment|send (?:me )?(?:the )?(?:payment )?link|create (?:a )?(?:payment )?link|prepare (?:for me )?(?:a )?(?:payment )?link|how (?:do|can) i pay|where (?:do|can) i pay)\b/i;
@@ -31,11 +32,6 @@ function asResult(reply: string): SalesAgentResult {
 
 function money(value: number) {
   return `K${Number(value).toLocaleString("en-ZM", { maximumFractionDigits: 2 })}`;
-}
-
-function normalizePhone(value: string) {
-  const digits = value.replace(/\D/g, "");
-  return digits.startsWith("0") && digits.length === 10 ? `260${digits.slice(1)}` : digits;
 }
 
 function inferProgramme(text: string) {
@@ -167,7 +163,6 @@ export async function handleMaryPaymentFlowV2(input: {
   }
 
   const email = lead.email || [...clientMessages].reverse().map((v) => v.match(EMAIL)?.[0]).find(Boolean) || null;
-  const statedPhone = [...clientMessages].reverse().map((v) => v.match(PHONE)?.[0]).find(Boolean) || null;
   const inferredProgramme = lead.programme || inferProgramme(transcript);
   const inferredDeadline = lead.deadline || inferDeadline(clientMessages);
   const inferredService = inferResearchService(context) || lead.serviceInterest || lead.packageName || null;
@@ -183,19 +178,15 @@ export async function handleMaryPaymentFlowV2(input: {
   if (Object.keys(patch).length) lead = await updateLead(input.phone, patch as any).catch(() => lead);
 
   if (!CREATE_INTENT.test(transcript) && lead.status !== "PAYMENT PENDING") {
-    return reply(input.phone, "For MedMinds research-support services, we use secure Sampay payment links. The checkout supports Mobile Money and supported bank cards. Once the service and approved amount are confirmed, I can create the payment request and send it here on WhatsApp and to your email. I’ll need your full name, email address and Mobile Money number for the request.");
+    return reply(input.phone, `You can pay by MedMinds bank transfer or an open custom Sampay link. No email or phone is required to create or open the link; the payer enters payment details at checkout.\n\n${MEDMINDS_BANK_TEXT}`);
   }
 
-  if (!lead.name?.trim()) return reply(input.phone, "I can create the secure Sampay payment request. What full name should I put on it?");
-  if (!email) return reply(input.phone, "What email address should I use for the payment request and official receipt?");
-  if (!statedPhone) return reply(input.phone, "Please send the Mobile Money number you want linked to the payment request. I’ll use it with your name and email to create the secure checkout link.");
-  if (!inferredService) return reply(input.phone, "I have your payment details. Which research service should I put on the Sampay payment request?");
-  if (/research proposal/i.test(inferredService) && !inferredProgramme) return reply(input.phone, "I have your payment details. What academic level is the research proposal for: diploma, bachelor’s, master’s or PhD?");
-  if (/research proposal/i.test(inferredService) && !inferredDeadline) return reply(input.phone, "I have your payment details. What deadline are you working toward for the proposal?");
-
   const quote = await getLatestPreparedQuotation(lead.id).catch(() => null);
-  let service = quote?.service || inferredService;
-  let amount = quote?.amount_zmw == null ? null : Number(quote.amount_zmw);
+  if (!quote && !inferredService) return reply(input.phone, "Which service should the payment link cover?");
+  if (!quote && /research proposal/i.test(inferredService || "") && !inferredProgramme) return reply(input.phone, "What academic level is the research proposal for: diploma, bachelor’s, master’s or PhD?");
+  if (!quote && /research proposal/i.test(inferredService || "") && !inferredDeadline) return reply(input.phone, "What deadline are you working toward for the proposal?");
+  let service = quote?.service || inferredService || "Research support";
+  let amount = quote ? commercialPaymentAmount(quote) : null;
 
   if (!(amount && Number.isFinite(amount) && amount > 0)) {
     const pricing = resolveCataloguePrice(await listOffers(true), {
@@ -207,7 +198,8 @@ export async function handleMaryPaymentFlowV2(input: {
       return reply(input.phone, "I have your payment details, but the final approved amount for this service is not yet available. I won’t create a payment request using a guessed fee. The quotation or approved amount needs to be confirmed first.");
     }
     service = pricing.offer.name;
-    amount = Number(pricing.amountZmw);
+    amount = Number(pricing.amountZmw) * (isTaskBasedService(service) ? 0.5 : 1);
+    amount = Math.round(amount * 100) / 100;
   }
 
   const existingToken = await latestPaymentTokenForLead(lead);
@@ -233,18 +225,15 @@ export async function handleMaryPaymentFlowV2(input: {
   try {
     const created = await createResearchPaymentRequest({
       lead,
-      title: service,
+      title: service!,
       description: `Secure MedMinds Sampay payment request for ${service}. Payment may be completed using Mobile Money or supported cards.`,
       amountZmw: amount,
-      customerName: lead.name,
-      customerEmail: email,
-      customerPhone: normalizePhone(statedPhone),
+      sourceReference: quote ? quotationPaymentReference(quote, amount) : undefined,
     });
     if (!created.created) return reply(input.phone, "I have the details, but the secure Research Portal payment-link service is not configured right now. I won’t provide an unofficial payment method. A MedMinds team member will need to issue the link.");
 
     await updateLead(input.phone, { email, serviceInterest: service, status: "PAYMENT PENDING" }).catch(() => undefined);
-    const emailNote = created.emailSent ? `I’ve also sent the same request to ${email}.` : "The WhatsApp link is ready; if the email does not arrive, you can use this link directly.";
-    return reply(input.phone, `Your secure Sampay payment request is ready for ${service}: ${money(amount)}. You can pay using Mobile Money or a supported bank card.\n\n${created.payment.link}\n\n${emailNote} After payment, tell me here and I’ll verify it against the MedMinds Research Portal before confirming your receipt.`);
+    return reply(input.phone, `Your open Sampay link is ready for ${service}: ${money(amount)}${isTaskBasedService(service!) ? " (50% deposit)" : ""}. Anyone with the link can open it without signing in. The payer enters payment details at checkout.\n\n${created.payment.link}\n\nAlternatively, pay by MedMinds bank transfer:\n${MEDMINDS_BANK_TEXT}\n\nAfter payment, tell me here so it can be verified before a receipt is confirmed.`);
   } catch (error) {
     console.error("Mary payment-link creation failed", { phoneSuffix: input.phone.slice(-4), error });
     return reply(input.phone, "I couldn’t create the secure payment link just now. I have not given you alternative personal payment details. I’ll keep the request pending until the MedMinds payment service is available.");

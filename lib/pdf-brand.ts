@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
+import { PDF_FONTS } from "@/lib/pdf-fonts";
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const OFFICIAL_LOGO_ASPECT = 614 / 260;
@@ -130,27 +131,40 @@ export function officialLogoDrawCommand(x: number, y: number, maxWidth: number, 
   return `q ${width.toFixed(2)} 0 0 ${height.toFixed(2)} ${drawX.toFixed(2)} ${drawY.toFixed(2)} cm /Im1 Do Q`;
 }
 
-export function buildPdfWithOfficialLogo(content: string) {
+export function buildPdfWithOfficialLogo(content: string, links: { url: string; rect: [number, number, number, number] }[] = []) {
   const logo = loadOfficialLogo();
   const compressedLogo = deflateSync(logo.rgb, { level: 9 });
   const contentBytes = Buffer.from(content, "utf8");
   const objects: Buffer[] = [
     Buffer.from("<< /Type /Catalog /Pages 2 0 R >>", "utf8"),
     Buffer.from("<< /Type /Pages /Kids [3 0 R] /Count 1 >>", "utf8"),
-    Buffer.from("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> /XObject << /Im1 7 0 R >> >> /Contents 4 0 R >>", "utf8"),
+    Buffer.from(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> /XObject << /Im1 7 0 R >> >> /Contents 4 0 R ${links.length ? `/Annots [${links.map((_, i) => `${12 + i} 0 R`).join(" ")}]` : ""} >>`, "utf8"),
     Buffer.concat([
       Buffer.from(`<< /Length ${contentBytes.length} >>\nstream\n`, "utf8"),
       contentBytes,
       Buffer.from("\nendstream", "utf8")
     ]),
-    Buffer.from("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", "utf8"),
-    Buffer.from("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>", "utf8"),
+    Buffer.from(`<< /Type /Font /Subtype /TrueType /BaseFont /${PDF_FONTS.regular.name} /FirstChar 32 /LastChar 255 /Widths [${PDF_FONTS.regular.widths.join(" ")}] /FontDescriptor 8 0 R /Encoding /WinAnsiEncoding >>`, "utf8"),
+    Buffer.from(`<< /Type /Font /Subtype /TrueType /BaseFont /${PDF_FONTS.bold.name} /FirstChar 32 /LastChar 255 /Widths [${PDF_FONTS.bold.widths.join(" ")}] /FontDescriptor 9 0 R /Encoding /WinAnsiEncoding >>`, "utf8"),
     Buffer.concat([
       Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${compressedLogo.length} >>\nstream\n`, "utf8"),
       compressedLogo,
       Buffer.from("\nendstream", "utf8")
     ])
   ];
+
+  for (const [index, font] of [PDF_FONTS.regular, PDF_FONTS.bold].entries()) {
+    objects.push(Buffer.from(`<< /Type /FontDescriptor /FontName /${font.name} /Flags 32 /FontBBox [${font.bbox.join(" ")}] /ItalicAngle 0 /Ascent ${font.ascent} /Descent ${font.descent} /CapHeight ${font.ascent} /StemV ${index ? 120 : 80} /FontFile2 ${10 + index} 0 R >>`, "utf8"));
+  }
+  for (const font of [PDF_FONTS.regular, PDF_FONTS.bold]) {
+    const data = Buffer.from(font.data, "base64");
+    objects.push(Buffer.concat([Buffer.from(`<< /Length ${data.length} /Length1 ${inflateSync(data).length} /Filter /FlateDecode >>\nstream\n`), data, Buffer.from("\nendstream")]));
+  }
+
+  for (const link of links) {
+    const uri = link.url.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+    objects.push(Buffer.from(`<< /Type /Annot /Subtype /Link /Rect [${link.rect.join(" ")}] /Border [0 0 0] /A << /S /URI /URI (${uri}) >> >>`, "utf8"));
+  }
 
   const header = Buffer.from("%PDF-1.4\n%MedMinds\n", "utf8");
   const chunks: Buffer[] = [header];

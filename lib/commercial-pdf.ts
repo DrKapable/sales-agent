@@ -1,5 +1,6 @@
 import { MEDMINDS_BUSINESS_IDENTITY } from "@/lib/business-identity";
 import { buildPdfWithOfficialLogo, officialLogoDrawCommand } from "@/lib/pdf-brand";
+import { MEDMINDS_BANK } from "@/lib/medminds-payment-policy";
 
 type CommercialDocumentInput = {
   kind: "quotation" | "invoice";
@@ -12,6 +13,9 @@ type CommercialDocumentInput = {
   balanceZmw?: number | null;
   details: string;
   issuedAt?: string | null;
+  paymentUrl?: string;
+  paymentAmountZmw?: number | null;
+  deposit?: boolean;
 };
 
 function pdfEscape(value: string) {
@@ -102,16 +106,22 @@ export function createCommercialPdf(input: CommercialDocumentInput) {
   );
   detailLines.forEach((row, index) => content.push(line(row, 210, 380 - index * 17, 10, "F1", navy)));
   content.push(
-    `${teal} rg 42 216 511 2 re f`,
-    line(input.kind === "invoice" ? "Balance shown above is the amount remaining against this recorded charge." : "This quotation is based on the approved MedMinds service and price recorded above.", 42, 185, 9.5, "F2", navy),
-    line("Payment details and any applicable conditions should be confirmed before payment.", 42, 162, 8.5, "F1", muted),
-    line(MEDMINDS_BUSINESS_IDENTITY.legalName, 42, 112, 8.2, "F2", navy),
-    line(`TPIN: ${MEDMINDS_BUSINESS_IDENTITY.tpin}`, 42, 97, 7.8, "F1", muted),
-    line(MEDMINDS_BUSINESS_IDENTITY.physicalAddress, 42, 82, 7.2, "F1", muted),
-    line("WhatsApp: +260 762 402042", 42, 64, 7.5, "F1", muted),
-    line(`Document ID: ${input.documentNumber}`, 390, 64, 7.5, "F1", muted),
+    `${teal} rg 42 245 511 2 re f`,
+    line("PAYMENT OPTIONS", 42, 227, 9, "F2", teal),
+    line(`Bank: ${MEDMINDS_BANK.bank} | Account: ${MEDMINDS_BANK.accountName}`, 42, 209, 8.5, "F2", navy),
+    line(`Account number: ${MEDMINDS_BANK.accountNumber} | ${MEDMINDS_BANK.accountType}`, 42, 194, 8.5, "F1", navy),
+    line(`Branch: ${MEDMINDS_BANK.branch} | Code: ${MEDMINDS_BANK.branchCode} | SWIFT: ${MEDMINDS_BANK.swift}`, 42, 179, 8.5, "F1", navy),
+    line(input.deposit && input.paymentAmountZmw ? `50% deposit: ${money(input.paymentAmountZmw)}. Remaining 50% on completion.` : input.paymentAmountZmw ? `Amount payable: ${money(input.paymentAmountZmw)}.` : "A final payable amount must be approved before payment.", 42, 161, 9, "F2", navy),
+    line("Mobile Money / card: open the custom Sampay payment link below.", 42, 143, 8.5, "F1", navy),
+    line(input.paymentUrl || "A payment link is issued once the payable amount is approved.", 42, 127, 7.5, "F1", teal),
+    line("No email or phone is needed to create or open the link. Enter payer details at checkout.", 42, 111, 8, "F1", muted),
+    line("Sampay processing charges are shown at checkout. Use the document number as bank reference.", 42, 97, 8, "F1", muted),
+    line(MEDMINDS_BUSINESS_IDENTITY.legalName, 42, 70, 8.2, "F2", navy),
+    line(`TPIN: ${MEDMINDS_BUSINESS_IDENTITY.tpin}`, 42, 55, 7.8, "F1", muted),
+    line(MEDMINDS_BUSINESS_IDENTITY.physicalAddress, 42, 40, 7.2, "F1", muted),
+    line(`Document ID: ${input.documentNumber}`, 390, 55, 7.5, "F1", muted),
     "Q"
   );
 
-  return buildPdfWithOfficialLogo(content.join("\n"));
+  return buildPdfWithOfficialLogo(content.join("\n"), input.paymentUrl ? [{ url: input.paymentUrl, rect: [42, 124, 553, 139] }] : []);
 }
