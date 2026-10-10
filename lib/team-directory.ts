@@ -1,9 +1,7 @@
 export const staffNames = [
   "Dr. Mustafa Juma Phiri",
   "Dr Kanyembo Ng'andwe",
-  "Counsel Chisha Chomba",
   "Mr Conrad Mununkha Phiri",
-  "Dr. Monica",
   "Dr Zabibu Nandazi"
 ] as const;
 
@@ -28,16 +26,8 @@ export const teamDirectory: ReadonlyArray<{ name: StaffName; roles: readonly str
     roles: ["Sales representative", "Lead conversion", "Marketing team", "Senior sales escalation"]
   },
   {
-    name: "Counsel Chisha Chomba",
-    roles: ["Customer support", "Conflict and dispute resolution", "Legal consultant"]
-  },
-  {
     name: "Mr Conrad Mununkha Phiri",
     roles: ["Digital marketer", "Marketing team", "Secretary"]
-  },
-  {
-    name: "Dr. Monica",
-    roles: ["Operations team", "Research support expert"]
   },
   {
     name: "Dr Zabibu Nandazi",

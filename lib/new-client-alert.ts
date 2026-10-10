@@ -1,5 +1,6 @@
 import { attachmentDisplayName, parseClientAttachmentChatContent } from "@/lib/client-attachment-content";
 import { sendTeamNotification } from "@/lib/team-notifications";
+import { referralRecipients } from "@/lib/referrals";
 import type { Lead } from "@/lib/types";
 
 export function buildNewClientAlert(input: {
@@ -42,7 +43,8 @@ export async function notifyDirectorOfNewClient(input: {
       lead: input.lead,
       phoneNumberIdOverride: input.phoneNumberIdOverride
     });
-    return results.some((result) => result.status === "fulfilled" && result.value.sent);
+    return results.some((result) => result.status === "fulfilled"
+      && result.value.recipient === referralRecipients.mustafa.name && result.value.sent);
   } catch (error) {
     console.error("New client team alert failed", {
       source: input.source,

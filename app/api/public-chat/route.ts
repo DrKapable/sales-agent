@@ -13,6 +13,7 @@ import { notifyDirectorOfNewClient } from "@/lib/new-client-alert";
 import { handleMaryPaymentFlowV2 } from "@/lib/mary-payment-flow-v2";
 import { sanitizeMaryPaymentKnowledge } from "@/lib/sampay-knowledge-guard";
 import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewrite";
+import { maybeNotifyHotLead } from "@/lib/business-notifications";
 
 const requestSchema = z.object({
   sessionId: z.string().regex(/^web-[a-f0-9-]{36}$/),
@@ -73,8 +74,9 @@ export async function POST(request: Request) {
   await addMessage(phone, "user", parsed.data.message);
 
   const queueNewClientAlert = () => {
-    if (!firstEverClientMessage) return;
     after(async () => {
+      await maybeNotifyHotLead(phone).catch((error) => console.error("Website hot client alert failed", { error }));
+      if (!firstEverClientMessage) return;
       const currentLead = await getOrCreateLead(phone, "simulator");
       const alerted = await notifyDirectorOfNewClient({ lead: currentLead, firstMessage: parsed.data.message, source: "website" });
       console.info("Website new client director alert processed", { phoneSuffix: phone.slice(-4), alerted });

@@ -11,9 +11,9 @@ const recipientMap: Record<BusinessEventType, { primary: string; cc: string[] }>
   payment_pending: { primary: "mustafa", cc: ["kanyembo"] },
   payment_verified: { primary: "mustafa", cc: ["kanyembo"] },
   receipt_sent: { primary: "mustafa", cc: ["kanyembo"] },
-  research_task_created: { primary: "monica", cc: [] },
+  research_task_created: { primary: "mustafa", cc: [] },
   review_requested: { primary: "zabibu", cc: [] },
-  operations_task: { primary: "monica", cc: [] }
+  operations_task: { primary: "mustafa", cc: [] }
 };
 
 const memoryClaims = new Set<string>();
@@ -55,8 +55,17 @@ export async function notifyBusinessEvent(input: {
     cc,
     lead: input.lead
   });
+  const directorSent = results.some((result) => result.status === "fulfilled"
+    && result.value.recipient === referralRecipients.mustafa.name && result.value.sent);
+  if (!directorSent) {
+    memoryClaims.delete(input.eventKey);
+    if (process.env.DATABASE_URL) {
+      const { neon } = await import("@neondatabase/serverless");
+      await neon(process.env.DATABASE_URL).query(`DELETE FROM business_event_notifications WHERE event_key=$1`, [input.eventKey]);
+    }
+  }
   return {
-    sent: results.some((result) => result.status === "fulfilled" && result.value.sent),
+    sent: directorSent,
     results
   };
 }
@@ -66,7 +75,7 @@ export async function maybeNotifyHotLead(phone: string) {
   if (!lead || lead.status === "CONVERTED" || lead.status === "LOST LEAD") return;
   const { scoreLead } = await import("@/lib/business-ops");
   const score = await scoreLead(lead);
-  if (score.score < 70) return;
+  if (score.score < 70 && lead.priority !== "HOT") return;
   await notifyBusinessEvent({
     type: "hot_lead",
     eventKey: `hot_lead:${lead.id}`,

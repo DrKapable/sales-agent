@@ -36,20 +36,10 @@ export const referralRecipients: Record<string, ReferralRecipient> = {
     phone: "260974634555",
     roles: ["Sales representative", "Lead conversion", "Marketing team", "Senior sales escalation"]
   },
-  chisha: {
-    name: "Counsel Chisha Chomba",
-    phone: "260970623913",
-    roles: ["Customer support", "Conflict and dispute resolution", "Legal consultant"]
-  },
   conrad: {
     name: "Mr Conrad Mununkha Phiri",
     phone: "260979235018",
     roles: ["Digital marketing", "Marketing team", "Secretary"]
-  },
-  monica: {
-    name: "Dr. Monica",
-    phone: "260968441133",
-    roles: ["Operations team", "Research support expert"]
   },
   zabibu: {
     name: "Dr Zabibu Nandazi",
@@ -62,9 +52,9 @@ function namedRecipient(context: string) {
   const text = context.toLowerCase();
   if (/\bmustafa\b|\bjuma phiri\b|\bdirector\b/.test(text)) return referralRecipients.mustafa;
   if (/\bkanyembo\b|\bng['’]?andwe\b/.test(text)) return referralRecipients.kanyembo;
-  if (/\bchisha\b|\bchomba\b|\bcounsel chisha\b/.test(text)) return referralRecipients.chisha;
+  if (/\bchisha\b|\bchomba\b|\bcounsel chisha\b/.test(text)) return referralRecipients.mustafa;
   if (/\bconrad\b|\bmununkha\b/.test(text)) return referralRecipients.conrad;
-  if (/\bmonica\b/.test(text)) return referralRecipients.monica;
+  if (/\bmonica\b/.test(text)) return referralRecipients.mustafa;
   if (/\bzabibu\b|\bnandazi\b/.test(text)) return referralRecipients.zabibu;
   return null;
 }
@@ -86,12 +76,12 @@ export function recipientForReferral(type: ReferralType, context = "") {
       return referralRecipients.kanyembo;
     case "research":
     case "operations":
-      return referralRecipients.monica;
+      return referralRecipients.mustafa;
     case "customer_support":
       return referralRecipients.zabibu;
     case "dispute":
     case "legal":
-      return referralRecipients.chisha;
+      return referralRecipients.mustafa;
     case "marketing":
     case "administrative":
       return referralRecipients.conrad;

@@ -43,6 +43,8 @@ async function ensureTables() {
     await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS program TEXT`);
     await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS academic_level TEXT`);
     await database.query(`ALTER TABLE business_tasks ADD COLUMN IF NOT EXISTS source_client TEXT`);
+    await database.query(`UPDATE business_tasks SET assigned_to='Dr. Mustafa Juma Phiri'
+      WHERE assigned_to IN ('Dr. Monica', 'Counsel Chisha Chomba') AND status <> 'COMPLETED'`);
     await database.query(`CREATE UNIQUE INDEX IF NOT EXISTS business_tasks_source_external_id_uidx ON business_tasks(source, external_id)`);
     await database.query(`CREATE TABLE IF NOT EXISTS client_payments (
       id UUID PRIMARY KEY, lead_id UUID, amount_zmw NUMERIC NOT NULL,

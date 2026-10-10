@@ -54,6 +54,8 @@ async function ensureDatabase() {
     await db.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS internal_note TEXT`);
     await db.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'STANDARD'`);
     await db.query(`ALTER TABLE leads ADD COLUMN IF NOT EXISTS follow_up_at TIMESTAMPTZ`);
+    await db.query(`UPDATE leads SET assigned_to='Dr. Mustafa Juma Phiri', updated_at=NOW()
+      WHERE assigned_to IN ('Dr. Monica', 'Counsel Chisha Chomba')`);
     await db.query(`CREATE TABLE IF NOT EXISTS messages (
       id UUID PRIMARY KEY, external_id TEXT UNIQUE, phone TEXT NOT NULL, role TEXT NOT NULL,
       content TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

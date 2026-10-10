@@ -1,6 +1,5 @@
 import { referralRecipients } from "@/lib/referrals";
-import { getApprovedMetaTemplateInventory, sendApprovedMetaTemplate, type MetaTemplate } from "@/lib/meta-templates";
-import { sendWhatsAppText } from "@/lib/whatsapp";
+import { sendStaffAlert } from "@/lib/team-alert-transport";
 import type { Lead } from "@/lib/types";
 
 export type TeamNotificationKind = "new_client" | "conversation_closed";
@@ -43,10 +42,10 @@ export function specialistsForLead(lead?: Lead | null): TeamCopyRecipient[] {
   const specialists: TeamCopyRecipient[] = [];
 
   if (/research|proposal|dissertation|thesis|data analysis|statistical|publication|methodology/.test(context)) {
-    specialists.push(referralRecipients.monica);
+    specialists.push(referralRecipients.mustafa);
   }
   if (/legal|dispute|conflict|contract|agreement/.test(context)) {
-    specialists.push(referralRecipients.chisha);
+    specialists.push(referralRecipients.mustafa);
   }
   if (/customer support|complaint|review|feedback|support issue/.test(context)) {
     specialists.push(referralRecipients.zabibu);
@@ -55,7 +54,7 @@ export function specialistsForLead(lead?: Lead | null): TeamCopyRecipient[] {
     specialists.push(referralRecipients.conrad);
   }
   if (/operations|project delivery|implementation|fulfilment|fulfillment/.test(context)) {
-    specialists.push(referralRecipients.monica);
+    specialists.push(referralRecipients.mustafa);
   }
 
   if (lead.assignedTo) {
@@ -85,106 +84,9 @@ function buildRecipients(
   add(primary, "PRIMARY");
   const ccRecipients = includeDefaultCc ? [...extraCc, ...defaultCcRecipients] : extraCc;
   ccRecipients.forEach((recipient) => add(recipient, "CC"));
+  // Every staff handover and marketing copy must also reach the director.
+  add(referralRecipients.mustafa, "CC");
   return recipients;
-}
-
-function variableCount(text = "") {
-  const matches = [...text.matchAll(/\{\{(\d+)\}\}/g)].map((match) => Number(match[1]));
-  return matches.length ? Math.max(...matches) : 0;
-}
-
-function referralTemplateScore(template: MetaTemplate) {
-  const text = `${template.name} ${template.components.map((item) => item.text || "").join(" ")}`.toLowerCase();
-  let score = 0;
-  if (/referral|refer|handoff|hand[_ -]?off/.test(text)) score += 120;
-  if (/team|assigned|assignment|client alert|lead alert/.test(text)) score += 70;
-  if (/medminds|mary/.test(text)) score += 15;
-  return score;
-}
-
-function referralTemplateUsable(template: MetaTemplate) {
-  for (const component of template.components || []) {
-    if (component.type === "HEADER" && component.format && component.format !== "TEXT") return false;
-    if (!["HEADER", "BODY", "FOOTER", "BUTTONS"].includes(component.type)) return false;
-    if (component.type === "BUTTONS" && /\{\{\d+\}\}/.test(JSON.stringify(component))) return false;
-  }
-  const header = template.components.find((item) => item.type === "HEADER");
-  const body = template.components.find((item) => item.type === "BODY");
-  return variableCount(header?.text) <= 4 && variableCount(body?.text) <= 4;
-}
-
-function chooseReferralTemplate(templates: MetaTemplate[]) {
-  const ranked = templates
-    .filter(referralTemplateUsable)
-    .map((template) => ({ template, score: referralTemplateScore(template) }))
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score || a.template.name.localeCompare(b.template.name));
-  return ranked[0]?.template || null;
-}
-
-function referralTemplateComponents(template: MetaTemplate, input: {
-  recipient: TeamCopyRecipient & { copyLabel: CopyLabel };
-  lead?: Lead | null;
-  heading: string;
-  body: string;
-}) {
-  const lead = input.lead;
-  const clientName = lead?.name || "MedMinds client";
-  const service = lead?.serviceInterest || lead?.packageName || input.heading;
-  const clientPhone = lead?.phone ? (lead.phone.startsWith("+") ? lead.phone : `+${lead.phone}`) : "See admin dashboard";
-  const values = [input.recipient.name, clientName, service, clientPhone];
-  const components: Array<{ type: "header" | "body"; parameters: Array<{ type: "text"; text: string }> }> = [];
-  const header = template.components.find((item) => item.type === "HEADER");
-  const body = template.components.find((item) => item.type === "BODY");
-  const headerCount = variableCount(header?.text);
-  const bodyCount = variableCount(body?.text);
-  if (headerCount) components.push({ type: "header", parameters: values.slice(0, headerCount).map((text) => ({ type: "text", text })) });
-  if (bodyCount) components.push({ type: "body", parameters: values.slice(0, bodyCount).map((text) => ({ type: "text", text })) });
-  return components;
-}
-
-async function sendReferralTemplateCopies(input: {
-  heading: string;
-  body: string;
-  primary: TeamCopyRecipient;
-  cc: TeamCopyRecipient[];
-  lead?: Lead | null;
-}) {
-  const inventory = await getApprovedMetaTemplateInventory();
-  const template = chooseReferralTemplate(inventory.templates);
-  if (!template) return null;
-
-  const recipients = buildRecipients(input.primary, input.cc, false);
-  const results = await Promise.allSettled(recipients.map(async (recipient) => {
-    if (!recipient.phone) return { recipient: recipient.name, sent: false, copyLabel: recipient.copyLabel, transport: "META_TEMPLATE" };
-    const sent = await sendApprovedMetaTemplate({
-      phone: recipient.phone,
-      name: template.name,
-      language: template.language,
-      components: referralTemplateComponents(template, { ...input, recipient })
-    });
-    return {
-      recipient: recipient.name,
-      sent: true,
-      copyLabel: recipient.copyLabel,
-      transport: "META_TEMPLATE",
-      template: template.name,
-      messageId: sent.messageId
-    };
-  }));
-
-  results.forEach((result, index) => {
-    if (result.status === "rejected") {
-      console.error("Referral Meta template send failed", {
-        heading: input.heading,
-        recipient: recipients[index]?.name,
-        copyLabel: recipients[index]?.copyLabel,
-        template: template.name,
-        error: result.reason
-      });
-    }
-  });
-  return results;
 }
 
 export async function sendTeamCopies(input: {
@@ -202,13 +104,7 @@ export async function sendTeamCopies(input: {
   );
   const results = await Promise.allSettled(recipients.map(async (recipient) => {
     if (!recipient.phone) return { recipient: recipient.name, sent: false, copyLabel: recipient.copyLabel };
-    const message = [
-      `${input.heading} (${recipient.copyLabel})`,
-      `For: ${recipient.name}`,
-      "",
-      input.body
-    ].join("\n");
-    await sendWhatsAppText(recipient.phone, message, input.phoneNumberIdOverride);
+    await sendStaffAlert({ phone: recipient.phone, name: recipient.name, heading: `${input.heading} (${recipient.copyLabel})`, body: input.body, phoneNumberIdOverride: input.phoneNumberIdOverride });
     return { recipient: recipient.name, sent: true, copyLabel: recipient.copyLabel };
   }));
 
@@ -245,20 +141,6 @@ export async function sendSalesPipelineCopies(input: {
       ...(input.cc || []),
       referralRecipients.mustafa
     ]);
-
-    try {
-      const templateResults = await sendReferralTemplateCopies({
-        heading: input.heading,
-        body: input.body,
-        primary: relevantPrimary,
-        cc,
-        lead: input.lead
-      });
-      if (templateResults) return templateResults;
-      console.warn("No compatible approved referral Meta template found; falling back to session text notification.", { heading: input.heading });
-    } catch (error) {
-      console.error("Referral Meta template dispatch failed; falling back to text notification.", { heading: input.heading, error });
-    }
 
     return sendTeamCopies({
       heading: input.heading,

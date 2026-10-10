@@ -36,15 +36,15 @@ describe("referral notifications", () => {
     expect(recipientForReferral("sales").name).toBe("Dr Kanyembo Ng'andwe");
   });
 
-  it("routes routine research support and operations to Dr Monica", () => {
-    expect(recipientForReferral("research").name).toBe("Dr. Monica");
-    expect(recipientForReferral("research").phone).toBe("260968441133");
-    expect(recipientForReferral("operations").name).toBe("Dr. Monica");
+  it("routes research and operations to the director", () => {
+    expect(recipientForReferral("research").name).toBe("Dr. Mustafa Juma Phiri");
+    expect(recipientForReferral("research").phone).toBe("260977259132");
+    expect(recipientForReferral("operations").name).toBe("Dr. Mustafa Juma Phiri");
   });
 
-  it("routes legal disputes to Counsel Chisha Chomba", () => {
-    expect(recipientForReferral("legal").name).toBe("Counsel Chisha Chomba");
-    expect(recipientForReferral("dispute").name).toBe("Counsel Chisha Chomba");
+  it("routes legal disputes to the director for management review", () => {
+    expect(recipientForReferral("legal").name).toBe("Dr. Mustafa Juma Phiri");
+    expect(recipientForReferral("dispute").name).toBe("Dr. Mustafa Juma Phiri");
   });
 
   it("routes cybersecurity to Dr Mustafa", () => {
@@ -52,9 +52,9 @@ describe("referral notifications", () => {
   });
 
   it("honours an explicitly requested active staff member", () => {
-    expect(recipientForReferral("general", "Client asked for Counsel Chisha Chomba").name).toBe("Counsel Chisha Chomba");
+    expect(recipientForReferral("general", "Client asked for Counsel Chisha Chomba").name).toBe("Dr. Mustafa Juma Phiri");
     expect(recipientForReferral("general", "Please connect me with Dr Mustafa").name).toBe("Dr. Mustafa Juma Phiri");
-    expect(recipientForReferral("general", "Please connect me with Dr Monica").name).toBe("Dr. Monica");
+    expect(recipientForReferral("general", "Please connect me with Dr Monica").name).toBe("Dr. Mustafa Juma Phiri");
   });
 
   it("includes client identity, contact and case summary", () => {

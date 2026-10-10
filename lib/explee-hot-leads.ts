@@ -1,5 +1,6 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { addMessage, getOrCreateLead, listLeads, updateLead } from "@/lib/store";
+import { notifyBusinessEvent } from "@/lib/business-notifications";
 
 const EXPLEE_BASE_URL = "https://api.explee.com";
 const DEFAULT_PROJECT_ID = 39070;
@@ -182,6 +183,17 @@ async function importLead(db: Database, hotLead: ExpleeHotLead) {
   if (hotLead.why_hot?.trim()) {
     await addMessage(contactKey, "user", `[Explee interested reply]
 ${hotLead.why_hot.trim()}`, `explee-hot:${externalKey}`);
+  }
+
+  if (updated.status !== "CONVERTED" && updated.status !== "LOST LEAD") {
+    const alert = await notifyBusinessEvent({
+      type: "hot_lead", eventKey: `hot_lead:explee:${externalKey}`,
+      title: "Hot MedMinds lead from Explee", lead: updated,
+      body: note
+    });
+    if (!alert.sent && !("reason" in alert && alert.reason === "duplicate")) {
+      throw new Error("Explee hot-client director alert failed; the import will retry on the next sync.");
+    }
   }
 
   await db.query(

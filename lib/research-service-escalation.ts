@@ -47,7 +47,7 @@ export async function maybeEscalateResearchService(input: {
   if (currentLead.status !== "CONVERTED") return null;
 
   const specialist = specialistRequest(input.text);
-  const recipient = specialist ? referralRecipients.mustafa : referralRecipients.monica;
+  const recipient = referralRecipients.mustafa;
   const reason = specialist
     ? "Converted client requested specialist research fulfilment."
     : "Converted client requested hands-on research fulfilment.";
