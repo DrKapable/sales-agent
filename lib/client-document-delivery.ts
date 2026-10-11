@@ -14,11 +14,12 @@ export async function sendClientDocument(input: {
   kind: ClientDocumentKind; phone: string; clientName?: string | null;
   documentNumber: string; detail: string; pdf: Uint8Array; filename: string;
   caption: string; phoneNumberIdOverride?: string;
+  forceTemplate?: boolean;
 }) {
-  if (await clientDocumentSessionOpen(input.phone)) return sendWhatsAppPdfDocument(input);
+  if (!input.forceTemplate && await clientDocumentSessionOpen(input.phone)) return sendWhatsAppPdfDocument(input);
   const template = await clientDocumentTemplateStatus(input.kind);
   if (template?.status !== "APPROVED" || !hasDocumentHeader(template)) {
-    throw new Error(`The client's WhatsApp reply window is closed. The MedMinds ${input.kind} PDF template must be APPROVED by Meta before sending (current status: ${template?.status || "NOT_SUBMITTED"}). The document remains saved.`);
+    throw new Error(`The MedMinds ${input.kind} PDF template must be APPROVED by Meta before sending (current status: ${template?.status || "NOT_SUBMITTED"}). The document remains saved.`);
   }
   const { mediaId } = await uploadWhatsAppPdf(input);
   const text = (value: string) => value.replace(/\s+/g, " ").trim().slice(0, 500);

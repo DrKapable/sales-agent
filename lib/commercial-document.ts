@@ -40,7 +40,7 @@ export function buildCommercialPdf(lead: Pick<Lead, "name" | "phone">, record: C
   });
 }
 
-export async function sendCommercialPdf(input: { lead: Lead; record: CommercialRecord; phoneNumberIdOverride?: string }) {
+export async function sendCommercialPdf(input: { lead: Lead; record: CommercialRecord; phoneNumberIdOverride?: string; forceTemplate?: boolean }) {
   const number = commercialDocumentNumber(input.record);
   const isInvoice = input.record.status === "INVOICE_UNPAID";
   const filename = `MedMinds-${isInvoice ? "Invoice" : "Quotation"}-${number}.pdf`;
@@ -56,7 +56,7 @@ export async function sendCommercialPdf(input: { lead: Lead; record: CommercialR
   };
   const result = isInvoice ? await sendWhatsAppPdfDocument(document) : await sendClientDocument({
     ...document, kind: "quotation", clientName: input.lead.name,
-    documentNumber: number, detail: input.record.service
+    documentNumber: number, detail: input.record.service, forceTemplate: input.forceTemplate
   });
   await markQuoteAccepted(input.record.id, result.messageId).catch((error) => {
     console.warn("Unable to link commercial document delivery", { quoteId: input.record.id, error });

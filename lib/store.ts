@@ -224,6 +224,19 @@ export async function saveOffer(input: Omit<Offer, "id" | "updatedAt">): Promise
   return mapOffer(rows[0] as Record<string, unknown>);
 }
 
+export async function getLead(phone: string): Promise<Lead | null> {
+  await ensureDatabase();
+  const db = database();
+  if (!db) {
+    const lead = memory.leads.get(phone);
+    return lead ? withMemoryLastMessage(lead) : null;
+  }
+  const rows = await db.query(`SELECT leads.*,
+    (SELECT MAX(m.created_at) FROM messages m WHERE m.phone=leads.phone) AS last_message_at
+    FROM leads WHERE phone=$1 LIMIT 1`, [phone]);
+  return rows[0] ? mapLead(rows[0] as Record<string, unknown>) : null;
+}
+
 export async function listLeads(): Promise<Lead[]> {
   await ensureDatabase();
   const db = database();
