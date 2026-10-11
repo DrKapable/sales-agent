@@ -233,7 +233,7 @@ export async function handleMaryPaymentFlowV2(input: {
     if (!created.created) return reply(input.phone, "I have the details, but the secure Research Portal payment-link service is not configured right now. I won’t provide an unofficial payment method. A MedMinds team member will need to issue the link.");
 
     await updateLead(input.phone, { email, serviceInterest: service, status: "PAYMENT PENDING" }).catch(() => undefined);
-    return reply(input.phone, `Your open Sampay link is ready for ${service}: ${money(amount)}${isTaskBasedService(service!) ? " (50% deposit)" : ""}. Anyone with the link can open it without signing in. The payer enters payment details at checkout.\n\n${created.payment.link}\n\nAlternatively, pay by MedMinds bank transfer:\n${MEDMINDS_BANK_TEXT}\n\nAfter payment, tell me here so it can be verified before a receipt is confirmed.`);
+    return reply(input.phone, `Your open Sampay link is ready for ${service}: ${money(amount)}${isTaskBasedService(service!) ? " (50% deposit)" : ""}. Anyone with the link can open it without signing in. The payer enters payment details at checkout.\n\n${created.payment.link}\n\nAlternatively, pay by MedMinds bank transfer:\n${MEDMINDS_BANK_TEXT}\n\nAfter payment, tell me here. Sampay payments are checked through the portal; the team can record bank transfers and issue a receipt without separate verification.`);
   } catch (error) {
     console.error("Mary payment-link creation failed", { phoneSuffix: input.phone.slice(-4), error });
     return reply(input.phone, "I couldn’t create the secure payment link just now. I have not given you alternative personal payment details. I’ll keep the request pending until the MedMinds payment service is available.");

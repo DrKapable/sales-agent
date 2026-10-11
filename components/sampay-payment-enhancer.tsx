@@ -164,7 +164,7 @@ export function SampayPaymentEnhancer() {
             <button type="button" className="secondary" disabled={busy} onClick={() => void checkStatus(client.phone)}>{busy ? "Checking…" : "Check payment"}</button>
             <button type="button" className="primary" disabled={busy || !service.trim()} onClick={createPayment}>{busy ? "Working…" : "Create open payment link"}</button>
           </div>
-          <p className="sampaySafety">Payment is confirmed only from the Research Portal/Sampay record. A screenshot or client message alone cannot mark a payment as paid. Official receipts are issued after verified payment.</p>
+          <p className="sampaySafety">Sampay payments are confirmed from the provider record. Staff can also record bank, cash or outside-platform payments and issue receipts without separate verification.</p>
         </div>
       </section>
     </div>,
