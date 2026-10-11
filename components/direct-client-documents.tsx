@@ -103,7 +103,7 @@ export function DirectClientDocuments() {
     return () => { active = false; window.clearInterval(timer); };
   }, [selected, normalized, kind, delivery?.status, delivery?.messageId]);
   const deliveryStatus = delivery?.status || selected?.delivery_status;
-  const deliveryError = delivery?.error || selected?.delivery_error;
+  const deliveryError = delivery ? delivery.error : selected?.delivery_error;
   const billingBlocked = /unsettled payments|business eligibility payment issue/i.test(deliveryError || error);
 
   return <main className="directDocs">
