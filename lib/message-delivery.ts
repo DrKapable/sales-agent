@@ -137,3 +137,14 @@ export async function decorateMessagesForAdmin(messages: ConversationMessage[]) 
     return { ...message, content: `${message.content}${ADMIN_MARKERS[status]}` };
   });
 }
+
+export async function getOutgoingMessageDelivery(messageId: string, phone: string) {
+  await ensureTable();
+  const db = database();
+  if (db) {
+    const rows = await db.query(`SELECT status,error,updated_at FROM message_delivery_status WHERE message_id=$1 AND phone=$2 LIMIT 1`, [messageId, phone]);
+    return rows[0] || null;
+  }
+  const item = memory.get(messageId);
+  return item?.phone === phone ? item : null;
+}

@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     void notifyBusinessEvent({
       type,
       eventKey: `${type}:${String(payment.id)}`,
-      title: parsed.data.verified ? "Payment verified" : "Payment recorded, verification pending",
+      title: parsed.data.verified ? "Payment verified" : "Payment recorded",
       body: [
         `Total charged: K${result.totalChargedZmw.toLocaleString()}`,
         `Amount paid: K${result.amountPaidZmw.toLocaleString()}`,
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     let receipt: any = null;
     let receiptError: string | null = null;
-    if (parsed.data.verified) {
+    {
       try {
         receipt = await sendBrandedReceiptPdf({ lead, payment });
       } catch (error) {
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       amount_paid_zmw: result.amountPaidZmw,
       balance_zmw: result.balanceZmw,
       invoice: result.invoice,
-      ...(receipt ? { receiptSent: true, receipt } : parsed.data.verified ? { receiptSent: false, receiptError } : {})
+      ...(receipt ? { receiptSent: true, receipt } : { receiptSent: false, receiptError })
     });
   } catch (error) {
     console.error("Financial payment action failed", { error });

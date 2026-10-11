@@ -21,7 +21,7 @@ export const directDocumentActionSchema = z.discriminatedUnion("action", [
     amountZmw: z.number().positive().max(100000000), details: z.string().trim().min(3).max(1800) }),
   z.object({ action: z.literal("create_receipt"), ...clientFields,
     totalChargedZmw: z.number().positive().max(100000000), amountPaidZmw: z.number().positive().max(100000000),
-    reference: z.string().trim().min(2).max(160), verified: z.literal(true), verifiedBy: z.string().trim().min(2).max(160) }),
+    reference: z.string().trim().max(160).optional(), recordedBy: z.string().trim().max(160).optional(), verified: z.boolean().optional(), verifiedBy: z.string().trim().max(160).optional() }),
   z.object({ action: z.literal("send"), phone: clientWhatsAppNumberSchema, kind: z.enum(["quotation", "receipt"]), documentId: z.string().uuid() })
 ]).superRefine((input, ctx) => {
   if (input.action === "create_receipt" && input.amountPaidZmw > input.totalChargedZmw) ctx.addIssue({ code: "custom", path: ["amountPaidZmw"], message: "Amount paid cannot exceed the total charged." });

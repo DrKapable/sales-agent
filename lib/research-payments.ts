@@ -51,8 +51,8 @@ export async function createResearchPaymentRequest(input: {
     signal: AbortSignal.timeout(15000),
     headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
     body: JSON.stringify({
-      title: input.title,
-      description: input.description || `MedMinds payment for ${input.title}`,
+      title: input.title.trim().slice(0, 140),
+      description: (input.description || `MedMinds payment for ${input.title}`).slice(0, 800),
       amount: input.amountZmw,
       openLink: true,
       expiryDays: input.expiryDays || 30,

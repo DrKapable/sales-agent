@@ -140,9 +140,8 @@ export async function POST(request: Request) {
       const payment = await recordPayment(input);
       const lead = await leadById(input.leadId);
       const type = input.verified ? "payment_verified" : "payment_pending";
-      void notifyBusinessEvent({ type, eventKey: `${type}:${String((payment as { id?: string }).id)}`, title: input.verified ? "Payment verified" : "Payment recorded, verification pending", body: `Amount: K${input.amountZmw.toLocaleString()}${input.reference ? `\nReference: ${input.reference}` : ""}`, lead }).catch(() => undefined);
-      if (input.verified) return NextResponse.json({ ...payment, ...(await trySendReceipt(lead, payment)) });
-      return NextResponse.json(payment);
+      void notifyBusinessEvent({ type, eventKey: `${type}:${String((payment as { id?: string }).id)}`, title: input.verified ? "Payment verified" : "Payment recorded", body: `Amount: K${input.amountZmw.toLocaleString()}${input.reference ? `\nReference: ${input.reference}` : ""}`, lead }).catch(() => undefined);
+      return NextResponse.json({ ...payment, ...(await trySendReceipt(lead, payment)) });
     }
     if (input.action === "verify_payment") {
       const payment = await verifyPayment(input) as { id?: string; lead_id?: string; amount_zmw?: number; reference?: string; status?: string; verified_at?: string; verified_by?: string };
@@ -154,7 +153,6 @@ export async function POST(request: Request) {
       const snapshot = await getFastBusinessSnapshot();
       const payment = snapshot.payments.find((item: any) => item.id === input.paymentId);
       if (!payment) throw new Error("Payment record not found.");
-      if (payment.status !== "VERIFIED") throw new Error("Only verified payments can be sent as receipts.");
       const lead = await leadById(payment.lead_id);
       if (!lead) throw new Error("The client linked to this payment could not be found.");
       return NextResponse.json(await sendBrandedReceiptPdf({ lead, payment }));

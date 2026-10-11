@@ -61,11 +61,19 @@ describe("client PDF delivery", () => {
   });
 });
 
-describe("receipt verification and delivery", () => {
+describe("recorded payment receipt delivery", () => {
   const lead = { phone: input.phone, name: "Sample Client" } as Lead;
-  it.each([undefined, "PENDING", "FAILED"])("refuses a receipt for payment status %s", async (status) => {
-    await expect(sendBrandedReceiptPdf({ lead, payment: { id: "12345678", amount_zmw: 1750, status } })).rejects.toThrow("Only verified payments");
+  it.each([undefined, "FAILED", "CANCELLED", "REFUNDED"])("refuses a receipt for payment status %s", async (status) => {
+    await expect(sendBrandedReceiptPdf({ lead, payment: { id: "12345678", amount_zmw: 1750, status } })).rejects.toThrow("Receipts require a recorded payment");
     expect(mocks.history).not.toHaveBeenCalled();
+    expect(mocks.template).not.toHaveBeenCalled();
+  });
+  it("sends a manually recorded receipt without verification", async () => {
+    const result = await sendBrandedReceiptPdf({ lead, payment: { id: "12345678", amount_zmw: 500, total_charged_zmw: 1750, balance_zmw: 1250, status: "PENDING", created_at: "2026-10-11T11:00:00Z" } });
+    expect(result).toMatchObject({ sent: true, amountPaidZmw: 500, balanceZmw: 1250 });
+  });
+  it.each([0, -1, NaN, Infinity])("refuses invalid recorded amounts %s", async (amount) => {
+    await expect(sendBrandedReceiptPdf({ lead, payment: { id: "12345678", amount_zmw: amount, status: "PENDING" } })).rejects.toThrow("amounts are invalid");
     expect(mocks.template).not.toHaveBeenCalled();
   });
   it("sends a verified receipt as a PDF template and records the accepted message ID", async () => {

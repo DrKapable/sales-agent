@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeClientWhatsAppNumber } from "@/lib/direct-document-input";
 
-const mocks = vi.hoisted(() => ({ query: vi.fn(), getLead: vi.fn(), getOrCreate: vi.fn(), updateLead: vi.fn(), createQuote: vi.fn(), payment: vi.fn(), ensureColumns: vi.fn(), addMessage: vi.fn(), history: vi.fn(), status: vi.fn(), accepted: vi.fn(), markQuote: vi.fn() }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), getLead: vi.fn(), getOrCreate: vi.fn(), updateLead: vi.fn(), createQuote: vi.fn(), payment: vi.fn(), ensureColumns: vi.fn(), addMessage: vi.fn(), history: vi.fn(), status: vi.fn(), accepted: vi.fn(), delivery: vi.fn(), markQuote: vi.fn() }));
 vi.mock("@neondatabase/serverless", () => ({ neon: () => ({ query: mocks.query }) }));
 vi.mock("@/lib/store", () => ({ getLead: mocks.getLead, getOrCreateLead: mocks.getOrCreate, updateLead: mocks.updateLead, addMessage: mocks.addMessage, getConversation: mocks.history }));
 vi.mock("@/lib/business-ops", () => ({ createQuote: mocks.createQuote }));
 vi.mock("@/lib/payment-finance", async (original) => ({ ...await original<typeof import("@/lib/payment-finance")>(), ensureFinancialColumns: mocks.ensureColumns, recordFinancialPayment: mocks.payment }));
 vi.mock("@/lib/client-document-templates", () => ({ clientDocumentTemplateStatus: mocks.status, hasDocumentHeader: () => true, clientDocumentTemplateResults: async () => [] }));
-vi.mock("@/lib/message-delivery", () => ({ recordOutgoingMessageAccepted: mocks.accepted }));
+vi.mock("@/lib/message-delivery", () => ({ recordOutgoingMessageAccepted: mocks.accepted, getOutgoingMessageDelivery: mocks.delivery }));
 vi.mock("@/lib/quotation-delivery", () => ({ markQuoteAccepted: mocks.markQuote }));
 import { GET, POST } from "@/app/api/admin/business/direct-documents/route";
 
@@ -77,8 +77,8 @@ describe("direct quotation and receipt workflow", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(mocks.createQuote).not.toHaveBeenCalled();
   });
-  it("sends a verified receipt to a first-time number using the receipt PDF template", async () => {
-    mocks.query.mockResolvedValue([payment]);
+  it("sends a manually recorded receipt to a first-time number using the receipt PDF template", async () => {
+    mocks.query.mockResolvedValue([{ ...payment, status: "PENDING", verified_at: null }]);
     mocks.status.mockResolvedValue({ name: "medminds_client_receipt_pdf_v1", language: "en_US", status: "APPROVED" });
     const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ id: "receipt-media" })))
       .mockResolvedValueOnce(new Response(JSON.stringify({ messages: [{ id: "wamid.receipt" }] })));
@@ -100,11 +100,10 @@ describe("direct quotation and receipt workflow", () => {
     const preview = await GET(new Request(`https://example.com/api/admin/business/direct-documents?phone=${lead.phone}&kind=receipt&documentId=${payment.id}`));
     expect(preview.status).toBe(400);
   });
-  it("requires explicit payment verification before creating a new receipt", async () => {
-    const response = await post({ action: "create_receipt", phone: lead.phone, name: lead.name, service: lead.serviceInterest, totalChargedZmw: 1750, amountPaidZmw: 500, reference: "BANK-123", verified: false, verifiedBy: "Admin" });
-    expect(response.status).toBe(400);
-    expect(mocks.payment).not.toHaveBeenCalled();
-    expect(mocks.getOrCreate).not.toHaveBeenCalled();
+  it("creates an outside-platform receipt without verification or a transaction reference", async () => {
+    const response = await post({ action: "create_receipt", phone: lead.phone, name: lead.name, service: lead.serviceInterest, totalChargedZmw: 1750, amountPaidZmw: 500, recordedBy: "Sales staff" });
+    expect(response.status).toBe(201);
+    expect(mocks.payment).toHaveBeenCalledWith(expect.objectContaining({ verified: false, recordedBy: "Sales staff", amountPaidZmw: 500 }));
   });
   it("rejects overpayment before creating a client or recording money", async () => {
     const response = await post({ action: "create_receipt", phone: lead.phone, name: lead.name, service: lead.serviceInterest, totalChargedZmw: 100, amountPaidZmw: 500, reference: "BANK-123", verified: true, verifiedBy: "Admin" });
@@ -114,7 +113,7 @@ describe("direct quotation and receipt workflow", () => {
   it("saves verified payment totals and reference separately from sending", async () => {
     const response = await post({ action: "create_receipt", phone: lead.phone, name: lead.name, service: lead.serviceInterest, totalChargedZmw: 1750, amountPaidZmw: 500, reference: "BANK-123", verified: true, verifiedBy: "Admin" });
     expect(response.status).toBe(201);
-    expect(mocks.payment).toHaveBeenCalledWith({ leadId: lead.id, totalChargedZmw: 1750, amountPaidZmw: 500, reference: "BANK-123", verified: true, verifiedBy: "Admin", service: lead.serviceInterest });
+    expect(mocks.payment).toHaveBeenCalledWith({ leadId: lead.id, totalChargedZmw: 1750, amountPaidZmw: 500, reference: "BANK-123", verified: true, verifiedBy: "Admin", recordedBy: undefined, service: lead.serviceInterest });
     expect(mocks.status).not.toHaveBeenCalled();
   });
   it("opens the verified receipt PDF for preview without sending it", async () => {
@@ -124,6 +123,18 @@ describe("direct quotation and receipt workflow", () => {
     expect(response.headers.get("content-type")).toBe("application/pdf");
     expect(Buffer.from(await response.arrayBuffer()).subarray(0, 4).toString()).toBe("%PDF");
     expect(mocks.status).not.toHaveBeenCalled();
+  });
+  it("reports asynchronous WhatsApp failure instead of treating API acceptance as delivery", async () => {
+    mocks.query.mockResolvedValue([{ ...quote, delivery_status: "FAILED", delivery_error: "Business eligibility payment issue: unsettled payments" }]);
+    const response = await GET(new Request(`https://example.com/api/admin/business/direct-documents?phone=${lead.phone}&kind=quotation&documentId=${quote.id}&delivery=true`));
+    expect(await response.json()).toEqual({ status: "FAILED", error: "Business eligibility payment issue: unsettled payments" });
+  });
+  it("reads receipt delivery for the document's own recipient", async () => {
+    mocks.query.mockResolvedValue([{ ...payment, status: "PENDING" }]);
+    mocks.delivery.mockResolvedValue({ status: "DELIVERED", error: null });
+    const response = await GET(new Request(`https://example.com/api/admin/business/direct-documents?phone=${lead.phone}&kind=receipt&documentId=${payment.id}&delivery=true&messageId=wamid.receipt`));
+    expect(await response.json()).toEqual({ status: "DELIVERED", error: null });
+    expect(mocks.delivery).toHaveBeenCalledWith("wamid.receipt", lead.phone);
   });
   it("uses a read-only lookup for new numbers instead of creating a lead", async () => {
     mocks.getLead.mockResolvedValue(null);

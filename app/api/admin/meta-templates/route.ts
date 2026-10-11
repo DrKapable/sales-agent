@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const approved = await listApprovedMetaTemplates();
     const template = approved.find((item) => item.name === parsed.data.name && item.language === parsed.data.language);
     if (!template) return NextResponse.json({ error: "This template is not currently approved in Meta." }, { status: 409 });
-    if (hasDocumentHeader(template)) return NextResponse.json({ error: "Send quotations and verified payment receipts from the Business page to attach the client's PDF." }, { status: 409 });
+    if (hasDocumentHeader(template)) return NextResponse.json({ error: "Send quotations and recorded payment receipts from the Business page to attach the client's PDF." }, { status: 409 });
     const sent = await sendApprovedMetaTemplate(parsed.data);
     const lead = await getOrCreateLead(parsed.data.phone, "whatsapp");
     const label = `[Meta template: ${template.name}]`;

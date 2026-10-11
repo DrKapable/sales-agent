@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { normalizeClientWhatsAppNumber } from "@/lib/direct-document-input";
 
 type Kind = "quotation" | "receipt";
-type Document = { id: string; documentNumber?: string; service?: string; amount_zmw?: number | string; amount_paid_zmw?: number | string; total_charged_zmw?: number | string; balance_zmw?: number | string; created_at?: string; details?: string };
+type Document = { id: string; documentNumber?: string; service?: string; amount_zmw?: number | string; amount_paid_zmw?: number | string; total_charged_zmw?: number | string; balance_zmw?: number | string; created_at?: string; details?: string; delivery_status?: string; delivery_error?: string };
 type Readiness = { kind: Kind; template?: { status: string; components?: Array<{ format?: string }> } | null; error?: string };
 const endpoint = "/api/admin/business/direct-documents";
 const money = (value?: number | string) => `K${Number(value || 0).toLocaleString("en-ZM", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -22,8 +22,8 @@ export function DirectClientDocuments() {
   const [paid, setPaid] = useState("");
   const [details, setDetails] = useState("");
   const [reference, setReference] = useState("");
-  const [verifiedBy, setVerifiedBy] = useState("");
-  const [verified, setVerified] = useState(false);
+  const [recordedBy, setRecordedBy] = useState("");
+  const [delivery, setDelivery] = useState<{ status: string; error?: string; messageId?: string } | null>(null);
   const [templates, setTemplates] = useState<Readiness[]>([]);
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -50,12 +50,12 @@ export function DirectClientDocuments() {
   useEffect(() => { void refreshTemplates(); }, []);
 
   function changePhone(value: string) {
-    setPhone(value); setSelected(null); setDocuments({ quotations: [], receipts: [] }); setError(""); setNotice("");
-    setName(""); setService(""); setAmount(""); setPaid(""); setDetails(""); setReference(""); setVerified(false);
+    setPhone(value); setSelected(null); setDelivery(null); setDocuments({ quotations: [], receipts: [] }); setError(""); setNotice("");
+    setName(""); setService(""); setAmount(""); setPaid(""); setDetails(""); setReference("");
   }
-  function changeKind(value: Kind) { setKind(value); setSelected(null); setVerified(false); setError(""); setNotice(""); }
+  function changeKind(value: Kind) { setKind(value); setSelected(null); setDelivery(null); setError(""); setNotice(""); }
   async function lookup() {
-    setBusy(true); setError(""); setNotice(""); setSelected(null);
+    setBusy(true); setError(""); setNotice(""); setSelected(null); setDelivery(null);
     try {
       const data = await request(`${endpoint}?phone=${encodeURIComponent(phone)}`);
       setDocuments({ quotations: data.quotations || [], receipts: data.receipts || [] });
@@ -70,9 +70,9 @@ export function DirectClientDocuments() {
     try {
       const data = await request(endpoint, kind === "quotation"
         ? { action: "create_quotation", phone, name, service, amountZmw: Number(amount), details }
-        : { action: "create_receipt", phone, name, service, totalChargedZmw: Number(amount), amountPaidZmw: Number(paid), reference, verifiedBy, verified });
-      setPhone(data.phone); setSelected(data.document);
-      setNotice(`${kind === "quotation" ? "Quotation" : "Verified receipt"} saved. Preview the PDF, then send it to +${data.phone}.`);
+        : { action: "create_receipt", phone, name, service, totalChargedZmw: Number(amount), amountPaidZmw: Number(paid), reference, recordedBy });
+      setPhone(data.phone); setSelected(data.document); setDelivery(null);
+      setNotice(`${kind === "quotation" ? "Quotation" : "Receipt"} saved. Preview the PDF, then send it to +${data.phone}.`);
     } catch (e) { setError(`${e instanceof Error ? e.message : "Unable to save document."} If the connection failed, check saved documents before saving again.`); }
     finally { setBusy(false); }
   }
@@ -81,10 +81,30 @@ export function DirectClientDocuments() {
     setBusy(true); setError(""); setNotice("");
     try {
       const data = await request(endpoint, { action: "send", phone, kind, documentId: selected.id });
+      setDelivery({ status: "ACCEPTED", messageId: data.delivery.messageId });
       setNotice(`${documentNumber(kind, selected)} submitted to WhatsApp for +${data.phone}. Delivery confirmation is pending.`);
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to send document. It remains saved for retry."); }
     finally { setBusy(false); }
   }
+
+  useEffect(() => {
+    if (!selected || !normalized || !delivery || !["ACCEPTED", "SENT"].includes(delivery.status)) return;
+    let active = true;
+    const timer = window.setInterval(async () => {
+      try {
+        const result = await request(`${endpoint}?phone=${normalized}&kind=${kind}&documentId=${selected.id}&delivery=true&messageId=${encodeURIComponent(delivery.messageId || "")}`);
+        if (active) {
+          setDelivery({ ...result, messageId: delivery.messageId });
+          if (result.status === "FAILED") { setNotice(""); setError(result.error || "WhatsApp could not deliver this document. It remains saved for retry."); }
+          if (["DELIVERED", "READ"].includes(result.status)) { setError(""); setNotice(`${documentNumber(kind, selected)} delivered to WhatsApp +${normalized}.`); }
+        }
+      } catch { /* Keep the accepted status until the next webhook lookup succeeds. */ }
+    }, 5000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [selected, normalized, kind, delivery?.status, delivery?.messageId]);
+  const deliveryStatus = delivery?.status || selected?.delivery_status;
+  const deliveryError = delivery?.error || selected?.delivery_error;
+  const billingBlocked = /unsettled payments|business eligibility payment issue/i.test(deliveryError || error);
 
   return <main className="directDocs">
     <header><div><a href="/admin">← Agent inbox</a><h1>Send quotations & receipts</h1><p>Enter a client's WhatsApp number. They do not need to have messaged Mary.</p></div></header>
@@ -99,10 +119,10 @@ export function DirectClientDocuments() {
           <button aria-pressed={kind === "receipt"} disabled={busy} onClick={() => changeKind("receipt")}>Receipt</button>
         </div>
         <div className="directDocsChoices" aria-label="Document source">
-          <button aria-pressed={source === "new"} disabled={busy} onClick={() => { setSource("new"); setSelected(null); setNotice(""); }}>Create new</button>
-          <button aria-pressed={source === "saved"} disabled={busy} onClick={() => { setSource("saved"); setSelected(null); void lookup(); }}>Use saved</button>
+          <button aria-pressed={source === "new"} disabled={busy} onClick={() => { setSource("new"); setSelected(null); setDelivery(null); setNotice(""); }}>Create new</button>
+          <button aria-pressed={source === "saved"} disabled={busy} onClick={() => { setSource("saved"); setSelected(null); setDelivery(null); void lookup(); }}>Use saved</button>
         </div>
-        {source === "saved" && <label>Saved {kind === "receipt" ? "verified receipts" : "quotations"}<select disabled={busy} value={selected?.id || ""} onChange={(e) => { setSelected(available.find((doc) => doc.id === e.target.value) || null); setNotice(""); setError(""); }}><option value="">{available.length ? "Choose a document" : "No saved documents for this number"}</option>{available.map((doc) => <option key={doc.id} value={doc.id}>{documentNumber(kind, doc)} · {money(kind === "receipt" ? doc.amount_paid_zmw ?? doc.amount_zmw : doc.amount_zmw)}{doc.service ? ` · ${doc.service}` : ""}</option>)}</select></label>}
+        {source === "saved" && <label>Saved {kind === "receipt" ? "receipts" : "quotations"}<select disabled={busy} value={selected?.id || ""} onChange={(e) => { setSelected(available.find((doc) => doc.id === e.target.value) || null); setDelivery(null); setNotice(""); setError(""); }}><option value="">{available.length ? "Choose a document" : "No saved documents for this number"}</option>{available.map((doc) => <option key={doc.id} value={doc.id}>{documentNumber(kind, doc)} · {money(kind === "receipt" ? doc.amount_paid_zmw ?? doc.amount_zmw : doc.amount_zmw)}{doc.service ? ` · ${doc.service}` : ""}</option>)}</select></label>}
         {source === "new" && !selected && <form onSubmit={(event) => void save(event)}>
           <fieldset disabled={busy}><label>Client name<input required minLength={2} maxLength={160} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} /></label>
             <label>Service<input required minLength={2} maxLength={240} placeholder="e.g. Research proposal support" value={service} onChange={(e) => setService(e.target.value)} /></label>
@@ -110,9 +130,9 @@ export function DirectClientDocuments() {
             {kind === "quotation" ? <label>Scope & quotation details<textarea required minLength={3} maxLength={1800} rows={4} value={details} onChange={(e) => setDetails(e.target.value)} placeholder="Deliverables, timeline and agreed terms" /></label> : <>
               <label>Amount paid (ZMW)<input required type="number" inputMode="decimal" min="0.01" max={Number(amount) || 100000000} step="0.01" value={paid} onChange={(e) => setPaid(e.target.value)} /></label>
               <p className="directDocsBalance">Balance: {money(Math.max(balance, 0))}</p>
-              <label>Payment reference<input required minLength={2} maxLength={160} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bank transaction or mobile-money reference" /></label>
-              <label>Verified by<input required minLength={2} maxLength={160} value={verifiedBy} onChange={(e) => setVerifiedBy(e.target.value)} placeholder="Name of the staff member who checked payment" /></label>
-              <label className="directDocsCheck"><input type="checkbox" required checked={verified} onChange={(e) => setVerified(e.target.checked)} />I have verified that this payment was received.</label>
+              <label>Payment reference (optional)<input maxLength={160} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bank transaction or mobile-money reference" /></label>
+              <label>Recorded by (optional)<input maxLength={160} value={recordedBy} onChange={(e) => setRecordedBy(e.target.value)} placeholder="Name of the staff member recording payment" /></label>
+              <small>Record bank, cash or mobile-money payments received outside the platform. No separate verification is required.</small>
             </>}
             <button type="submit" disabled={!normalized || busy}>{busy ? "Saving…" : "Save & preview PDF"}</button>
           </fieldset>
@@ -125,11 +145,13 @@ export function DirectClientDocuments() {
           {kind === "receipt" && <p>Total charged: {money(selected.total_charged_zmw ?? selected.amount_zmw)} · Balance: {money(selected.balance_zmw)}</p>}
           <a className="directDocsPreview" href={`${endpoint}?phone=${encodeURIComponent(phone)}&kind=${kind}&documentId=${selected.id}`} target="_blank" rel="noreferrer">Open branded PDF preview ↗</a>
           <button type="button" disabled={busy || !approved || !normalized} onClick={() => void send()}>{busy ? "Sending…" : "Send PDF with Meta template"}</button>
+          {deliveryStatus && <p role="status">WhatsApp delivery: <strong>{deliveryStatus}</strong>{deliveryStatus === "FAILED" && deliveryError && <><br />{deliveryError}</>}</p>}
           <small>Meta acceptance confirms submission. Final delivery is recorded when WhatsApp confirms it.</small>
-          {source === "new" && <button className="secondary" type="button" disabled={busy} onClick={() => { setSelected(null); setVerified(false); setReference(""); setNotice(""); }}>Create another document</button>}
-        </div> : <p className="directDocsEmpty">Save a new document or choose a saved quotation or verified receipt. Preview it here before sending.</p>}
+          {source === "new" && <button className="secondary" type="button" disabled={busy} onClick={() => { setSelected(null); setDelivery(null); setReference(""); setNotice(""); }}>Create another document</button>}
+        </div> : <p className="directDocsEmpty">Save a new document or choose a saved quotation or receipt. Preview it here before sending.</p>}
         {notice && <p className="directDocsNotice" role="status">{notice}</p>}
         {error && <p className="directDocsError" role="alert">{error}</p>}
+        {billingBlocked && <p className="directDocsError">WhatsApp is blocking messages because the Business account has an outstanding balance. <a href="https://business.facebook.com/billing_hub/accounts/details/?business_id=1141349878139333&asset_id=27665017719858325&wizard_name=PAY_NOW&account_type=whatsapp-business-account" target="_blank" rel="noreferrer">Open Meta billing</a>, settle the balance, then retry the saved document.</p>}
       </section>
     </div>
     <style jsx>{`

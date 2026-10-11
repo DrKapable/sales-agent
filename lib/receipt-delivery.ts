@@ -12,6 +12,8 @@ export type VerifiedPayment = {
   balance_zmw?: number | string | null;
   reference?: string | null;
   status?: string;
+  created_at?: string | null;
+  recorded_by?: string | null;
   verified_at?: string | null;
   verified_by?: string | null;
 };
@@ -21,12 +23,13 @@ export function receiptNumber(paymentId: string) {
 }
 
 export function buildReceiptPdf(input: { lead: Lead; payment: VerifiedPayment }) {
-  if (input.payment.status !== "VERIFIED") throw new Error("Only verified payments can be issued as receipts.");
+  if (!["PENDING", "RECORDED", "VERIFIED"].includes(input.payment.status || "")) throw new Error("Receipts require a recorded payment that has not failed, been cancelled or refunded.");
 
   const number = receiptNumber(input.payment.id);
   const paid = Number(input.payment.amount_paid_zmw ?? input.payment.amount_zmw);
   const total = Number(input.payment.total_charged_zmw ?? paid);
   const balance = Number(input.payment.balance_zmw ?? Math.max(total - paid, 0));
+  if (![paid, total, balance].every(Number.isFinite) || paid <= 0 || total < paid || balance < 0 || Math.abs(total - paid - balance) > 0.01) throw new Error("The recorded payment amounts are invalid.");
   const pdf = createBrandedReceiptPdf({
     receiptNumber: number,
     clientName: input.lead.name || input.lead.phone,
@@ -34,9 +37,9 @@ export function buildReceiptPdf(input: { lead: Lead; payment: VerifiedPayment })
     totalChargedZmw: total,
     balanceZmw: balance,
     paymentReference: input.payment.reference,
-    verifiedAt: input.payment.verified_at,
+    recordedAt: input.payment.created_at || input.payment.verified_at,
     service: input.lead.serviceInterest || input.lead.packageName,
-    verifiedBy: input.payment.verified_by || "MedMinds Administration"
+    recordedBy: input.payment.recorded_by || input.payment.verified_by || "MedMinds Administration"
   });
   const filename = `MedMinds_Receipt_${number}.pdf`;
   return { number, paid, total, balance, pdf, filename };

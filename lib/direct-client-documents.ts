@@ -5,7 +5,7 @@ import { buildCommercialPdf, commercialDocumentNumber, sendCommercialPdf, type C
 import { buildReceiptPdf, receiptNumber, sendBrandedReceiptPdf, type VerifiedPayment } from "@/lib/receipt-delivery";
 import type { ClientDocumentKind } from "@/lib/client-document-templates";
 import { addMessage } from "@/lib/store";
-import { recordOutgoingMessageAccepted } from "@/lib/message-delivery";
+import { getOutgoingMessageDelivery, recordOutgoingMessageAccepted } from "@/lib/message-delivery";
 
 let sql: NeonQueryFunction<false, false> | null = null;
 function database() {
@@ -21,7 +21,7 @@ export async function listDirectClientDocuments(phone: string) {
   const db = database();
   const [quotations, receipts] = await Promise.all([
     db.query(`SELECT * FROM sales_quotes WHERE lead_id=$1 AND status='QUOTATION' ORDER BY created_at DESC LIMIT 50`, [lead.id]),
-    db.query(`SELECT * FROM client_payments WHERE lead_id=$1 AND status='VERIFIED' ORDER BY created_at DESC LIMIT 50`, [lead.id])
+    db.query(`SELECT * FROM client_payments WHERE lead_id=$1 AND status IN ('PENDING','RECORDED','VERIFIED') AND COALESCE(amount_paid_zmw,amount_zmw)>0 ORDER BY created_at DESC LIMIT 50`, [lead.id])
   ]);
   return { lead: { name: lead.name, phone: lead.phone, service: lead.serviceInterest },
     quotations: quotations.map((row) => ({ ...row, documentNumber: commercialDocumentNumber(row as unknown as CommercialRecord) })),
@@ -35,8 +35,8 @@ async function loadDocument(input: { phone: string; kind: ClientDocumentKind; do
   const db = database();
   const rows = input.kind === "quotation"
     ? await db.query(`SELECT * FROM sales_quotes WHERE id=$1 AND lead_id=$2 AND status='QUOTATION' LIMIT 1`, [input.documentId, lead.id])
-    : await db.query(`SELECT * FROM client_payments WHERE id=$1 AND lead_id=$2 AND status='VERIFIED' LIMIT 1`, [input.documentId, lead.id]);
-  if (!rows[0]) throw new Error("No matching quotation or verified receipt belongs to this WhatsApp number.");
+    : await db.query(`SELECT * FROM client_payments WHERE id=$1 AND lead_id=$2 AND status IN ('PENDING','RECORDED','VERIFIED') AND COALESCE(amount_paid_zmw,amount_zmw)>0 LIMIT 1`, [input.documentId, lead.id]);
+  if (!rows[0]) throw new Error("No matching quotation or recorded receipt belongs to this WhatsApp number.");
   return { lead, record: rows[0] };
 }
 
@@ -56,4 +56,12 @@ export async function sendDirectClientDocument(input: { phone: string; kind: Cli
   await addMessage(lead.phone, "assistant", `[Human: MedMinds Sales] Quotation ${result.documentNumber} submitted through Meta template. Delivery confirmation pending.`, result.messageId);
   await recordOutgoingMessageAccepted({ phone: lead.phone, messageId: result.messageId }).catch(() => undefined);
   return result;
+}
+
+export async function directClientDocumentDelivery(input: { phone: string; kind: ClientDocumentKind; documentId: string; messageId?: string }) {
+  const { lead, record } = await loadDocument(input);
+  if (input.kind === "quotation") return { status: record.delivery_status || "NOT_SENT", error: record.delivery_error || null };
+  if (!input.messageId) return { status: "NOT_SENT", error: null };
+  const delivery = await getOutgoingMessageDelivery(input.messageId, lead.phone);
+  return { status: delivery?.status || "ACCEPTED", error: delivery?.error || null };
 }

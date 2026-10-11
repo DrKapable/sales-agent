@@ -8,6 +8,8 @@ type ReceiptInput = {
   totalChargedZmw?: number | null;
   balanceZmw?: number | null;
   paymentReference?: string | null;
+  recordedAt?: string | null;
+  recordedBy?: string | null;
   verifiedAt?: string | null;
   service?: string | null;
   verifiedBy?: string | null;
@@ -49,7 +51,7 @@ export function createBrandedReceiptPdf(input: ReceiptInput) {
     `${teal} rg 0 722 ${pageWidth} 5 re f`,
     line("Receipt", 42, 688, 28, "F2", navy),
     line(input.receiptNumber, 42, 662, 12, "F2", teal),
-    line(`Issued ${dateLabel(input.verifiedAt)}`, 42, 642, 9, "F1", muted),
+    line(`Issued ${dateLabel(input.recordedAt || input.verifiedAt)}`, 42, 642, 9, "F1", muted),
 
     `${pale} rg 42 514 511 104 re f`,
     line("TOTAL CHARGED", 60, 588, 8, "F2", muted),
@@ -69,11 +71,11 @@ export function createBrandedReceiptPdf(input: ReceiptInput) {
     line("Payment reference", 42, 380, 9, "F2", muted),
     line(input.paymentReference || "Not provided", 210, 380, 11, "F1", navy),
     "0.86 0.9 0.92 RG 0.8 w 42 364 m 553 364 l S",
-    line("Verified by", 42, 335, 9, "F2", muted),
-    line(input.verifiedBy || "MedMinds Administration", 210, 335, 11, "F1", navy),
+    line("Recorded by", 42, 335, 9, "F2", muted),
+    line(input.recordedBy || input.verifiedBy || "MedMinds Administration", 210, 335, 11, "F1", navy),
     "0.86 0.9 0.92 RG 0.8 w 42 319 m 553 319 l S",
-    line("Verification date", 42, 290, 9, "F2", muted),
-    line(dateLabel(input.verifiedAt), 210, 290, 11, "F1", navy),
+    line("Payment recorded", 42, 290, 9, "F2", muted),
+    line(dateLabel(input.recordedAt || input.verifiedAt), 210, 290, 11, "F1", navy),
 
     `${teal} rg 42 216 511 2 re f`,
     line("Thank you for choosing MedMinds.", 42, 185, 12, "F2", navy),

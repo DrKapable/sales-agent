@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { clientWhatsAppNumberSchema, directDocumentActionSchema } from "@/lib/direct-document-input";
-import { listDirectClientDocuments, previewDirectClientDocument, sendDirectClientDocument } from "@/lib/direct-client-documents";
+import { directClientDocumentDelivery, listDirectClientDocuments, previewDirectClientDocument, sendDirectClientDocument } from "@/lib/direct-client-documents";
 import { clientDocumentTemplateResults } from "@/lib/client-document-templates";
 import { createQuote } from "@/lib/business-ops";
 import { paymentBreakdown, recordFinancialPayment } from "@/lib/payment-finance";
@@ -20,6 +20,7 @@ export async function GET(request: Request) {
     if (params.has("documentId")) {
       const preview = z.object({ documentId: z.string().uuid(), kind: z.enum(["quotation", "receipt"]) }).safeParse({ documentId: params.get("documentId"), kind: params.get("kind") });
       if (!preview.success) return NextResponse.json({ error: "Select a valid document." }, { status: 400 });
+      if (params.get("delivery") === "true") return NextResponse.json(await directClientDocumentDelivery({ phone: parsed.data, ...preview.data, messageId: params.get("messageId") || undefined }));
       const { pdf, filename } = await previewDirectClientDocument({ phone: parsed.data, ...preview.data });
       return new Response(new Uint8Array(pdf), { headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${filename}"`, "Cache-Control": "no-store" } });
     }
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ kind: "quotation", document, phone: lead.phone }, { status: 201 });
     }
     const finance = await recordFinancialPayment({ leadId: lead.id, totalChargedZmw: input.totalChargedZmw, amountPaidZmw: input.amountPaidZmw,
-      reference: input.reference, verified: true, verifiedBy: input.verifiedBy, service: input.service });
+      reference: input.reference, verified: Boolean(input.verified), verifiedBy: input.verifiedBy, recordedBy: input.recordedBy, service: input.service });
     return NextResponse.json({ kind: "receipt", document: finance.payment, phone: lead.phone }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to save or send the document." }, { status: input.action === "send" ? 409 : 400 });

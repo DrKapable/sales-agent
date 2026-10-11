@@ -22,7 +22,8 @@ export async function GET(_request: Request, context: { params: Promise<{ quoteI
     });
     if (!created.created) return NextResponse.json({ error: "Payment checkout is temporarily unavailable. Please use the MedMinds bank details on your quotation." }, { status: 503 });
     return NextResponse.redirect(created.payment.link, { status: 303, headers: { "Cache-Control": "no-store" } });
-  } catch {
+  } catch (error) {
+    console.error("Quotation checkout failed", { quoteId, error: error instanceof Error ? error.message : "Unknown checkout error" });
     return NextResponse.json({ error: "Unable to open checkout. Please use the MedMinds bank details on your quotation." }, { status: 503 });
   }
 }

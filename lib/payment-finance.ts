@@ -27,6 +27,7 @@ export async function ensureFinancialColumns() {
       reference TEXT, status TEXT NOT NULL DEFAULT 'PENDING', verified_by TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), verified_at TIMESTAMPTZ
     )`);
+    await database.query(`ALTER TABLE client_payments ADD COLUMN IF NOT EXISTS recorded_by TEXT`);
     await database.query(`ALTER TABLE client_payments ADD COLUMN IF NOT EXISTS total_charged_zmw NUMERIC`);
     await database.query(`ALTER TABLE client_payments ADD COLUMN IF NOT EXISTS amount_paid_zmw NUMERIC`);
     await database.query(`ALTER TABLE client_payments ADD COLUMN IF NOT EXISTS balance_zmw NUMERIC`);
@@ -78,6 +79,7 @@ export async function recordFinancialPayment(input: {
   totalChargedZmw: number;
   amountPaidZmw: number;
   reference?: string | null;
+  recordedBy?: string | null;
   verified?: boolean;
   verifiedBy?: string | null;
   service?: string | null;
@@ -87,9 +89,9 @@ export async function recordFinancialPayment(input: {
   if (!database) throw new Error("Persistent database storage is required.");
   const money = paymentBreakdown(input.totalChargedZmw, input.amountPaidZmw);
   const rows = await database.query(
-    `INSERT INTO client_payments (id,lead_id,amount_zmw,total_charged_zmw,amount_paid_zmw,balance_zmw,reference,status,verified_by,verified_at)
-     VALUES ($1,$2,$3,$4,$3,$5,$6,$7,$8,$9) RETURNING *`,
-    [crypto.randomUUID(), input.leadId, money.amountPaidZmw, money.totalChargedZmw, money.balanceZmw, input.reference || null, input.verified ? "VERIFIED" : "PENDING", input.verified ? (input.verifiedBy || "Admin") : null, input.verified ? new Date().toISOString() : null]
+    `INSERT INTO client_payments (id,lead_id,amount_zmw,total_charged_zmw,amount_paid_zmw,balance_zmw,reference,status,verified_by,verified_at,recorded_by)
+     VALUES ($1,$2,$3,$4,$3,$5,$6,$7,$8,$9,$10) RETURNING *`,
+    [crypto.randomUUID(), input.leadId, money.amountPaidZmw, money.totalChargedZmw, money.balanceZmw, input.reference || null, input.verified ? "VERIFIED" : "PENDING", input.verified ? (input.verifiedBy || "Admin") : null, input.verified ? new Date().toISOString() : null, input.recordedBy || "MedMinds Administration"]
   );
   const payment = rows[0];
   const invoice = await syncInvoice({ leadId: input.leadId, service: input.service, ...money });
