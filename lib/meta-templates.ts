@@ -4,7 +4,7 @@ export type MetaTemplateComponent = {
   type: string;
   format?: string;
   text?: string;
-  example?: { header_text?: string[]; body_text?: string[][] };
+  example?: { header_text?: string[]; header_handle?: string[]; body_text?: string[][] };
 };
 
 export type MetaTemplate = {
@@ -68,10 +68,13 @@ export async function sendApprovedMetaTemplate(input: {
   phone: string;
   name: string;
   language: string;
-  components?: Array<{ type: "header" | "body"; parameters: Array<{ type: "text"; text: string }> }>;
+  phoneNumberIdOverride?: string;
+  components?: Array<{ type: "header" | "body"; parameters: Array<
+    { type: "text"; text: string } | { type: "document"; document: { id: string; filename: string } }
+  > }>;
 }) {
   const { token, version, phoneNumberId } = config();
-  const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
+  const response = await fetch(`https://graph.facebook.com/${version}/${input.phoneNumberIdOverride || phoneNumberId}/messages`, {
     method: "POST",
     signal: AbortSignal.timeout(12000),
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

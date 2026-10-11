@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-type Component = { type: string; text?: string };
+type Component = { type: string; text?: string; format?: string };
 type Template = { id: string; name: string; language: string; category?: string; components: Component[] };
 type Inventory = { templates: Template[]; approvedCount?: number; sampleCount?: number; sampleOnly?: boolean; wabaSuffix?: string };
 
@@ -65,9 +65,11 @@ export function MetaTemplateEnhancer() {
   const body = template?.components.find((item) => item.type === "BODY");
   const headerVars = countVars(header?.text);
   const bodyVars = countVars(body?.text);
+  const documentTemplate = header?.format === "DOCUMENT";
 
   async function send() {
     if (!template) return;
+    if (documentTemplate) { setMessage("Send quotations and verified payment receipts from the Business page to attach the client's PDF."); setState("error"); return; }
     const phone = currentPhone();
     if (!phone) { setMessage("Select a client conversation first."); setState("error"); return; }
     const missing = [...Array(headerVars)].some((_, i) => !values[`h${i + 1}`]?.trim()) || [...Array(bodyVars)].some((_, i) => !values[`b${i + 1}`]?.trim());
@@ -111,10 +113,11 @@ export function MetaTemplateEnhancer() {
           {!inventory.sampleOnly && templates.length === 0 && state !== "error" && <div style={{ padding: 12, borderRadius: 12, background: "#f4f7f6", fontSize: 13 }}>No production approved templates were returned by Meta.</div>}
           {templates.length > 0 && <select aria-label="Approved Meta template" value={selected} onChange={(event) => { setSelected(event.target.value); setValues({}); setMessage(""); setState("idle"); }} style={{ width: "100%", minHeight: 46, borderRadius: 11, padding: "8px 10px", border: "1px solid rgba(15,23,42,.18)", background: "#fff", fontSize: 14 }}>{templates.map((item) => <option key={`${item.id}-${item.language}`} value={`${item.name}|${item.language}`}>{item.name} · {item.language}</option>)}</select>}
           {template && <div style={{ fontSize: 13, lineHeight: 1.5, padding: 12, borderRadius: 11, background: "#f4f7f6", maxHeight: 190, overflow: "auto" }}>{header?.text && <strong style={{ display: "block", marginBottom: 5 }}>{header.text}</strong>}<span>{body?.text || "Approved WhatsApp template"}</span></div>}
-          {[...Array(headerVars)].map((_, i) => <input key={`h${i}`} placeholder={`Header variable {{${i + 1}}}`} value={values[`h${i + 1}`] || ""} onChange={(e) => setValues((v) => ({ ...v, [`h${i + 1}`]: e.target.value }))} style={{ minHeight: 44, borderRadius: 10, padding: "8px 10px", border: "1px solid rgba(15,23,42,.18)" }} />)}
-          {[...Array(bodyVars)].map((_, i) => <input key={`b${i}`} placeholder={`Message variable {{${i + 1}}}`} value={values[`b${i + 1}`] || ""} onChange={(e) => setValues((v) => ({ ...v, [`b${i + 1}`]: e.target.value }))} style={{ minHeight: 44, borderRadius: 10, padding: "8px 10px", border: "1px solid rgba(15,23,42,.18)" }} />)}
+          {documentTemplate && <p style={{ fontSize: 13, margin: 0 }}>Send this template from the Business page. It attaches the client's branded quotation or verified payment receipt automatically. <a href="/admin/business">Open quotations and receipts</a></p>}
+          {!documentTemplate && [...Array(headerVars)].map((_, i) => <input key={`h${i}`} placeholder={`Header variable {{${i + 1}}}`} value={values[`h${i + 1}`] || ""} onChange={(e) => setValues((v) => ({ ...v, [`h${i + 1}`]: e.target.value }))} style={{ minHeight: 44, borderRadius: 10, padding: "8px 10px", border: "1px solid rgba(15,23,42,.18)" }} />)}
+          {!documentTemplate && [...Array(bodyVars)].map((_, i) => <input key={`b${i}`} placeholder={`Message variable {{${i + 1}}}`} value={values[`b${i + 1}`] || ""} onChange={(e) => setValues((v) => ({ ...v, [`b${i + 1}`]: e.target.value }))} style={{ minHeight: 44, borderRadius: 10, padding: "8px 10px", border: "1px solid rgba(15,23,42,.18)" }} />)}
           {message && <small style={{ lineHeight: 1.45, color: state === "error" ? "#9b2c2c" : "inherit" }}>{message}</small>}
-          {templates.length > 0 && <button type="button" onClick={() => void send()} disabled={state === "sending"} style={{ minHeight: 48, border: 0, borderRadius: 12, fontWeight: 800, cursor: "pointer", background: "#0f806f", color: "white", fontSize: 15 }}>{state === "sending" ? "Sending..." : state === "sent" ? "Sent" : "Send approved template"}</button>}
+          {templates.length > 0 && !documentTemplate && <button type="button" onClick={() => void send()} disabled={state === "sending"} style={{ minHeight: 48, border: 0, borderRadius: 12, fontWeight: 800, cursor: "pointer", background: "#0f806f", color: "white", fontSize: 15 }}>{state === "sending" ? "Sending..." : state === "sent" ? "Sent" : "Send approved template"}</button>}
         </div>
       </section>
     </div>,

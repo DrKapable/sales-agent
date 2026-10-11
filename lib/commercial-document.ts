@@ -1,6 +1,7 @@
 import { createCommercialPdf } from "@/lib/commercial-pdf";
 import { markQuoteAccepted } from "@/lib/quotation-delivery";
 import { sendWhatsAppPdfDocument } from "@/lib/whatsapp";
+import { sendClientDocument } from "@/lib/client-document-delivery";
 import type { Lead } from "@/lib/types";
 import { commercialPaymentAmount, isTaskBasedService, quotationPaymentUrl } from "@/lib/medminds-payment-policy";
 
@@ -44,7 +45,7 @@ export async function sendCommercialPdf(input: { lead: Lead; record: CommercialR
   const isInvoice = input.record.status === "INVOICE_UNPAID";
   const filename = `MedMinds-${isInvoice ? "Invoice" : "Quotation"}-${number}.pdf`;
   const pdf = buildCommercialPdf(input.lead, input.record);
-  const result = await sendWhatsAppPdfDocument({
+  const document = {
     phone: input.lead.phone,
     pdf,
     filename,
@@ -52,6 +53,10 @@ export async function sendCommercialPdf(input: { lead: Lead; record: CommercialR
       ? `MedMinds invoice ${number}. Please review the attached balance details.`
       : `MedMinds quotation ${number}. Please review the attached document.`,
     phoneNumberIdOverride: input.phoneNumberIdOverride
+  };
+  const result = isInvoice ? await sendWhatsAppPdfDocument(document) : await sendClientDocument({
+    ...document, kind: "quotation", clientName: input.lead.name,
+    documentNumber: number, detail: input.record.service
   });
   await markQuoteAccepted(input.record.id, result.messageId).catch((error) => {
     console.warn("Unable to link commercial document delivery", { quoteId: input.record.id, error });

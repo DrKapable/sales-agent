@@ -243,11 +243,9 @@ export async function sendWhatsAppText(phone: string, body: string, phoneNumberI
   return { messageId, waId: parsed.contacts?.[0]?.wa_id ?? null };
 }
 
-export async function sendWhatsAppPdfDocument(input: {
-  phone: string;
+export async function uploadWhatsAppPdf(input: {
   pdf: Uint8Array;
   filename: string;
-  caption?: string;
   phoneNumberIdOverride?: string;
 }) {
   const { token, phoneNumberId, version } = whatsappConfig(input.phoneNumberIdOverride);
@@ -267,6 +265,18 @@ export async function sendWhatsAppPdfDocument(input: {
   if (!upload.ok) throw new Error(`WhatsApp media upload returned ${upload.status}: ${JSON.stringify(sanitizeWhatsAppApiError(uploadBody))}`);
   const mediaId = (JSON.parse(uploadBody) as { id?: string }).id;
   if (!mediaId) throw new Error("WhatsApp media upload succeeded without returning a media ID.");
+  return { mediaId };
+}
+
+export async function sendWhatsAppPdfDocument(input: {
+  phone: string;
+  pdf: Uint8Array;
+  filename: string;
+  caption?: string;
+  phoneNumberIdOverride?: string;
+}) {
+  const { token, phoneNumberId, version } = whatsappConfig(input.phoneNumberIdOverride);
+  const { mediaId } = await uploadWhatsAppPdf(input);
 
   const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
     method: "POST",

@@ -62,22 +62,12 @@ async function trySendReceipt(lead: Awaited<ReturnType<typeof leadById>>, paymen
   }
 }
 
-async function hasOpenWhatsAppWindow(phone: string) {
-  const history = await getConversation(phone, 50);
-  const lastUser = [...history].reverse().find((message) => message.role === "user");
-  return Boolean(lastUser && Date.now() - new Date(lastUser.createdAt).getTime() < 24 * 60 * 60 * 1000);
-}
-
 function quotationAmount(value: unknown) {
   return value == null ? "Tailored quotation" : `K${Number(value).toLocaleString()}`;
 }
 
 async function submitQuotation(lead: NonNullable<Awaited<ReturnType<typeof leadById>>>, quote: any) {
   const quoteId = String(quote.id || "");
-  if (!(await hasOpenWhatsAppWindow(lead.phone))) {
-    return { ok: false as const, status: 409, reason: "The client’s 24-hour WhatsApp reply window is closed. The quotation remains saved, but Meta will not allow this free-form document until the client replies or an approved quotation template is configured." };
-  }
-
   const sender = await getWhatsAppSender(lead.phone);
   if (!sender?.phoneNumberId) return { ok: false as const, status: 409, reason: "No MedMinds WhatsApp sender is configured for quotation delivery." };
 

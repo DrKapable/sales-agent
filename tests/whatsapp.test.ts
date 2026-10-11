@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseIncomingMessages, sanitizeWhatsAppApiError, sendWhatsAppText, verifyWhatsAppSignature } from "../lib/whatsapp";
+import { sendApprovedMetaTemplate } from "../lib/meta-templates";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -8,6 +9,18 @@ afterEach(() => {
 });
 
 describe("WhatsApp webhook security", () => {
+  it("sends a document-header template through the selected WhatsApp sender", async () => {
+    vi.stubEnv("WHATSAPP_ACCESS_TOKEN", "test-token");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "default-sender");
+    vi.stubEnv("WHATSAPP_GRAPH_VERSION", "v25.0");
+    vi.stubEnv("WHATSAPP_BUSINESS_ACCOUNT_ID", "business");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ messages: [{ id: "wamid.pdf-template" }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const components = [{ type: "header" as const, parameters: [{ type: "document" as const, document: { id: "pdf-media", filename: "receipt.pdf" } }] }];
+    await expect(sendApprovedMetaTemplate({ phone: "+260970000000", name: "medminds_client_receipt_pdf_v1", language: "en_US", phoneNumberIdOverride: "selected-sender", components })).resolves.toEqual({ messageId: "wamid.pdf-template" });
+    expect(fetchMock.mock.calls[0][0]).toBe("https://graph.facebook.com/v25.0/selected-sender/messages");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ type: "template", to: "260970000000", template: { components } });
+  });
   it("accepts only a valid HMAC signature", () => {
     const body = JSON.stringify({ object: "whatsapp_business_account" });
     const secret = "test-secret";
