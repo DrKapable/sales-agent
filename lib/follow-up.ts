@@ -170,6 +170,24 @@ export async function getFollowUpPerformance(days = 30) {
   };
 }
 
+export async function getFollowUpActivityForPeriod(start: string, end: string, excludedPhones: string[] = []) {
+  await ensureTables();
+  const db = database();
+  if (!db) throw new Error("Persistent storage is required for daily follow-up reporting.");
+  const rows = await db.query(`SELECT
+    COUNT(*) FILTER (WHERE sent_at >= $1::timestamptz AND sent_at < $2::timestamptz)::int AS sent,
+    COUNT(*) FILTER (WHERE response_at >= $1::timestamptz AND response_at < $2::timestamptz)::int AS responded,
+    COUNT(*) FILTER (WHERE sent_at >= $1::timestamptz AND sent_at < $2::timestamptz AND transport='freeform')::int AS freeform,
+    COUNT(*) FILTER (WHERE sent_at >= $1::timestamptz AND sent_at < $2::timestamptz AND transport='template')::int AS templates
+    FROM lead_follow_up_events
+    WHERE phone ~ '^[+]?[0-9]{8,15}$'
+      AND NOT (REGEXP_REPLACE(phone,'[^0-9]','','g') = ANY($3::text[]))
+      AND ((sent_at >= $1::timestamptz AND sent_at < $2::timestamptz)
+        OR (response_at >= $1::timestamptz AND response_at < $2::timestamptz))`, [start, end, excludedPhones]);
+  const row = rows[0] || {};
+  return { sent: Number(row.sent || 0), responded: Number(row.responded || 0), freeform: Number(row.freeform || 0), templates: Number(row.templates || 0) };
+}
+
 function isExplicitOptOut(text: string) {
   const clean = text.trim().toLowerCase().replace(/[.!?]+$/g, "").trim();
   if (/\b(unsubscribe|do not contact me|don't contact me|dont contact me|stop messaging me|stop contacting me|no more messages|leave me alone)\b/i.test(clean)) return true;

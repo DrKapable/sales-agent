@@ -191,6 +191,51 @@ export async function getBusinessSnapshot() {
   };
 }
 
+export async function getBusinessActivityForPeriod(start: string, end: string, excludedPhones: string[] = []) {
+  // Initialise existing tables without loading the cumulative business snapshot.
+  await Promise.all([ensureTables(), listOffers(true)]);
+  const database = db();
+  if (!database) throw new Error("Persistent storage is required for daily activity reporting.");
+  const rows = await database.query(`
+    WITH clients AS (
+      SELECT id,phone,created_at FROM leads
+      WHERE phone ~ '^[+]?[0-9]{8,15}$'
+        AND NOT (REGEXP_REPLACE(phone,'[^0-9]','','g') = ANY($3::text[]))
+    ), day_messages AS (
+      SELECT m.phone,m.role FROM messages m INNER JOIN clients c ON c.phone=m.phone
+      WHERE m.created_at >= $1::timestamptz AND m.created_at < $2::timestamptz
+    ), day_quotes AS (
+      SELECT q.* FROM sales_quotes q INNER JOIN clients c ON c.id=q.lead_id
+      WHERE q.created_at >= $1::timestamptz AND q.created_at < $2::timestamptz AND q.status <> 'DRAFT'
+    ), day_payments AS (
+      SELECT p.* FROM client_payments p INNER JOIN clients c ON c.id=p.lead_id
+      WHERE p.created_at >= $1::timestamptz AND p.created_at < $2::timestamptz
+    ), verified_payments AS (
+      SELECT p.* FROM client_payments p INNER JOIN clients c ON c.id=p.lead_id
+      WHERE p.verified_at >= $1::timestamptz AND p.verified_at < $2::timestamptz AND p.status='VERIFIED'
+    )
+    SELECT
+      (SELECT COUNT(*)::int FROM clients WHERE created_at >= $1::timestamptz AND created_at < $2::timestamptz) AS new_clients,
+      (SELECT COUNT(DISTINCT phone)::int FROM day_messages WHERE role='user') AS active_clients,
+      (SELECT COUNT(*)::int FROM day_messages WHERE role='user') AS client_messages,
+      (SELECT COUNT(*)::int FROM day_messages WHERE role='assistant') AS team_replies,
+      (SELECT COUNT(*)::int FROM day_quotes) AS documents_created,
+      (SELECT COUNT(*)::int FROM day_payments) AS payments_recorded,
+      (SELECT COUNT(*)::int FROM verified_payments) AS payments_verified,
+      (SELECT COALESCE(SUM(amount_zmw),0) FROM verified_payments) AS verified_amount_zmw,
+      (SELECT COUNT(*)::int FROM business_tasks WHERE created_at >= $1::timestamptz AND created_at < $2::timestamptz) AS tasks_created,
+      (SELECT COUNT(*)::int FROM business_tasks WHERE completed_at >= $1::timestamptz AND completed_at < $2::timestamptz) AS tasks_completed
+  `, [start, end, excludedPhones]);
+  const row = rows[0] || {};
+  return {
+    newClients: Number(row.new_clients || 0), activeClients: Number(row.active_clients || 0),
+    clientMessages: Number(row.client_messages || 0), teamReplies: Number(row.team_replies || 0),
+    documentsCreated: Number(row.documents_created || 0), paymentsRecorded: Number(row.payments_recorded || 0),
+    paymentsVerified: Number(row.payments_verified || 0), verifiedAmountZmw: Number(row.verified_amount_zmw || 0),
+    tasksCreated: Number(row.tasks_created || 0), tasksCompleted: Number(row.tasks_completed || 0)
+  };
+}
+
 export async function createBusinessTask(input: BusinessTaskInput) {
   await ensureTables();
   const database = db();

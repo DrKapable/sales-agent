@@ -1,41 +1,41 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
-import { getBusinessSnapshot } from "@/lib/business-ops";
-import { getFollowUpPerformance } from "@/lib/follow-up";
+import { getBusinessActivityForPeriod } from "@/lib/business-ops";
+import { getFollowUpActivityForPeriod } from "@/lib/follow-up";
+import { previousLusakaDay } from "@/lib/daily-report-period";
 import { referralRecipients } from "@/lib/referrals";
 import { sendTeamCopies } from "@/lib/team-notifications";
 
 let sql: NeonQueryFunction<false, false> | null = null;
 function db() { if (!process.env.DATABASE_URL) return null; sql ??= neon(process.env.DATABASE_URL); return sql; }
 
-async function claimToday() {
+async function claimDay(deliveryDate: string) {
   const database = db();
   if (!database) return true;
   await database.query(`CREATE TABLE IF NOT EXISTS daily_management_briefs (brief_date DATE PRIMARY KEY, sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-  const rows = await database.query(`INSERT INTO daily_management_briefs (brief_date) VALUES (CURRENT_DATE) ON CONFLICT DO NOTHING RETURNING brief_date`);
+  const rows = await database.query(`INSERT INTO daily_management_briefs (brief_date) VALUES ($1::date) ON CONFLICT DO NOTHING RETURNING brief_date`, [deliveryDate]);
   return rows.length > 0;
 }
 
-export async function runDailyManagementBrief() {
-  if (!(await claimToday())) return { sent: false, reason: "already_sent" };
+export async function runDailyManagementBrief(now = new Date()) {
+  const period = previousLusakaDay(now);
+  if (!(await claimDay(period.deliveryDate))) return { sent: false, reason: "already_sent" };
   try {
-    const [snapshot, followUpPerformance] = await Promise.all([
-      getBusinessSnapshot(),
-      getFollowUpPerformance(30).catch(() => ({ days: 30, sent: 0, responded: 0, responseRate: 0, freeform: 0, templates: 0 }))
+    const excludedPhones = Object.values(referralRecipients).flatMap((recipient) => recipient.phone ? [recipient.phone.replace(/\D/g, "")] : []);
+    const [activity, followUpPerformance] = await Promise.all([
+      getBusinessActivityForPeriod(period.start, period.end, excludedPhones),
+      getFollowUpActivityForPeriod(period.start, period.end, excludedPhones)
     ]);
-    const topServices = snapshot.services.slice(0, 3).map((row) => `${row.service}: ${row.leads} leads, ${row.conversionRate}% converted`).join("\n") || "No service data yet";
-    const hot = snapshot.leads.filter((lead) => lead.scoreBand === "HOT" && lead.status !== "CONVERTED").slice(0, 5).map((lead) => `${lead.name || lead.phone} (${lead.leadScore}/100) - ${lead.serviceInterest || "service not established"}`).join("\n") || "None";
-    const lost = snapshot.lostReasons.slice(0, 3).map((row) => `${row.reason}: ${row.count}`).join("\n") || "None";
     const body = [
-      `Total leads: ${snapshot.metrics.totalLeads}`,
-      `Conversion: ${snapshot.metrics.conversionRate}% (${snapshot.metrics.converted} converted)`,
-      `Hot unconverted leads: ${snapshot.metrics.hotLeads}`,
-      `Follow-ups due: ${snapshot.metrics.followUpsDue}`,
-      `Automated follow-ups (30d): ${followUpPerformance.sent} sent, ${followUpPerformance.responded} replies (${followUpPerformance.responseRate}%)`,
-      `Follow-up delivery mix: ${followUpPerformance.freeform} personalised, ${followUpPerformance.templates} templates`,
-      `Payment pending: ${snapshot.metrics.paymentPending}`,
-      "", "Top services", topServices,
-      "", "Highest-priority leads", hot,
-      "", "Lost-lead signals", lost
+      `Report: ${period.label} (Zambia time, 00:00–23:59)`,
+      `New clients: ${activity.newClients}`,
+      `Clients who messaged: ${activity.activeClients}`,
+      `Client messages: ${activity.clientMessages} | Team replies: ${activity.teamReplies}`,
+      `Quotations/invoices created: ${activity.documentsCreated}`,
+      `Payments recorded: ${activity.paymentsRecorded}`,
+      `Payments verified: ${activity.paymentsVerified} | K${activity.verifiedAmountZmw.toLocaleString("en-GB", { maximumFractionDigits: 2 })}`,
+      `Tasks: ${activity.tasksCreated} created, ${activity.tasksCompleted} completed`,
+      `Automated follow-ups: ${followUpPerformance.sent} sent | Replies received: ${followUpPerformance.responded}`,
+      `Follow-up delivery: ${followUpPerformance.freeform} personalised, ${followUpPerformance.templates} templates`
     ].join("\n");
 
     const results = await sendTeamCopies({
@@ -52,11 +52,14 @@ export async function runDailyManagementBrief() {
     return {
       sent: results.some((result) => result.status === "fulfilled" && result.value.sent),
       results,
+      reportDate: period.reportDate,
+      period: { start: period.start, end: period.end, timeZone: period.timeZone },
+      activity,
       followUpPerformance
     };
   } catch (error) {
     const database = db();
-    if (database) await database.query(`DELETE FROM daily_management_briefs WHERE brief_date=CURRENT_DATE`);
+    if (database) await database.query(`DELETE FROM daily_management_briefs WHERE brief_date=$1::date`, [period.deliveryDate]);
     throw error;
   }
 }
