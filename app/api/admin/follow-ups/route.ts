@@ -11,6 +11,7 @@ import {
 import { runMaryAutomaticFollowUps } from "@/lib/mary-automatic-follow-ups";
 import { isFollowUpTeamMember } from "@/lib/follow-up-team";
 import { manualFollowUpOptions } from "@/lib/manual-follow-up-options";
+import { getFollowUpAutomation, setFollowUpAutomationPaused } from "@/lib/follow-up-automation";
 
 const BACKGROUND_SYNC_INTERVAL_MS = 60 * 1000;
 let lastBackgroundSyncAt = 0;
@@ -20,6 +21,7 @@ const teamMemberSchema = z.string().trim().min(2).max(120).refine(isFollowUpTeam
 });
 
 const actionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("set_automation_paused"), paused: z.boolean() }),
   z.object({
     action: z.literal("schedule"),
     phone: z.string().trim().min(8).max(40),
@@ -72,12 +74,14 @@ function manualClientPool(data: Awaited<ReturnType<typeof listHumanFollowUps>>) 
 export async function GET() {
   const startedAt = Date.now();
   try {
+    const automation = await getFollowUpAutomation();
     const data = await listHumanFollowUps();
-    queueBackgroundFollowUpSync();
+    if (!automation.paused) queueBackgroundFollowUpSync();
 
     return NextResponse.json(
       {
         ...data,
+        automation,
         availableLeads: manualClientPool(data),
         loadMs: Date.now() - startedAt
       },
@@ -96,6 +100,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
   try {
+    if (parsed.data.action === "set_automation_paused") {
+      const automation = await setFollowUpAutomationPaused(parsed.data.paused);
+      return NextResponse.json({ ok: true, automation }, { headers: { "Cache-Control": "private, no-store" } });
+    }
     if (parsed.data.action === "schedule") {
       const scheduledAt = new Date(parsed.data.scheduledAt);
       if (!Number.isFinite(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) {

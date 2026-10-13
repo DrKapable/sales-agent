@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { humanFollowUpCss } from "@/components/human-follow-up-styles";
 import { FOLLOW_UP_TEAM, type FollowUpTeamMember } from "@/lib/follow-up-team";
+import type { FollowUpAutomation } from "@/lib/follow-up-automation";
 
 type Channel = "CALL" | "WHATSAPP" | "SMS";
 type Outcome = "REACHED_CONTINUE" | "NO_ANSWER" | "INTERESTED" | "READY_TO_PROCEED" | "NOT_INTERESTED" | "OTHER";
@@ -56,7 +57,7 @@ type AvailableLead = {
   priority: string;
 };
 
-type Payload = { tasks: FollowUpTask[]; availableLeads: AvailableLead[]; smsConfigured: boolean };
+type Payload = { tasks: FollowUpTask[]; availableLeads: AvailableLead[]; smsConfigured: boolean; automation: FollowUpAutomation };
 type Filter = "DUE" | "UPCOMING" | "COMPLETED" | "DROPPED" | "ALL";
 
 function displayDate(value?: string | null) {
@@ -114,6 +115,7 @@ export function HumanFollowUpPanel({ onBack }: { onBack?: () => void }) {
   const [manualReason, setManualReason] = useState("");
   const [manualBy, setManualBy] = useState<FollowUpTeamMember>(FOLLOW_UP_TEAM[0]);
   const [busy, setBusy] = useState(false);
+  const [automationBusy, setAutomationBusy] = useState(false);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -121,7 +123,11 @@ export function HumanFollowUpPanel({ onBack }: { onBack?: () => void }) {
       const response = await fetch("/api/admin/follow-ups", { cache: "no-store" });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || "Unable to load follow-ups.");
-      setData(json as Payload);
+      const payload = json as Payload;
+      // A slow refresh started before a toggle must not overwrite its saved state.
+      setData((current) => current?.automation.updatedAt && (!payload.automation.updatedAt || current.automation.updatedAt > payload.automation.updatedAt)
+        ? { ...payload, automation: current.automation }
+        : payload);
       setError("");
     } catch (err) {
       if (!quiet) setError(err instanceof Error ? err.message : "Unable to load follow-ups.");
@@ -174,6 +180,22 @@ export function HumanFollowUpPanel({ onBack }: { onBack?: () => void }) {
     return json;
   }
 
+  async function toggleAutomation() {
+    if (!data?.automation.configured || automationBusy) return;
+    setAutomationBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const json = await post({ action: "set_automation_paused", paused: !data.automation.paused });
+      setData((current) => current ? { ...current, automation: json.automation } : current);
+      setNotice(json.automation.paused ? "Automatic follow-ups paused for all clients." : "Automatic follow-ups resumed for all clients.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to change automatic follow-ups.");
+    } finally {
+      setAutomationBusy(false);
+    }
+  }
+
   async function scheduleManual() {
     if (!manualPhone || !manualAt) return;
     setBusy(true);
@@ -206,7 +228,7 @@ export function HumanFollowUpPanel({ onBack }: { onBack?: () => void }) {
         <div>
           <button type="button" className="hfuBack" onClick={onBack}>← Business dashboard</button>
           <div className="hfuTitle"><h1>Human follow-ups</h1><span>FOLLOW-UP WORKSPACE</span></div>
-          <p>Mary schedules the right clients. The follow-up team owns the contact, outcome and next follow-up.</p>
+          <p>Manage Mary's automatic follow-ups and the follow-up team's manual contact, outcomes and next steps.</p>
         </div>
         <div className="hfuHeaderActions">
           <button type="button" className="hfuGhost" onClick={() => void load()} disabled={loading}>↻ Refresh</button>
@@ -214,8 +236,17 @@ export function HumanFollowUpPanel({ onBack }: { onBack?: () => void }) {
         </div>
       </header>
 
+      <section className={`hfuAutomation${data?.automation.paused ? " paused" : ""}`} aria-label="Automatic follow-up controls" data-mary-followup-automation="true">
+        <div>
+          <strong>{!data ? "Loading auto follow-up status…" : !data.automation.configured ? "Auto follow-up unavailable" : data.automation.paused ? "Auto follow-up paused" : "Auto follow-up active"}</strong>
+          <p>{data?.automation.paused && data.automation.configured ? "Mary will not send automatic follow-ups until you resume. Pending tasks are kept, and manual follow-ups remain available." : "Mary sends approved WhatsApp templates for scheduled tasks when due. Pause applies to all clients; manual follow-ups remain available."}</p>
+          {data?.automation.paused && data.automation.configured ? <small>Messages already being sent may finish.</small> : null}
+        </div>
+        <button type="button" className="hfuGhost" disabled={!data?.automation.configured || automationBusy} onClick={() => void toggleAutomation()}>{automationBusy ? "Saving…" : data?.automation.paused ? "Resume auto follow-up" : "Pause auto follow-up"}</button>
+      </section>
+
       {error ? <div className="hfuAlert error">{error}</div> : null}
-      {notice ? <div className="hfuAlert success">{notice}</div> : null}
+      {notice ? <div className="hfuAlert success" role="status">{notice}</div> : null}
 
       <section className="hfuMetrics" aria-label="Follow-up summary">
         <button className={filter === "DUE" ? "active" : ""} onClick={() => setFilter("DUE")}><span>Due now</span><strong>{counts.due}</strong><small>needs human action</small></button>

@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { addMessage, listLeads, updateLead } from "@/lib/store";
 import { getApprovedMetaTemplateInventory, sendApprovedMetaTemplate, type MetaTemplate } from "@/lib/meta-templates";
 import { recordOutgoingMessageAccepted } from "@/lib/message-delivery";
+import { getFollowUpAutomation } from "@/lib/follow-up-automation";
 
 const MAX_AUTOMATED_STEPS = 3;
 const NEXT_STEP_HOURS = 24;
@@ -68,6 +69,8 @@ export async function runMaryAutomaticFollowUps() {
   const sql = db();
   if (!sql) return { checked: 0, sent: 0, failed: 0, skipped: "database_not_configured" };
 
+  if ((await getFollowUpAutomation()).paused) return { checked: 0, sent: 0, failed: 0, skipped: "auto_follow_up_paused" };
+
   const inventory = await getApprovedMetaTemplateInventory();
   if (!inventory.templates.length) return { checked: 0, sent: 0, failed: 0, skipped: "no_approved_production_templates" };
 
@@ -102,6 +105,9 @@ export async function runMaryAutomaticFollowUps() {
     }
 
     try {
+      // Re-read shared state so a pause also stops a batch already running.
+      // A request already submitted to Meta may still finish.
+      if ((await getFollowUpAutomation()).paused) return { checked: rows.length, sent, failed, skipped: "auto_follow_up_paused" };
       const components = templateComponents(template, lead);
       const result = await sendApprovedMetaTemplate({ phone, name: template.name, language: template.language, components });
       const chatLabel = `[Mary automatic follow-up · Meta template: ${template.name}]`;
