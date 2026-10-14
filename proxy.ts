@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sessionCookieName, verifySessionToken } from "@/lib/session";
 
-function contentSecurityPolicy(nonce: string, embeddable = false) {
+function contentSecurityPolicy(nonce: string, embeddable = false, documentPreview = false) {
   const connectSource = process.env.NODE_ENV === "development" ? "connect-src 'self' ws: http:" : "connect-src 'self'";
   return [
     "default-src 'self'",
@@ -11,7 +11,7 @@ function contentSecurityPolicy(nonce: string, embeddable = false) {
     "font-src 'self'",
     connectSource,
     "object-src 'none'",
-    embeddable ? "frame-ancestors *" : "frame-ancestors 'none'",
+    embeddable ? "frame-ancestors *" : documentPreview ? "frame-ancestors 'self'" : "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'"
   ].join("; ");
@@ -26,7 +26,11 @@ export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const embeddable = path === "/widget" || path.startsWith("/widget/");
-  const policy = contentSecurityPolicy(nonce, embeddable);
+  // Only document responses may be framed, and only by this application's origin.
+  const documentPreview = /^\/api\/documents\/[0-9a-f-]{36}$/i.test(path) ||
+    /^\/api\/admin\/client-documents\/[0-9a-f-]{36}$/i.test(path) ||
+    path.startsWith("/api/admin/whatsapp-media/");
+  const policy = contentSecurityPolicy(nonce, embeddable, documentPreview);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", policy);

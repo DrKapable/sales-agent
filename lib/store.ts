@@ -237,6 +237,17 @@ export async function getLead(phone: string): Promise<Lead | null> {
   return rows[0] ? mapLead(rows[0] as Record<string, unknown>) : null;
 }
 
+export async function getLeadById(id: string): Promise<Lead | null> {
+  await ensureDatabase();
+  const db = database();
+  if (!db) {
+    const lead = [...memory.leads.values()].find((item) => item.id === id);
+    return lead ? withMemoryLastMessage(lead) : null;
+  }
+  const rows = await db.query(`SELECT * FROM leads WHERE id=$1 LIMIT 1`, [id]);
+  return rows[0] ? mapLead(rows[0] as Record<string, unknown>) : null;
+}
+
 export async function listLeads(): Promise<Lead[]> {
   await ensureDatabase();
   const db = database();

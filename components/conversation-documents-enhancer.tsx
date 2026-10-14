@@ -1,9 +1,10 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { documentDeliveryLabel, matchingCommercialDocument } from "@/lib/conversation-documents";
 
-type SharedDocument = {
+export type SharedDocument = {
   id: string;
   kind: "quotation" | "invoice" | "shared_file";
   title: string;
@@ -23,35 +24,6 @@ type SharedDocument = {
 
 type Payload = { phone?: string; documents?: SharedDocument[]; error?: string };
 
-function digits(value: string) {
-  return value.replace(/\D/g, "");
-}
-
-function phoneFromText(value: string | null | undefined) {
-  if (!value) return null;
-  const matches = value.match(/\+?\d[\d\s()\-]{6,}\d/g) || [];
-  for (const match of matches) {
-    const valueDigits = digits(match);
-    if (valueDigits.length >= 8 && valueDigits.length <= 15) return valueDigits;
-  }
-  return null;
-}
-
-function activeConversationPanel() {
-  const panels = Array.from(document.querySelectorAll<HTMLElement>(".conversationPanel"));
-  return panels.find((panel) => {
-    const rect = panel.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  }) || panels.at(-1) || null;
-}
-
-function activePhone(panel: HTMLElement | null) {
-  if (!panel) return null;
-  const identity = panel.querySelector<HTMLElement>(".clientIdentity")?.textContent;
-  const selected = document.querySelector<HTMLElement>(".leadListItem.selected")?.textContent;
-  return phoneFromText(identity) || phoneFromText(selected) || null;
-}
-
 function formatDate(value: string) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "";
@@ -60,17 +32,6 @@ function formatDate(value: string) {
 
 function formatAmount(value: number | null) {
   return value == null || !Number.isFinite(Number(value)) ? null : `K${Number(value).toLocaleString()}`;
-}
-
-function deliveryLabel(status: string) {
-  switch (status.toUpperCase()) {
-    case "ACCEPTED": return "Accepted";
-    case "SENT": return "Sent";
-    case "DELIVERED": return "Delivered";
-    case "READ": return "Read";
-    case "FAILED": return "Failed";
-    default: return "Created";
-  }
 }
 
 function kindLabel(document: SharedDocument) {
@@ -83,71 +44,50 @@ function isPdf(document: SharedDocument) {
   return document.mimeType === "application/pdf" || document.fileName.toLowerCase().endsWith(".pdf");
 }
 
-export function ConversationDocumentsEnhancer() {
-  const [phone, setPhone] = useState<string | null>(null);
-  const [actionsHost, setActionsHost] = useState<HTMLElement | null>(null);
+type DocumentsContext = {
+  documents: SharedDocument[];
+  error: string;
+  loading: boolean;
+  openDocument: (document: SharedDocument) => void;
+  openDrawer: () => void;
+  retry: () => void;
+};
+const DocumentsContext = createContext<DocumentsContext | null>(null);
+
+export function ConversationDocumentsProvider({ phone, children }: { phone: string; children: ReactNode }) {
   const [documents, setDocuments] = useState<SharedDocument[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<SharedDocument | null>(null);
   const [error, setError] = useState("");
-  const phoneRef = useRef<string | null>(null);
-
-  const sync = useCallback(() => {
-    if (!window.location.pathname.startsWith("/admin")) return;
-    const panel = activeConversationPanel();
-    const nextPhone = activePhone(panel);
-    if (nextPhone !== phoneRef.current) {
-      phoneRef.current = nextPhone;
-      setPhone(nextPhone);
-      setDocuments([]);
-      setDrawerOpen(false);
-      setPreviewDocument(null);
-      setError("");
-    }
-    const nextHost = panel?.querySelector<HTMLElement>(".conversationActions") || null;
-    setActionsHost((current) => current === nextHost ? current : nextHost);
-  }, []);
+  const [loading, setLoading] = useState(true);
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
-    sync();
-    let frame = 0;
-    const observer = new MutationObserver(() => {
-      if (frame) return;
-      frame = window.requestAnimationFrame(() => {
-        frame = 0;
-        sync();
-      });
-    });
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-    const timer = window.setInterval(sync, 2500);
-    return () => {
-      observer.disconnect();
-      window.clearInterval(timer);
-      if (frame) window.cancelAnimationFrame(frame);
+    let disposed = false;
+    let inFlight = false;
+    let controller: AbortController | null = null;
+    const load = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      controller = new AbortController();
+      try {
+        const response = await fetch(`/api/admin/conversation-documents?phone=${encodeURIComponent(phone)}`, { cache: "no-store", signal: controller.signal });
+        const data = await response.json() as Payload;
+        if (!response.ok) throw new Error(data.error || "Unable to load shared documents.");
+        if (!disposed) { setDocuments(data.documents || []); setError(""); }
+      } catch (err) {
+        if (!disposed) setError(err instanceof Error ? err.message : "Unable to load shared documents.");
+      } finally {
+        inFlight = false;
+        if (!disposed) setLoading(false);
+      }
     };
-  }, [sync]);
-
-  const load = useCallback(async () => {
-    if (!phone) return;
-    try {
-      const response = await fetch(`/api/admin/conversation-documents?phone=${encodeURIComponent(phone)}`, { cache: "no-store" });
-      const data = await response.json() as Payload;
-      if (!response.ok) throw new Error(data.error || "Unable to load shared documents.");
-      setDocuments(data.documents || []);
-      setError("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load shared documents.");
-    }
-  }, [phone]);
-
-  useEffect(() => {
-    if (!phone) return;
     void load();
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void load();
     }, 5000);
-    return () => window.clearInterval(timer);
-  }, [load, phone]);
+    return () => { disposed = true; controller?.abort(); window.clearInterval(timer); };
+  }, [phone, revision]);
 
   useEffect(() => {
     const modalOpen = drawerOpen || Boolean(previewDocument);
@@ -173,17 +113,9 @@ export function ConversationDocumentsEnhancer() {
   }
 
   const body = typeof document === "undefined" ? null : document.body;
-  if (!phone) return null;
-
-  return <>
-    {actionsHost && documents.length ? createPortal(
-      <button type="button" className="conversationDocumentsButton" aria-label={`Shared documents (${documents.length})`} title="Shared documents" onClick={() => setDrawerOpen(true)}>
-        <span className="conversationDocumentsButtonIcon" aria-hidden="true">▤</span>
-        <span className="conversationDocumentsButtonLabel">Documents</span>
-        <b>{documents.length}</b>
-      </button>,
-      actionsHost
-    ) : null}
+  const context = { documents, error, loading, openDocument, openDrawer: () => setDrawerOpen(true), retry: () => setRevision((value) => value + 1) };
+  return <DocumentsContext.Provider value={context}>
+    {children}
 
     {body && drawerOpen ? createPortal(
       <div className="conversationDocumentsOverlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) setDrawerOpen(false); }}>
@@ -199,7 +131,7 @@ export function ConversationDocumentsEnhancer() {
               return <button type="button" className="conversationDocumentRow" key={`${document.kind}:${document.id}`} onClick={() => openDocument(document)}>
                 <span className="conversationDocumentIcon" aria-hidden="true">{isPdf(document) ? "PDF" : "FILE"}</span>
                 <span className="conversationDocumentRowBody">
-                  <span className="conversationDocumentTop"><strong>{kindLabel(document)}</strong><em className={`documentDeliveryStatus ${document.deliveryStatus.toLowerCase()}`}>{deliveryLabel(document.deliveryStatus)}</em></span>
+                  <span className="conversationDocumentTop"><strong>{kindLabel(document)}</strong><em className={`documentDeliveryStatus ${document.deliveryStatus.toLowerCase()}`}>{documentDeliveryLabel(document.deliveryStatus)}</em></span>
                   <b>{document.title}</b>
                   <span>{document.service || document.fileName}{document.service && amount ? ` · ${amount}` : ""}</span>
                   {document.details && <small>{document.details}</small>}
@@ -209,7 +141,8 @@ export function ConversationDocumentsEnhancer() {
                 <span className="conversationDocumentChevron" aria-hidden="true">›</span>
               </button>;
             })}
-            {!documents.length && <div className="conversationDocumentsEmpty">No shared documents yet.</div>}
+            {loading && <div className="conversationDocumentsEmpty">Loading documents…</div>}
+            {!loading && !documents.length && <div className="conversationDocumentsEmpty">No documents yet.</div>}
           </div>
         </section>
       </div>,
@@ -225,10 +158,46 @@ export function ConversationDocumentsEnhancer() {
             <a href={previewDocument.downloadUrl} target="_blank" rel="noreferrer" aria-label="Open document in a new tab">↗</a>
           </header>
           <iframe src={`${previewDocument.downloadUrl}#toolbar=0&navpanes=0`} title={previewDocument.title} />
-          <footer><span>{kindLabel(previewDocument)} · {deliveryLabel(previewDocument.deliveryStatus)}</span><a href={previewDocument.downloadUrl} target="_blank" rel="noreferrer">Open externally</a></footer>
+          <footer><span>{kindLabel(previewDocument)} · {documentDeliveryLabel(previewDocument.deliveryStatus)}</span><a href={previewDocument.downloadUrl} download={previewDocument.fileName}>Download PDF</a><a href={previewDocument.downloadUrl} target="_blank" rel="noreferrer">Open externally</a></footer>
         </section>
       </div>,
       body
     ) : null}
-  </>;
+  </DocumentsContext.Provider>;
+}
+
+
+export function ConversationDocumentsButton() {
+  const context = useContext(DocumentsContext);
+  if (!context) return null;
+  return <button type="button" className="conversationDocumentsButton" aria-label={`Documents (${context.documents.length})`} title="Client documents" onClick={context.openDrawer}>
+    <span className="conversationDocumentsButtonIcon" aria-hidden="true">▤</span>
+    <span className="conversationDocumentsButtonLabel">Documents</span><b>{context.documents.length}</b>
+  </button>;
+}
+
+function DocumentCard({ document, openDocument }: { document: SharedDocument; openDocument: (document: SharedDocument) => void }) {
+  return <button type="button" className="conversationQuotationCard" onClick={() => openDocument(document)} aria-label={`View ${document.documentNumber || document.title}`}>
+    <span className="conversationQuotationCardIcon" aria-hidden="true">PDF</span>
+    <span className="conversationQuotationCardBody"><strong>{document.documentNumber || document.title}{formatAmount(document.amountZmw) ? ` · ${formatAmount(document.amountZmw)}` : ""}</strong><small>{document.service || document.fileName}</small><em className={`documentDeliveryStatus ${document.deliveryStatus.toLowerCase()}`}>{documentDeliveryLabel(document.deliveryStatus)}</em></span>
+    <span className="conversationQuotationCardAction">View PDF ›</span>
+  </button>;
+}
+
+export function ConversationDocumentsSummary() {
+  const context = useContext(DocumentsContext);
+  if (!context) return null;
+  const latest = context.documents.find((item) => item.kind === "quotation" || item.kind === "invoice");
+  return <div className="conversationDocumentsSummary">
+    {latest ? <DocumentCard document={latest} openDocument={context.openDocument} /> : <button type="button" className="conversationDocumentsSummaryButton" onClick={context.openDrawer}>{context.loading ? "Loading client documents…" : `Client documents (${context.documents.length})`} ›</button>}
+    {latest && <button type="button" className="conversationDocumentsSummaryButton" onClick={context.openDrawer}>All documents ({context.documents.length}) ›</button>}
+    {context.error && <div className="conversationSharedDocumentsError" role="status">{context.error} <button type="button" onClick={context.retry}>Retry</button></div>}
+  </div>;
+}
+
+export function ConversationDocumentAttachment({ content }: { content: string }) {
+  const context = useContext(DocumentsContext);
+  if (!context) return null;
+  const document = matchingCommercialDocument(content, context.documents);
+  return document ? <DocumentCard document={document} openDocument={context.openDocument} /> : null;
 }
