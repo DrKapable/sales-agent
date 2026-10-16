@@ -71,8 +71,8 @@ export async function flagStaffDispatchUncertain(id: string, reason: string) {
 /** Distinguish status enquiries from instructions that would send or change records. */
 export function isStaffCorrespondenceInquiry(text:string) {
   const q=text.trim();
-  if (/^(send|message|remind|assign|follow up with|forward|tell|create|mark|update the|delete|confirm [a-f0-9]{8})\\b/i.test(q)) return false;
-  return /\\b(delivery|delivered|read receipt|confirm delivery|who replied|what (?:did|has|have|was) .{0,70}(?:said|replied)|what .{0,70} said|who (?:has )?responded|(?:any|latest|their|his|her) replies|what (?:has )?.{0,40}replied|(?:staff|team) (?:message|reply|replies|response|updates)|heard (?:back )?from|any (?:reply|response) from|check (?:their|his|her|the) (?:reply|message)|what he replies|what she replies)\\b/i.test(q);
+  if (/^(send|message|remind|assign|follow up with|forward|tell|create|mark|update the|delete|confirm [a-f0-9]{8})\b/i.test(q)) return false;
+  return /\b(delivery|delivered|read receipt|confirm delivery|who replied|what (?:did|has|have|was) .{0,70}(?:said|replied)|what .{0,70} said|who (?:has )?responded|(?:any|latest|their|his|her) replies|what (?:has )?.{0,40}replied|(?:staff|team) (?:message|reply|replies|response|updates)|heard (?:back )?from|any (?:reply|response) from|check (?:their|his|her|the) (?:reply|message)|what he replies|what she replies)\b/i.test(q);
 }
 function formatWhen(value: unknown) {
   if (!value) return "unknown";
@@ -96,8 +96,8 @@ function compactText(input: unknown, limit = 450) {
 }
 function matchingRegisteredStaff(members: readonly TeamMember[], input: string) {
   const normalize = (value:string) => value.toLowerCase()
-    .replace(/['’]s\\b/g,"").replace(/[^a-z0-9]+/g," ").trim()
-    .split(/\\s+/).filter(token => token.length >= 3 && !["dr","mr","mrs","ms","doctor"].includes(token));
+    .replace(/['’]s\b/g,"").replace(/[^a-z0-9]+/g," ").trim()
+    .split(/\s+/).filter(token => token.length >= 3 && !["dr","mr","mrs","ms","doctor"].includes(token));
   const tokens=normalize(input);
   if(!tokens.length)return [];
   return members.filter(member=>member.active &&
