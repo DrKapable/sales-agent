@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createQuote, recordFeedback, recordPayment, updateBusinessTask, verifyPayment } from "@/lib/business-ops";
+import { deleteSalesPayment } from "@/lib/sales-data-maintenance";
 import { createMirroredBusinessTask } from "@/lib/business-task-bridge";
 import { getFastBusinessSnapshot } from "@/lib/business-snapshot-fast";
 import { addMessage, getConversation, listLeads } from "@/lib/store";
@@ -18,6 +19,7 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("task_status"), taskId: z.string().uuid(), status: z.enum(["OPEN", "COMPLETED"]) }),
   z.object({ action: z.literal("payment"), leadId: z.string().min(1), amountZmw: z.number().positive(), reference: z.string().max(160).optional(), verified: z.boolean().optional(), verifiedBy: z.string().max(160).optional() }),
   z.object({ action: z.literal("verify_payment"), paymentId: z.string().uuid(), verifiedBy: z.string().max(160).optional() }),
+  z.object({ action: z.literal("delete_payment"), paymentId: z.string().uuid() }),
   z.object({ action: z.literal("send_receipt"), paymentId: z.string().uuid() }),
   z.object({ action: z.literal("quote"), leadId: z.string().min(1), service: z.string().min(2).max(240), amountZmw: z.number().nonnegative().optional(), details: z.string().min(3).max(1800) }),
   z.object({ action: z.literal("resend_quote"), quoteId: z.string().uuid() }),
@@ -143,6 +145,7 @@ export async function POST(request: Request) {
       void notifyBusinessEvent({ type, eventKey: `${type}:${String((payment as { id?: string }).id)}`, title: input.verified ? "Payment verified" : "Payment recorded", body: `Amount: K${input.amountZmw.toLocaleString()}${input.reference ? `\nReference: ${input.reference}` : ""}`, lead }).catch(() => undefined);
       return NextResponse.json({ ...payment, ...(await trySendReceipt(lead, payment)) });
     }
+    if (input.action === "delete_payment") return NextResponse.json(await deleteSalesPayment(input.paymentId));
     if (input.action === "verify_payment") {
       const payment = await verifyPayment(input) as { id?: string; lead_id?: string; amount_zmw?: number; reference?: string; status?: string; verified_at?: string; verified_by?: string };
       const lead = await leadById(payment.lead_id);
