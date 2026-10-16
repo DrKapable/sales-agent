@@ -68,6 +68,12 @@ export async function flagStaffDispatchUncertain(id: string, reason: string) {
     error_note=$2,updated_at=NOW() WHERE id=$1 AND status='PREPARING'`,
     [id,reason.slice(0,300)]);
 }
+/** Distinguish status enquiries from instructions that would send or change records. */
+export function isStaffCorrespondenceInquiry(text:string) {
+  const q=text.trim();
+  if (/^(send|message|remind|assign|follow up with|forward|tell|create|mark|update the|delete|confirm [a-f0-9]{8})\\b/i.test(q)) return false;
+  return /\\b(delivery|delivered|read receipt|confirm delivery|who replied|what (?:did|has|have|was) .{0,70}(?:said|replied)|what .{0,70} said|who (?:has )?responded|(?:any|latest|their|his|her) replies|what (?:has )?.{0,40}replied|(?:staff|team) (?:message|reply|replies|response|updates)|heard (?:back )?from|any (?:reply|response) from|check (?:their|his|her|the) (?:reply|message)|what he replies|what she replies)\\b/i.test(q);
+}
 function formatWhen(value: unknown) {
   if (!value) return "unknown";
   const date = new Date(String(value));
