@@ -1,7 +1,7 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { findTeamMember, listTeamMembers, type TeamMember } from "@/lib/internal-team-registry";
-import { createBusinessTask } from "@/lib/business-ops";
-import { addMessage, getConversation } from "@/lib/store";
+import { createMirroredBusinessTask } from "@/lib/business-task-bridge";
+import { addMessage, getConversation, getLeadById } from "@/lib/store";
 import { sendStaffAlert } from "@/lib/team-alert-transport";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 import { sendWhatsAppFollowUpTemplate } from "@/lib/whatsapp-template";
@@ -154,7 +154,10 @@ async function applyTeamAction(member:TeamMember, action:TeamAction):Promise<str
       const recipient=await staffFor(action.assignee||"");
       const rows=await db().query(`UPDATE leads SET assigned_to=$2,updated_at=NOW() WHERE id=$1 RETURNING id`,[lead.id,recipient.name]);
       if (!rows.length) throw new Error("Client assignment failed.");
-      return `Assigned ${lead.name||lead.phone} to ${recipient.name}.`;
+      let notification="Staff notification sent.";
+      try { await sendStaffAlert({phone:recipient.phone,name:recipient.name,heading:"New client assignment from Mary Kaunda",body:`${member.name} assigned client ${lead.name||lead.phone}. Open your MedMinds task list for details.`}); }
+      catch { notification="Staff notification could not be confirmed."; }
+      return `Assigned ${lead.name||lead.phone} to ${recipient.name}. ${notification}`;
     }
     case "update_lead": {
       const lead=await exactLead(action.client||"");
@@ -168,14 +171,19 @@ async function applyTeamAction(member:TeamMember, action:TeamAction):Promise<str
     case "create_task": {
       const recipient=action.assignee?await staffFor(action.assignee):member;
       const lead=action.client?await exactLead(action.client):null;
-      const result=await createBusinessTask({
+      const result=await createMirroredBusinessTask({
         title:requiresText(action.title,"task title"), assignedTo:recipient.name,
         leadId:lead?.id, dueAt:validDueAt(action.dueAt)||undefined,
         notes:action.notes?.slice(0,1200),priority:["urgent","high","standard","low"].includes(action.priority||"")?
           action.priority as "urgent"|"high"|"standard"|"low":"standard",
-        source:"mary-team-whatsapp"
-      });
-      return `Task created for ${recipient.name} (ID: ${String(result?.id||"")}).`;
+      },lead ? await getLeadById(String(lead.id)):null);
+      let notification = " Team notification sent.";
+      if (recipient.id !== member.id) {
+        try {
+          await sendStaffAlert({phone:recipient.phone,name:recipient.name,heading:"New assignment from Mary Kaunda",body:`${member.name} assigned a task: ${String(action.title||"")} (ID: ${String(result?.id||"")}).`});
+        } catch { notification = " Notification delivery could not be confirmed; check the staff dashboard."; }
+      }
+      return `Task created for ${recipient.name} (ID: ${String(result?.id||"")}) and synchronised with the Research Portal.${notification}`;
     }
     case "complete_task": {
       const task=await exactTask(action.task||"",member);
