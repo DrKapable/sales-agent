@@ -69,14 +69,55 @@ async function exactLead(client: string) {
   if (results.length !== 1) throw new Error(results.length ? "Several clients match. Specify a complete WhatsApp number." : "No client matched. Search the CRM and use the exact client name or number.");
   return results[0] as Record<string,any>;
 }
-async function staffFor(input: string) {
+function staffNameTokens(value: string) {
+  return value.toLowerCase()
+    .replace(/[’'\u2019]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length > 0 && !["dr","doctor","mr","mrs","ms","prof","professor"].includes(token));
+}
+
+/**
+ * A short colleague name is accepted only when it uniquely identifies ONE
+ * active person from the persisted registry. Never use partial phone digits.
+ * Unlike the authenticated WhatsApp *sender*, this is a recipient lookup.
+ */
+export function matchingRegisteredStaff(members: readonly TeamMember[], input: string) {
+  const query = input.trim();
+  const phone = canonicalTeamPhone(query);
+  if (/^[+()\d\s-]+$/.test(query)) {
+    return phone.length >= 9 ? members.filter((m) => m.active && m.phone === phone) : [];
+  }
+  const tokens = staffNameTokens(query);
+  if (!tokens.length || tokens.some((token) => token.length < 3)) return [];
+  return members.filter((member) => {
+    if (!member.active) return false;
+    const registered = staffNameTokens(member.name);
+    return tokens.every((token) => registered.includes(token));
+  });
+}
+
+export async function resolveRegisteredStaff(input: string) {
   const q=requiresText(input,"registered staff member",140);
-  const normalized=canonicalTeamPhone(q);
-  const members=(await listTeamMembers()).filter((m)=>
-    m.active && (m.name.toLowerCase()===q.toLowerCase() || (normalized.length>=9 && m.phone===normalized))
-  );
-  if (members.length!==1) throw new Error("Choose one registered active team member by full name or WhatsApp number.");
+  const members=matchingRegisteredStaff(await listTeamMembers(),q);
+  if (members.length > 1) throw new Error("More than one active colleague matches that name. Please specify the full name.");
+  if (!members.length) throw new Error("No active registered colleague matches that name. Please check the Team WhatsApp access directory.");
   return members[0];
+}
+
+async function staffFor(input: string) {
+  return resolveRegisteredStaff(input);
+}
+
+/** The preview is the exact free-form message body; the provider may use an approved
+ * notification template if the recipient's 24-hour WhatsApp window has closed. */
+export function staffMessagePreview(sender: string, recipient: string, message: string) {
+  return [
+    "*Recipient:* " + recipient,
+    "*Message heading:* Message from " + sender + " via Mary Kaunda",
+    "*Message body:*",
+    message
+  ].join("\n");
 }
 async function exactTask(input:string, member:TeamMember) {
   const q=requiresText(input,"task ID or exact title",240);
@@ -149,6 +190,18 @@ export async function stageTeamAction(member:TeamMember, action:TeamAction) {
   await db().query(`INSERT INTO team_action_requests (id,code,staff_id,action,summary,expires_at)
     VALUES ($1,$2,$3,$4::jsonb,$5,NOW()+INTERVAL '10 minutes')`,
     [id,code,member.id,JSON.stringify(action),validated.summary]);
+  if (action.kind === "message_staff") {
+    const recipient = await staffFor(action.assignee || "");
+    const fullBody = requiresText(action.message,"message",900);
+    return [
+      "*WhatsApp message for your approval*",
+      staffMessagePreview(member.name,recipient.name,fullBody),
+      "Outside the 24-hour reply window, an approved Meta notification template may be used.",
+      "To send, reply *CONFIRM " + code + "* within 10 minutes.",
+      "To cancel, reply *CANCEL " + code + "*.",
+      "*Nothing has been sent.*"
+    ].join("\n\n");
+  }
   return `Proposed: ${validated.summary}. To proceed, reply *CONFIRM ${code}* within 10 minutes. No action has been performed yet.`;
 }
 async function applyTeamAction(member:TeamMember, action:TeamAction):Promise<string> {
