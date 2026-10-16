@@ -18,7 +18,7 @@ import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewr
 import { buildAttachmentReviewNotification, classifyIncomingAttachmentForReview } from "@/lib/incoming-attachment-review";
 import { forwardAttachmentToReviewers } from "@/lib/team-attachment-forwarding";
 import { referralRecipients } from "@/lib/referrals";
-import { findTeamMember, recordTeamInbound, recordTeamReply } from "@/lib/internal-team-registry";
+import { findTeamMember, isRegisteredTeamPhone, recordTeamInbound, recordTeamReply } from "@/lib/internal-team-registry";
 import { respondToTeamMember } from "@/lib/internal-team-agent";
 
 import { forwardWalimaDeliveryReceipts } from "@/lib/walima-delivery-forwarding";
@@ -98,6 +98,12 @@ export async function POST(request: NextRequest) {
           await recordOutgoingMessageAccepted({ messageId: sent.messageId, phone: message.phone })
             .catch(() => undefined);
           console.info("Internal staff WhatsApp reply delivered", { messageId: message.id, staffId: teamMember.id, role: teamMember.role });
+          continue;
+        }
+        if (await isRegisteredTeamPhone(message.phone)) {
+          // A disabled or revoked staff identity must not be silently downgraded
+          // into a public lead, nor be allowed to ask business questions.
+          console.info("Disabled team identity attempted WhatsApp contact", { messageId: message.id });
           continue;
         }
 
