@@ -58,7 +58,7 @@ export async function respondToTeamMember(member: TeamMember, question: string) 
     const yesterday = /\b(yesterday|overnight)\b/i.test(input);
     return getManagementCatchUp(member, yesterday ? "yesterday" : "today");
   }
-  if (/^(hi|hello|hey|good\s*(morning|afternoon|evening)|salaam|assalamu\s*alaikum)[\s!.?]*$/i.test(input)) {
+  if (/^(?:(?:hi|hello|hey)(?:[,\s]+mary(?:\s+kaunda)?)?|good\s*(?:morning|afternoon|evening)(?:[,\s]+mary)?|salaam(?:[,\s]+mary)?|assalamu\s*alaikum(?:[,\s]+mary)?)[\s!.?]*$/i.test(input)) {
     return fallbackHeader(member);
   }
   const history=(await recentTeamMessages(member.id,12)).slice(-10);
