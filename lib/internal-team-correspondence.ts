@@ -1,6 +1,6 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { listTeamMembers, type TeamMember } from "@/lib/internal-team-registry";
-import { matchingRegisteredStaff } from "@/lib/internal-team-actions";
+
 import { sendStaffAlert } from "@/lib/team-alert-transport";
 
 type Database = NeonQueryFunction<false, false>;
@@ -87,6 +87,15 @@ export function deliveryLabel(statuses: string[], overall: string) {
 }
 function compactText(input: unknown, limit = 450) {
   return String(input || "").replace(/\s+/g," ").slice(0,limit);
+}
+function matchingRegisteredStaff(members: readonly TeamMember[], input: string) {
+  const normalize = (value:string) => value.toLowerCase()
+    .replace(/['’]s\\b/g,"").replace(/[^a-z0-9]+/g," ").trim()
+    .split(/\\s+/).filter(token => token.length >= 3 && !["dr","mr","mrs","ms","doctor"].includes(token));
+  const tokens=normalize(input);
+  if(!tokens.length)return [];
+  return members.filter(member=>member.active &&
+    tokens.every(token=>normalize(member.name).includes(token)));
 }
 function matchNames(members: TeamMember[], text: string) {
   const words = text.toLowerCase().replace(/[^a-z0-9'’]+/g," ").split(/\s+/);
