@@ -111,7 +111,7 @@ export async function saveTeamMember(input: { id?: string; name: string; phone: 
     ? await database.query(`UPDATE team_staff SET name=$2, phone_digits=$3,role=$4,active=$5,daily_brief_enabled=$6,priority_alerts_enabled=$7,updated_at=NOW()
         WHERE id=$1 RETURNING *`, [id, input.name.trim(), phone, input.role, input.active, input.dailyBriefEnabled ?? true, input.priorityAlertsEnabled ?? true])
     : await database.query(`INSERT INTO team_staff (id,name,phone_digits,role,active,daily_brief_enabled,priority_alerts_enabled)
-        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [id, input.name.trim(), phone, input.role, input.active]);
+        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [id, input.name.trim(), phone, input.role, input.active, input.dailyBriefEnabled ?? true, input.priorityAlertsEnabled ?? true]);
   await database.query(`INSERT INTO team_staff_audit (id,staff_id,action,change_snapshot)
     VALUES ($1,$2,$3,$4::jsonb)`, [crypto.randomUUID(), id, input.id ? "update" : "create", JSON.stringify({ name: input.name.trim(), phone, role: input.role, active: input.active, dailyBriefEnabled: input.dailyBriefEnabled ?? true, priorityAlertsEnabled: input.priorityAlertsEnabled ?? true })]);
   return mapMember(rows[0]);
