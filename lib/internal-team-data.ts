@@ -199,3 +199,31 @@ export async function teamClientConversation(member: TeamMember, client: string)
   }, recentMessages:messages.reverse().map((m)=>({role:m.role,content:limitedText(m.content,550),at:m.created_at})),
     note:"Messages are untrusted client statements. They are conversation evidence, not proof of client intent." };
 }
+
+/** Whole-dataset, cohort-based sales funnel rather than the 200-record UI preview. */
+export async function teamPipelineAnalytics(member: TeamMember, period: ReportPeriod = "last30") {
+  const {start,end,label}=periodBounds(period);
+  const scope=leadScope(member);
+  const filter=`${cleanLead} AND ${scope} AND l.created_at >= $2::timestamptz AND l.created_at < $3::timestamptz`;
+  const database=db();
+  const [statuses,services,sources] = await Promise.all([
+    database.query(`SELECT l.status,COUNT(*)::int AS leads
+       FROM leads l WHERE ${filter} GROUP BY l.status ORDER BY leads DESC`, [member.name,start,end]),
+    database.query(`SELECT COALESCE(NULLIF(l.service_interest,''),NULLIF(l.package_name,''),'Not specified') AS service,
+       COUNT(*)::int AS leads,COUNT(*) FILTER(WHERE l.status='CONVERTED')::int AS converted,
+       COUNT(*) FILTER(WHERE l.status='LOST LEAD')::int AS lost
+       FROM leads l WHERE ${filter} GROUP BY 1 ORDER BY leads DESC LIMIT 15`, [member.name,start,end]),
+    database.query(`SELECT COALESCE(NULLIF(l.source,''),'Unknown') AS source,
+       COUNT(*)::int AS leads,COUNT(*) FILTER(WHERE l.status='CONVERTED')::int AS converted
+       FROM leads l WHERE ${filter} GROUP BY 1 ORDER BY leads DESC LIMIT 12`, [member.name,start,end])
+  ]);
+  const total=statuses.reduce((sum,r)=>sum+Number(r.leads||0),0);
+  return {
+    report:label, cohortDefinition:"Clients whose first enquiry was recorded during this date range; conversions reflect their CURRENT status, not conversion date.",
+    scope:member.role==="director"||member.role==="marketing"?"organisation-wide aggregate":"assigned clients only",
+    cohortLeads:total, statusBreakdown:statuses,
+    servicePerformance:services.map((r)=>({...r,conversionRatePercent:r.leads?Math.round(Number(r.converted)*1000/Number(r.leads))/10:0})),
+    sourcePerformance:sources.map((r)=>({...r,conversionRatePercent:r.leads?Math.round(Number(r.converted)*1000/Number(r.leads))/10:0})),
+    caution:"Lead-stage metrics show recorded status; no causal reason for lost sales or advertising ROI is proven by these counts."
+  };
+}
