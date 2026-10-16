@@ -20,7 +20,7 @@ import { forwardAttachmentToReviewers } from "@/lib/team-attachment-forwarding";
 import { referralRecipients } from "@/lib/referrals";
 import { findTeamMember, isRegisteredTeamPhone, recordTeamInbound, recordTeamReply } from "@/lib/internal-team-registry";
 import { respondToTeamMember } from "@/lib/internal-team-agent";
-import { relayTeamStaffReply } from "@/lib/internal-team-correspondence";
+import { relayTeamStaffReply, notifyStaffDispatchReceipt } from "@/lib/internal-team-correspondence";
 
 import { forwardWalimaDeliveryReceipts } from "@/lib/walima-delivery-forwarding";
 
@@ -64,6 +64,11 @@ export async function POST(request: NextRequest) {
         ]);
         if (quoteMatched) console.info("Quotation delivery receipt recorded", { messageId: receipt.id, status: receipt.status });
         if (messageMatched) console.info("WhatsApp chat delivery receipt recorded", { messageId: receipt.id, status: receipt.status });
+        await notifyStaffDispatchReceipt(receipt.id).catch(error =>
+          console.warn("Staff delivery receipt notification unavailable",{
+            messageId:receipt.id,reason:error instanceof Error?error.name:"unknown"
+          })
+        );
       } catch (error) {
         console.error("Unable to record WhatsApp delivery receipt", { messageId: receipt.id, status: receipt.status, error });
       }
