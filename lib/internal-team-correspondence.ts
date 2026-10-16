@@ -110,6 +110,23 @@ export function deliveryLabel(statuses: string[], overall: string) {
   if (statuses.every(s => ["READ","DELIVERED","SENT"].includes(s))) return "Sent (some parts delivered/read)";
   return "Accepted by WhatsApp; awaiting further delivery receipts";
 }
+/** Stable reference for one confirmed instruction, not a new authorisation token. */
+export function staffInstructionReference(actionId: string) {
+  if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(actionId)) throw new Error("Invalid staff instruction ID.");
+  return "MM-" + actionId.slice(0,8).toUpperCase();
+}
+export function staffInstructionFooter(actionId: string) {
+  const ref=staffInstructionReference(actionId);
+  return "Staff response reference: " + ref + "\n"
+    + "Reply ACK " + ref + " to acknowledge, WORKING " + ref
+    + " for progress, or DONE " + ref + " when you have addressed the instruction."
+    + " Mary will relay your update to the requester; DONE is a staff report, not verification of client resolution.";
+}
+export type StaffUpdateState = "ACK" | "WORKING" | "DONE";
+export function parseStaffStatusReply(text: string): {state:StaffUpdateState; code:string} | null {
+  const match=text.trim().match(/^(ACK|WORKING|DONE)\s+MM-([A-F0-9]{8})[.!]?$/i);
+  return match ? { state:match[1].toUpperCase() as StaffUpdateState, code:match[2].toUpperCase() } : null;
+}
 function compactText(input: unknown, limit = 450) {
   return String(input || "").replace(/\s+/g," ").slice(0,limit);
 }
@@ -197,8 +214,12 @@ export async function staffCorrespondenceReport(requester: TeamMember, question:
         const replies=await db().query(`SELECT content,received_at,relationship FROM team_staff_dispatch_replies
           WHERE dispatch_id=$1 ORDER BY received_at DESC LIMIT 3`,[entry.id]);
         for(const reply of replies) {
-          block.push((reply.relationship==="whatsapp_context"?"Direct WhatsApp reply":"Staff message received after the instruction; context not confirmed")
-            +" ("+formatWhen(reply.received_at)+"): "+compactText(reply.content,400));
+          const relationship=String(reply.relationship);
+          const label=relationship.startsWith("explicit_ref_")
+            ? "Staff-reported "+relationship.slice("explicit_ref_".length).toUpperCase()+" (referenced instruction; not independently verified)"
+            : relationship==="whatsapp_context"?"Direct WhatsApp reply"
+            :"Staff message received after the instruction; context not confirmed";
+          block.push(label+" ("+formatWhen(reply.received_at)+"): "+compactText(reply.content,400));
         }
       }
     } else {
@@ -234,7 +255,21 @@ export async function relayTeamStaffReply(input: {
     ORDER BY d.created_at DESC LIMIT 6`,[input.member.id]);
   let match:Record<string,any>|undefined;
   let relationship="whatsapp_context";
-  if (input.replyToMessageId) {
+  const statusUpdate=parseStaffStatusReply(input.text);
+  if (statusUpdate) {
+    const byCode=await db().query(`SELECT d.id,d.sender_staff_id,d.recipient_staff_id,
+        d.message_ids,d.created_at,d.status,s.name AS sender_name,s.phone_digits AS sender_phone
+      FROM team_staff_dispatches d JOIN team_staff s ON s.id=d.sender_staff_id
+      WHERE d.recipient_staff_id=$1 AND d.status='ACCEPTED'
+        AND left(d.action_id::text,8)=lower($2)
+        AND d.created_at >= NOW()-INTERVAL '30 days'
+      LIMIT 1`,[input.member.id,statusUpdate.code]);
+    match=byCode[0];
+    if (!match) return {linked:false,forwarded:false,
+      replyText:"I could not verify reference MM-"+statusUpdate.code+
+        " against an approved instruction addressed to you. Please check the code and try again."};
+    relationship="explicit_ref_"+statusUpdate.state.toLowerCase();
+  } else if (input.replyToMessageId) {
     match=candidates.find(d=>Array.isArray(d.message_ids)&&d.message_ids.includes(input.replyToMessageId));
   } else if(candidates.length===1 && /\b(done|completed|resolved|addressed|noted|received|acknowledged|working on|in progress|will|i'?ll|updated|replied|contacted|followed up|please tell|please update|report|issue|client)\b/i.test(input.text)) {
     match=candidates[0]; relationship="recent_unique";
@@ -252,18 +287,25 @@ export async function relayTeamStaffReply(input: {
     await sendStaffAlert({
       phone:sender.phone,name:sender.name,
       heading:"Staff update from "+input.member.name+" via Mary Kaunda",
-      body:(relationship==="whatsapp_context"?"Reply to your earlier instruction":"New staff message following your instruction (not explicitly threaded)")
+      body:(statusUpdate
+        ? "Staff-reported "+statusUpdate.state+" for "+"MM-"+statusUpdate.code 
+        : relationship==="whatsapp_context" ? "Direct reply to your earlier instruction"
+        : "New staff message following your instruction (not explicitly threaded)")
         +"\nReceived: "+formatWhen(new Date())+"\n"+compactText(input.text,950)
     });
     await db().query(`UPDATE team_staff_dispatch_replies SET forwarded_at=NOW(),
       forward_state='ACCEPTED' WHERE id=$1`,[stored[0].id]);
-    return {linked:true,forwarded:true};
+    return {linked:true,forwarded:true,
+      ...(statusUpdate ? {replyText:"Recorded your "+statusUpdate.state+" update for reference MM-"+statusUpdate.code+
+        ". WhatsApp accepted the notification to the requester; delivery confirmation may follow. Thank you."} : {})};
   } catch(error) {
     await db().query(`UPDATE team_staff_dispatch_replies SET forward_state='FAILED'
       WHERE id=$1`,[stored[0].id]).catch(()=>undefined);
     console.warn("Staff reply forwarding unavailable",{recipientStaffId:input.member.id,
       reason:error instanceof Error?error.name:"unknown"});
-    return {linked:true,forwarded:false};
+    return {linked:true,forwarded:false,
+      ...(statusUpdate ? {replyText:"Your "+statusUpdate.state+" update was recorded for MM-"+statusUpdate.code+
+        ", but I could not confirm that the notification reached the requester. Please check the team dashboard."} : {})};
   }
 }
 
