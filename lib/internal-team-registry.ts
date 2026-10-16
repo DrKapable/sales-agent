@@ -138,3 +138,11 @@ export async function staffInboundSessionOpen(phone: string, since: Date) {
   const rows = await db().query(`SELECT 1 FROM team_chat_messages WHERE staff_id=$1 AND role='user' AND created_at >= $2 LIMIT 1`, [member.id, since.toISOString()]);
   return rows.length > 0;
 }
+
+export async function isRegisteredTeamPhone(phone: string) {
+  await ensureTables();
+  const normalized = canonicalTeamPhone(phone);
+  if (!/^[1-9]\\d{8,14}$/.test(normalized)) return false;
+  const rows = await db().query(`SELECT 1 FROM team_staff WHERE phone_digits=$1 LIMIT 1`, [normalized]);
+  return rows.length > 0;
+}
