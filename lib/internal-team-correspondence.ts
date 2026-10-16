@@ -89,7 +89,8 @@ export function deliveryLabel(statuses: string[], overall: string) {
   if (statuses.every(s => s === "READ")) return "Read";
   if (statuses.every(s => s === "DELIVERED")) return "Delivered";
   if (statuses.every(s => s === "READ" || s === "DELIVERED")) return "Delivered (some parts read)";
-  if (statuses.every(s => ["READ","DELIVERED","SENT"].includes(s))) return "Sent (some parts delivered)";
+  if (statuses.every(s => s === "SENT")) return "Sent";
+  if (statuses.every(s => ["READ","DELIVERED","SENT"].includes(s))) return "Sent (some parts delivered/read)";
   return "Accepted by WhatsApp; awaiting further delivery receipts";
 }
 function compactText(input: unknown, limit = 450) {
