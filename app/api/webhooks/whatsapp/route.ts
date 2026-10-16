@@ -18,6 +18,8 @@ import { rewriteLatestUnsentAssistantMessage } from "@/lib/outgoing-message-rewr
 import { buildAttachmentReviewNotification, classifyIncomingAttachmentForReview } from "@/lib/incoming-attachment-review";
 import { forwardAttachmentToReviewers } from "@/lib/team-attachment-forwarding";
 import { referralRecipients } from "@/lib/referrals";
+import { findTeamMember, recordTeamInbound, recordTeamReply } from "@/lib/internal-team-registry";
+import { respondToTeamMember } from "@/lib/internal-team-agent";
 
 import { forwardWalimaDeliveryReceipts } from "@/lib/walima-delivery-forwarding";
 
@@ -81,6 +83,23 @@ export async function POST(request: NextRequest) {
 
         await rememberWhatsAppSender({ phone: message.phone, phoneNumberId: message.phoneNumberId, displayPhoneNumber: message.displayPhoneNumber })
           .catch((error) => console.error("Unable to remember WhatsApp sender context", { phoneSuffix: message.phone.slice(-4), error }));
+
+        // Internal WhatsApp messages MUST be handled before CRM creation, lead scoring,
+        // client attachment review and the public-facing Mary sales conversation.
+        // Sender identity is derived from the signed Meta webhook's "from" field, never profile name/text.
+        const teamMember = await findTeamMember(message.phone);
+        if (teamMember) {
+          const newInbound = await recordTeamInbound(teamMember.id, message.text, message.id);
+          if (!newInbound) continue; // WhatsApp webhook retries must not produce duplicate responses.
+          await sendWhatsAppTypingIndicator(message.id, message.phoneNumberId ?? undefined).catch(() => undefined);
+          const answer = await respondToTeamMember(teamMember, message.text);
+          const sent = await sendWhatsAppTextWithRetry(message.phone, answer, message.phoneNumberId);
+          await recordTeamReply(teamMember.id, answer, sent.messageId);
+          await recordOutgoingMessageAccepted({ messageId: sent.messageId, phone: message.phone })
+            .catch(() => undefined);
+          console.info("Internal staff WhatsApp reply delivered", { messageId: message.id, staffId: teamMember.id, role: teamMember.role });
+          continue;
+        }
 
         const previousHistory = await getConversation(message.phone, 12);
         const firstEverClientMessage = previousHistory.length === 0;
