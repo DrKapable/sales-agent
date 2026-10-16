@@ -13,7 +13,7 @@ const WINDOW_MS = 24 * 60 * 60 * 1000;
 export async function staffSessionOpen(phone: string, now = Date.now()) {
   // Internal conversations are isolated from the public CRM but still open
   // WhatsApp's 24-hour free-form messaging window for staff notifications.
-  if (await staffInboundSessionOpen(phone, new Date(now - WINDOW_MS))) return true;
+  if (process.env.DATABASE_URL && await staffInboundSessionOpen(phone, new Date(now - WINDOW_MS))) return true;
   const history = await getConversation(phone, 100);
   const latestInbound = [...history].reverse().find((message) => message.role === "user");
   if (!latestInbound) return false;
