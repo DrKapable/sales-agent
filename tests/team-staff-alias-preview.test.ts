@@ -27,7 +27,7 @@ describe("Mary's registered team recipient resolution", () => {
   it("does not resolve partial phone numbers or generic titles", () => {
     expect(matchingRegisteredStaff(people,"634555")).toHaveLength(0);
     expect(matchingRegisteredStaff(people,"Dr")).toHaveLength(0);
-    expect(matchingRegisteredStaff(people,"974634555")).toHaveLength(0);
+    expect(matchingRegisteredStaff(people,"97463455")).toHaveLength(0);
   });
   it("never includes revoked staff and does not substitute their numbers", () => {
     const disabled=people.map(p=>({...p,active:p.role!=="sales"}));
