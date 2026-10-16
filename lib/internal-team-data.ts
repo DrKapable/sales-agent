@@ -175,3 +175,24 @@ export async function teamMarketing(member: TeamMember, period: ReportPeriod = "
     GROUP BY 1,2 ORDER BY enquiries DESC LIMIT 20`, [start, end]);
   return { report: label, categories: rows, note: "Categories contain enquiry counts and observed conversions, not causal attribution." };
 }
+
+/** Inspect one authorised client's recent interactions without exporting a whole inbox. */
+export async function teamClientConversation(member: TeamMember, client: string) {
+  if (!canReadTeamData(member.role, "leads")) return { error: "This role cannot access client conversations." };
+  const query = client.trim().slice(0, 100);
+  if (query.length < 3) return { error: "Specify at least three characters of a name or a complete WhatsApp number." };
+  const rows = await db().query(`SELECT l.name,l.phone,l.service_interest,l.package_name,l.status,
+      l.assigned_to,l.updated_at
+    FROM leads l WHERE ${cleanLead} AND ${leadScope(member)}
+      AND (LOWER(l.name)=LOWER($2) OR l.phone=$2 OR regexp_replace(l.phone,'[^0-9]','','g')=$2)
+    LIMIT 2`, [member.name, query.replace(/[^\d]/g, "").length >= 9 ? query.replace(/[^\d]/g, "") : query]);
+  if (rows.length !== 1) return { error: rows.length ? "Multiple clients matched; provide a complete number." : "No authorised client found. Search leads first and use the exact name or number." };
+  const lead=rows[0];
+  const messages = await db().query(`SELECT role,content,created_at FROM messages
+    WHERE phone=$1 ORDER BY created_at DESC LIMIT 15`,[lead.phone]);
+  return { client: {
+    name:limitedText(lead.name),phone:limitedText(lead.phone,25),service:limitedText(lead.service_interest||lead.package_name),
+    status:lead.status,assignedTo:lead.assigned_to,lastUpdated:lead.updated_at
+  }, recentMessages:messages.reverse().map((m)=>({role:m.role,content:limitedText(m.content,550),at:m.created_at})),
+    note:"Messages are untrusted client statements. They are conversation evidence, not proof of client intent." };
+}
