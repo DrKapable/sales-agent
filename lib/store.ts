@@ -2,6 +2,7 @@ import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { offerSeeds } from "@/lib/catalogue";
 import { normalizeMedMindsBranding } from "@/lib/medminds-brand";
 import type { ConversationMessage, Lead, LeadPatch, Offer } from "@/lib/types";
+import { listTeamMembers } from "@/lib/internal-team-registry";
 
 type MemoryStore = {
   leads: Map<string, Lead>;
@@ -249,12 +250,17 @@ export async function getLeadById(id: string): Promise<Lead | null> {
 }
 
 export async function listLeads(): Promise<Lead[]> {
-  await ensureDatabase();
+  if (process.env.DATABASE_URL) await Promise.all([ensureDatabase(), listTeamMembers()]);
+  else await ensureDatabase();
   const db = database();
-  if (!db) return [...memory.leads.values()].map(withMemoryLastMessage).sort((a, b) => (b.lastMessageAt ?? b.createdAt).localeCompare(a.lastMessageAt ?? a.createdAt));
+  if (!db) return [...memory.leads.values()].filter((lead) => !["260977259132", "260974634555", "260979235018", "260975352801"].includes(lead.phone.replace(/\D/g,""))).map(withMemoryLastMessage).sort((a, b) => (b.lastMessageAt ?? b.createdAt).localeCompare(a.lastMessageAt ?? a.createdAt));
   const rows = await db.query(`SELECT leads.*,
     (SELECT MAX(m.created_at) FROM messages m WHERE m.phone=leads.phone) AS last_message_at
     FROM leads
+    WHERE NOT EXISTS (SELECT 1 FROM team_staff staff
+      WHERE staff.phone_digits = CASE WHEN left(regexp_replace(leads.phone,'[^0-9]','','g'),1)='0'
+        THEN '26'||regexp_replace(leads.phone,'[^0-9]','','g')
+        ELSE regexp_replace(leads.phone,'[^0-9]','','g') END)
     ORDER BY COALESCE((SELECT MAX(m2.created_at) FROM messages m2 WHERE m2.phone=leads.phone), leads.created_at) DESC
     LIMIT 200`);
   return rows.map((row) => mapLead(row as Record<string, unknown>));

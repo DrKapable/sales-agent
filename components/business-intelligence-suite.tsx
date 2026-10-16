@@ -7,6 +7,7 @@ import { BusinessAnalyticsUXEnhancer } from "@/components/business-analytics-ux-
 import { BusinessIntelligenceResponsive } from "@/components/business-intelligence-responsive";
 import { BusinessPaymentEnhancer } from "@/components/business-payment-enhancer";
 import { SalesResetControl } from "@/components/sales-reset-control";
+import { TeamIntelligenceSettings } from "@/components/team-intelligence-settings";
 import { HumanFollowUpPanel } from "@/components/human-follow-up-panel";
 import { MaryFollowUpAutomationEnhancer } from "@/components/mary-follow-up-automation-enhancer";
 import { DirectClientDocuments } from "@/components/direct-client-documents";
@@ -40,6 +41,7 @@ export function BusinessIntelligenceSuite() {
       <button role="tab" aria-selected={section === "followups"} className={section === "followups" ? "active" : ""} onClick={() => changeSection("followups")}><span>✓</span><strong>Follow-ups</strong><small>Mary automation, human outreach & outcomes</small></button>
       <button role="tab" aria-selected={section === "documents"} className={section === "documents" ? "active" : ""} onClick={() => changeSection("documents")}><span>↗</span><strong>Quotations & receipts</strong><small>Send directly to a WhatsApp number</small></button>
     </div></div>
+    <TeamIntelligenceSettings />
     <SalesResetControl />
     {section === "documents" ? <DirectClientDocuments /> : section === "dashboard" ? <BusinessIntelligenceResponsive /> : section === "analytics" ? <BusinessAnalyticsPanel onBack={() => changeSection("dashboard")} /> : <HumanFollowUpPanel onBack={() => changeSection("dashboard")} />}
     <style jsx global>{`

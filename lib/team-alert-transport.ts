@@ -1,4 +1,5 @@
 import { getConversation } from "@/lib/store";
+import { staffInboundSessionOpen } from "@/lib/internal-team-registry";
 import { getApprovedMetaTemplateInventory, sendApprovedMetaTemplate } from "@/lib/meta-templates";
 import { recordOutgoingMessageAccepted } from "@/lib/message-delivery";
 import { sanitizeWhatsAppApiError, sendWhatsAppText } from "@/lib/whatsapp";
@@ -10,6 +11,9 @@ const LANGUAGE = "en_US";
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function staffSessionOpen(phone: string, now = Date.now()) {
+  // Internal conversations are isolated from the public CRM but still open
+  // WhatsApp's 24-hour free-form messaging window for staff notifications.
+  if (process.env.DATABASE_URL && await staffInboundSessionOpen(phone, new Date(now - WINDOW_MS))) return true;
   const history = await getConversation(phone, 100);
   const latestInbound = [...history].reverse().find((message) => message.role === "user");
   if (!latestInbound) return false;
