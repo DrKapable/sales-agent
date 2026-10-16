@@ -34,7 +34,7 @@ describe("verified WhatsApp status labels", () => {
     expect(deliveryLabel(["ACCEPTED"], "ACCEPTED")).toContain("awaiting further");
   });
   it("handles sent, delivered, read and failed correctly", () => {
-    expect(deliveryLabel(["SENT"], "ACCEPTED")).toContain("Sent");
+    expect(deliveryLabel(["SENT"], "ACCEPTED")).toBe("Sent");
     expect(deliveryLabel(["DELIVERED"], "ACCEPTED")).toContain("Delivered");
     expect(deliveryLabel(["READ"], "ACCEPTED")).toBe("Read");
     expect(deliveryLabel(["SENT","READ"], "ACCEPTED")).toContain("Sent");
