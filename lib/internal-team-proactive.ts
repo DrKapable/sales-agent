@@ -74,7 +74,7 @@ async function summaryFor(member:TeamMember) {
     details.push(`Pending recorded yesterday: ${finance.summary.pendingPayments} (${formatZmw(finance.summary.pendingAmountZmw)})`);
   } else if (member.role==="marketing") {
     const marketing=await teamMarketing(member,"last7");
-    details.push(`Top enquiries (last 7 days): ${marketing.categories.slice(0,3).map(r=>`${r.service} ${r.enquiries}`).join("; ")||"None"}`);
+    details.push(`Top enquiries (last 7 days): ${(marketing.categories||[]).slice(0,3).map(r=>`${r.service} ${r.enquiries}`).join("; ")||"None"}`);
   } else {
     const attention=await teamAttention(member);
     const count=Array.isArray((attention as any).openTasks)?(attention as any).openTasks.length:0;
