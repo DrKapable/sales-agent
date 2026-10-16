@@ -40,7 +40,7 @@ const cleanLead = `NOT EXISTS (
 )`;
 function leadScope(member: TeamMember) {
   return member.role === "director" || member.role === "marketing"
-    ? "TRUE" : "l.assigned_to=$1";
+    ? "($1::text IS NOT NULL)" : "l.assigned_to=$1";
 }
 
 function limitedText(value: unknown, max = 160) { return value == null ? null : String(value).slice(0, max); }
@@ -80,8 +80,16 @@ export async function teamOverview(member: TeamMember, period: ReportPeriod = "a
     leadsPaymentPending: Number(row.leads_payment_pending || 0)
   };
   if (member.role === "director") {
-    const finance = await teamFinance(member, period);
-    response.payments = finance.summary;
+    try {
+      const finance = await teamFinance(member, period);
+      response.payments = finance.summary;
+    } catch (error) {
+      // Lead analytics must still work when optional finance reports cannot load.
+      console.warn("Director finance could not be included in overview", {
+        reason: error instanceof Error ? error.message : "unknown"
+      });
+      response.paymentReportUnavailable = true;
+    }
   }
   return response;
 }
@@ -114,7 +122,7 @@ export async function teamAttention(member: TeamMember) {
     return { error: "Individual client priority lists are unavailable for this role. Request marketing trends instead." };
   }
   const leads = await teamLeads(member, { priority: "attention", limit: 20 });
-  const scope = member.role === "director" ? "TRUE" : "t.assigned_to=$1";
+  const scope = member.role === "director" ? "($1::text IS NOT NULL)" : "t.assigned_to=$1";
   const tasks = await db().query(`SELECT id,title,assigned_to,due_at,status,priority,created_at
     FROM business_tasks t WHERE status <> 'COMPLETED' AND ${scope}
     ORDER BY CASE WHEN due_at < NOW() THEN 0 ELSE 1 END,
@@ -136,18 +144,18 @@ export async function teamFinance(member: TeamMember, period: ReportPeriod = "al
   const rows = await db().query(`SELECT
       COUNT(*) FILTER (WHERE status='VERIFIED' AND verified_at >= $1::timestamptz
         AND verified_at < $2::timestamptz)::int AS verified_count,
-      COALESCE(SUM(COALESCE(amount_paid_zmw,amount_zmw))
+      COALESCE(SUM(amount_zmw)
         FILTER (WHERE status='VERIFIED' AND verified_at >= $1::timestamptz
         AND verified_at < $2::timestamptz),0)::numeric AS verified_amount,
       COUNT(*) FILTER (WHERE status='PENDING' AND created_at >= $1::timestamptz
         AND created_at < $2::timestamptz)::int AS pending_count,
-      COALESCE(SUM(COALESCE(amount_paid_zmw,amount_zmw))
+      COALESCE(SUM(amount_zmw)
         FILTER (WHERE status='PENDING' AND created_at >= $1::timestamptz
         AND created_at < $2::timestamptz),0)::numeric AS pending_amount
     FROM client_payments`, [start, end]);
   const row = rows[0] || {};
   const payments = await db().query(`SELECT p.created_at,p.verified_at,p.status,p.reference,
-      COALESCE(p.amount_paid_zmw,p.amount_zmw) AS amount,
+      p.amount_zmw AS amount,
       l.name AS client_name
       FROM client_payments p LEFT JOIN leads l ON l.id=p.lead_id
       WHERE p.created_at >= $1::timestamptz AND p.created_at < $2::timestamptz
