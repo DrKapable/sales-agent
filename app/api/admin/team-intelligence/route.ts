@@ -10,6 +10,8 @@ const updateSchema = z.object({
   phone: z.string().trim().min(9).max(25),
   role: z.enum(["director", "sales", "marketing", "support"]),
   active: z.boolean(),
+  dailyBriefEnabled: z.boolean().default(true),
+  priorityAlertsEnabled: z.boolean().default(true),
   adminPassword: z.string().min(1).max(256)
 });
 function authenticated(request: NextRequest) {
