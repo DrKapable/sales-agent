@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deliveryLabel, isStaffCorrespondenceInquiry } from "@/lib/internal-team-correspondence";
+import { deliveryLabel, isStaffCorrespondenceInquiry, staffReceiptMilestone } from "@/lib/internal-team-correspondence";
 import { parseIncomingMessages } from "@/lib/whatsapp";
 
 describe("Mary staff delivery/reply queries", () => {
@@ -66,5 +66,20 @@ describe("Meta WhatsApp reply context", () => {
       }]}}]}]
     });
     expect(parsed[0].replyToMessageId).toBeUndefined();
+  });
+});
+
+describe("deduplicated staff delivery milestones", () => {
+  it("does not alert delivered while any message part is only sent or accepted", () => {
+    expect(staffReceiptMilestone(["SENT"])).toBeNull();
+    expect(staffReceiptMilestone(["DELIVERED", "SENT"])).toBeNull();
+    expect(staffReceiptMilestone(["READ", "ACCEPTED"])).toBeNull();
+    expect(staffReceiptMilestone([])).toBeNull();
+  });
+  it("waits for all parts and handles provider failure", () => {
+    expect(staffReceiptMilestone(["DELIVERED","DELIVERED"])).toBe("DELIVERED");
+    expect(staffReceiptMilestone(["READ","DELIVERED"])).toBe("DELIVERED");
+    expect(staffReceiptMilestone(["READ","READ"])).toBe("READ");
+    expect(staffReceiptMilestone(["READ","FAILED"])).toBe("FAILED");
   });
 });
