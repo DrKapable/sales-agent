@@ -205,7 +205,7 @@ export async function stageTeamAction(member:TeamMember, action:TeamAction) {
   if (action.kind === "message_staff") {
     const recipient = await staffFor(action.assignee || "");
     const fullBody = requiresText(action.message,"message",900);
-    const messageWithReference = fullBody + "\\n\\n" + staffInstructionFooter(id);
+    const messageWithReference = fullBody + "\n\n" + staffInstructionFooter(id);
     return [
       "*WhatsApp message for your approval*",
       staffMessagePreview(member.name,recipient.name,messageWithReference),
@@ -282,7 +282,7 @@ async function applyTeamAction(member:TeamMember, action:TeamAction, actionId:st
     }
     case "message_staff": {
       const target=await staffFor(action.assignee||"");
-      const body=requiresText(action.message,"message",900) + "\\n\\n" + staffInstructionFooter(actionId);
+      const body=requiresText(action.message,"message",900) + "\n\n" + staffInstructionFooter(actionId);
       const trackingId=await beginStaffDispatch({actionId,sender:member,recipient:target,body});
       let sent: Awaited<ReturnType<typeof sendStaffAlert>>;
       try {
