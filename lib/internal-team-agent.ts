@@ -66,7 +66,7 @@ export async function respondToTeamMember(member: TeamMember, question: string) 
       description:"Find actual MedMinds CRM leads by name/number/service, or return the current top hot or pending leads. Only director and assigned sales/support staff may see individual client details. Returned list is paginated and may not contain all matches.",
       inputSchema:z.object({
         search:z.string().max(100).optional(),
-        priority:z.enum(["all","hot","pending"]).default("all"),
+        priority:z.enum(["all","hot","pending","attention"]).default("all"),
         limit:z.number().int().min(1).max(30).optional()
       }),
       execute:async (query)=>teamLeads(member,query)
