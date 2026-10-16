@@ -91,6 +91,14 @@ function formatWhen(value: unknown) {
     timeZone:"Africa/Lusaka",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"
   }).format(date) + " Zambia time";
 }
+/** Notify only once every part is delivered/read, or when a part fails. */
+export function staffReceiptMilestone(values:string[]): "FAILED"|"DELIVERED"|"READ"|null {
+  if(!values.length)return null;
+  if(values.includes("FAILED"))return "FAILED";
+  if(values.every(s=>s==="READ"))return "READ";
+  if(values.every(s=>s==="READ"||s==="DELIVERED"))return "DELIVERED";
+  return null;
+}
 export function deliveryLabel(statuses: string[], overall: string) {
   if (overall !== "ACCEPTED") return overall === "UNCERTAIN" ? "Submission unverified" : "Submission not confirmed";
   if (!statuses.length) return "Accepted by WhatsApp; delivery not yet confirmed";
@@ -280,9 +288,7 @@ export async function notifyStaffDispatchReceipt(messageId:string) {
     WHERE message_id=ANY($1::text[])`,[ids]);
   const lookup=new Map(states.map(x=>[String(x.message_id),String(x.status).toUpperCase()]));
   const values=ids.map(id=>lookup.get(id)||"ACCEPTED");
-  const milestone=values.includes("FAILED")?"FAILED"
-    :values.every(s=>s==="READ")?"READ"
-    :values.every(s=>s==="READ"||s==="DELIVERED")?"DELIVERED":null;
+  const milestone=staffReceiptMilestone(values);
   if(!milestone)return {matched:true,notified:false};
   const claimed=await db().query(`INSERT INTO team_staff_delivery_alerts
     (id,dispatch_id,status) VALUES ($1,$2,$3)
