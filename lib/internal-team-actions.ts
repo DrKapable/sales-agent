@@ -1,5 +1,5 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
-import { findTeamMember, listTeamMembers, type TeamMember } from "@/lib/internal-team-registry";
+import { canonicalTeamPhone, findTeamMember, listTeamMembers, type TeamMember } from "@/lib/internal-team-registry";
 import { createMirroredBusinessTask } from "@/lib/business-task-bridge";
 import { addMessage, getConversation, getLeadById } from "@/lib/store";
 import { sendStaffAlert } from "@/lib/team-alert-transport";
@@ -8,7 +8,7 @@ import { sendWhatsAppFollowUpTemplate } from "@/lib/whatsapp-template";
 import { recordOutgoingMessageAccepted } from "@/lib/message-delivery";
 import { leadStatuses } from "@/lib/types";
 
-export type ActionKind = "assign_lead" | "update_lead" | "create_task" | "complete_task" | "message_staff" | "follow_up_client";
+export type ActionKind = "assign_lead" | "update_lead" | "create_task" | "complete_task" | "progress_task" | "message_staff" | "follow_up_client";
 export type TeamAction = {
   kind: ActionKind;
   client?: string; assignee?: string; status?: string; priority?: string;
@@ -24,7 +24,7 @@ function db() {
 export function mayPerform(role: TeamMember["role"], kind: ActionKind) {
   if (kind === "assign_lead") return role === "director";
   if (kind === "update_lead" || kind === "follow_up_client") return role === "director" || role === "sales" || role === "support";
-  if (kind === "create_task" || kind === "complete_task" || kind === "message_staff") return true;
+  if (kind === "create_task" || kind === "complete_task" || kind === "progress_task" || kind === "message_staff") return true;
   return false;
 }
 function canAccessLead(member: TeamMember, lead: Record<string, any>) {
@@ -71,7 +71,7 @@ async function exactLead(client: string) {
 }
 async function staffFor(input: string) {
   const q=requiresText(input,"registered staff member",140);
-  const normalized=q.replace(/\D/g,"");
+  const normalized=canonicalTeamPhone(q);
   const members=(await listTeamMembers()).filter((m)=>
     m.active && (m.name.toLowerCase()===q.toLowerCase() || (normalized.length>=9 && m.phone===normalized))
   );
@@ -119,6 +119,12 @@ export async function validateTeamAction(member:TeamMember, action:TeamAction) {
       const task=await exactTask(action.task||"",member);
       if (task.status==="COMPLETED") throw new Error("This task is already completed.");
       return {summary:`Mark "${task.title}" completed`};
+    }
+    case "progress_task": {
+      const task=await exactTask(action.task||"",member);
+      if (task.status==="COMPLETED") throw new Error("This task has already been completed.");
+      const note=requiresText(action.notes,"task progress note",1000);
+      return {summary:`Add progress to "${task.title}": ${note.slice(0,130)}`};
     }
     case "message_staff": {
       const target=await staffFor(action.assignee||"");
@@ -191,6 +197,16 @@ async function applyTeamAction(member:TeamMember, action:TeamAction):Promise<str
         WHERE id=$1 AND status <> 'COMPLETED' AND ($2='director' OR assigned_to=$3) RETURNING id`,[task.id,member.role,member.name]);
       if (!result.length) throw new Error("Task was already completed or reassigned.");
       return `Completed task: ${task.title}.`;
+    }
+    case "progress_task": {
+      const task=await exactTask(action.task||"",member);
+      const note=requiresText(action.notes,"task progress note",1000);
+      const rows=await db().query(`UPDATE business_tasks
+        SET notes=concat_ws(E'\\n',NULLIF(notes,''),$2)
+        WHERE id=$1 AND status<>'COMPLETED' AND ($3='director' OR assigned_to=$4)
+        RETURNING id`,[task.id,`[${new Date().toISOString()} by ${member.name}] ${note}`,member.role,member.name]);
+      if(!rows.length)throw new Error("Task access or status changed.");
+      return `Progress recorded for "${task.title}".`;
     }
     case "message_staff": {
       const target=await staffFor(action.assignee||"");
