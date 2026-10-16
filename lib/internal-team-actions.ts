@@ -12,7 +12,7 @@ export type ActionKind = "assign_lead" | "update_lead" | "create_task" | "comple
 export type TeamAction = {
   kind: ActionKind;
   client?: string; assignee?: string; status?: string; priority?: string;
-  task?: string; title?: string; notes?: string; message?: string; dueAt?: string;
+  task?: string; title?: string; notes?: string; message?: string; dueAt?: string; recipientId?: string;
 };
 type Db = NeonQueryFunction<false, false>;
 let connection: Db | null = null;
@@ -114,8 +114,10 @@ async function staffFor(input: string) {
 export function staffMessagePreview(sender: string, recipient: string, message: string) {
   return [
     "*Recipient:* " + recipient,
-    "*Message heading:* Message from " + sender + " via Mary Kaunda",
-    "*Message body:*",
+    "*Full proposed WhatsApp message:*",
+    "Message from " + sender + " via Mary Kaunda",
+    "For: " + recipient,
+    "",
     message
   ].join("\n");
 }
@@ -185,11 +187,19 @@ export async function validateTeamAction(member:TeamMember, action:TeamAction) {
 export async function stageTeamAction(member:TeamMember, action:TeamAction) {
   await ensureActionTables();
   const validated=await validateTeamAction(member,action);
+  // Bind a recipient's immutable staff ID at approval time so subsequent
+  // directory edits cannot silently redirect a confirmed instruction.
+  const recipient = action.assignee && ["message_staff","assign_lead","create_task"].includes(action.kind)
+    ? await staffFor(action.assignee)
+    : null;
+  const persistedAction = recipient
+    ? { ...action, assignee: recipient.name, recipientId: recipient.id }
+    : action;
   const id=crypto.randomUUID();
   const code=id.slice(0,8).toUpperCase();
   await db().query(`INSERT INTO team_action_requests (id,code,staff_id,action,summary,expires_at)
     VALUES ($1,$2,$3,$4::jsonb,$5,NOW()+INTERVAL '10 minutes')`,
-    [id,code,member.id,JSON.stringify(action),validated.summary]);
+    [id,code,member.id,JSON.stringify(persistedAction),validated.summary]);
   if (action.kind === "message_staff") {
     const recipient = await staffFor(action.assignee || "");
     const fullBody = requiresText(action.message,"message",900);
@@ -207,6 +217,12 @@ export async function stageTeamAction(member:TeamMember, action:TeamAction) {
 async function applyTeamAction(member:TeamMember, action:TeamAction):Promise<string> {
   // Re-resolve all client/staff/task scopes at execution time to prevent role or assignment drift.
   await validateTeamAction(member,action);
+  if (action.recipientId) {
+    const currentRecipient=await staffFor(action.assignee||"");
+    if (currentRecipient.id!==action.recipientId) {
+      throw new Error("The intended staff recipient changed since you approved the message. Please prepare a new draft.");
+    }
+  }
   switch(action.kind) {
     case "assign_lead": {
       const lead=await exactLead(action.client||"");
