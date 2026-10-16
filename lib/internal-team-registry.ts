@@ -2,7 +2,7 @@ import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { referralRecipients } from "@/lib/referrals";
 
 export type TeamRole = "director" | "sales" | "marketing" | "support";
-export type TeamMember = { id: string; name: string; phone: string; role: TeamRole; active: boolean };
+export type TeamMember = { id: string; name: string; phone: string; role: TeamRole; active: boolean; dailyBriefEnabled: boolean; priorityAlertsEnabled: boolean };
 type Db = NeonQueryFunction<false, false>;
 
 const seedMembers: ReadonlyArray<{ name: string; phone: string; role: TeamRole }> = [
@@ -44,9 +44,13 @@ async function ensureTables() {
       phone_digits TEXT NOT NULL UNIQUE,
       role TEXT NOT NULL CHECK (role IN ('director','sales','marketing','support')),
       active BOOLEAN NOT NULL DEFAULT TRUE,
+      daily_brief_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      priority_alerts_enabled BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+    await database.query(`ALTER TABLE team_staff ADD COLUMN IF NOT EXISTS daily_brief_enabled BOOLEAN NOT NULL DEFAULT TRUE`);
+    await database.query(`ALTER TABLE team_staff ADD COLUMN IF NOT EXISTS priority_alerts_enabled BOOLEAN NOT NULL DEFAULT TRUE`);
     await database.query(`CREATE TABLE IF NOT EXISTS team_chat_messages (
       id UUID PRIMARY KEY, staff_id UUID NOT NULL REFERENCES team_staff(id),
       external_id TEXT UNIQUE, role TEXT NOT NULL CHECK (role IN ('user','assistant')),
@@ -71,7 +75,7 @@ async function ensureTables() {
 }
 
 function mapMember(row: Record<string, unknown>): TeamMember {
-  return { id: String(row.id), name: String(row.name), phone: String(row.phone_digits), role: String(row.role) as TeamRole, active: Boolean(row.active) };
+  return { id: String(row.id), name: String(row.name), phone: String(row.phone_digits), role: String(row.role) as TeamRole, active: Boolean(row.active), dailyBriefEnabled: row.daily_brief_enabled !== false, priorityAlertsEnabled: row.priority_alerts_enabled !== false };
 }
 
 export async function findTeamMember(phone: string): Promise<TeamMember | null> {
@@ -88,7 +92,7 @@ export async function listTeamMembers() {
 }
 
 /** Staff edits require a second admin password check in the API. */
-export async function saveTeamMember(input: { id?: string; name: string; phone: string; role: TeamRole; active: boolean }) {
+export async function saveTeamMember(input: { id?: string; name: string; phone: string; role: TeamRole; active: boolean; dailyBriefEnabled?: boolean; priorityAlertsEnabled?: boolean }) {
   await ensureTables();
   const phone = canonicalTeamPhone(input.phone);
   if (!/^[1-9]\d{8,14}$/.test(phone)) throw new Error("Enter a valid international WhatsApp phone number.");
@@ -104,12 +108,12 @@ export async function saveTeamMember(input: { id?: string; name: string; phone: 
     throw new Error("Additional director accounts require a separate privileged approval workflow.");
   }
   const rows = input.id
-    ? await database.query(`UPDATE team_staff SET name=$2, phone_digits=$3,role=$4,active=$5,updated_at=NOW()
-        WHERE id=$1 RETURNING *`, [id, input.name.trim(), phone, input.role, input.active])
-    : await database.query(`INSERT INTO team_staff (id,name,phone_digits,role,active)
-        VALUES ($1,$2,$3,$4,$5) RETURNING *`, [id, input.name.trim(), phone, input.role, input.active]);
+    ? await database.query(`UPDATE team_staff SET name=$2, phone_digits=$3,role=$4,active=$5,daily_brief_enabled=$6,priority_alerts_enabled=$7,updated_at=NOW()
+        WHERE id=$1 RETURNING *`, [id, input.name.trim(), phone, input.role, input.active, input.dailyBriefEnabled ?? true, input.priorityAlertsEnabled ?? true])
+    : await database.query(`INSERT INTO team_staff (id,name,phone_digits,role,active,daily_brief_enabled,priority_alerts_enabled)
+        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [id, input.name.trim(), phone, input.role, input.active]);
   await database.query(`INSERT INTO team_staff_audit (id,staff_id,action,change_snapshot)
-    VALUES ($1,$2,$3,$4::jsonb)`, [crypto.randomUUID(), id, input.id ? "update" : "create", JSON.stringify({ name: input.name.trim(), phone, role: input.role, active: input.active })]);
+    VALUES ($1,$2,$3,$4::jsonb)`, [crypto.randomUUID(), id, input.id ? "update" : "create", JSON.stringify({ name: input.name.trim(), phone, role: input.role, active: input.active, dailyBriefEnabled: input.dailyBriefEnabled ?? true, priorityAlertsEnabled: input.priorityAlertsEnabled ?? true })]);
   return mapMember(rows[0]);
 }
 
