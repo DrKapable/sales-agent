@@ -86,7 +86,7 @@ export async function teamOverview(member: TeamMember, period: ReportPeriod = "a
   return response;
 }
 
-export async function teamLeads(member: TeamMember, input: { search?: string; priority?: "all" | "hot" | "pending"; limit?: number }) {
+export async function teamLeads(member: TeamMember, input: { search?: string; priority?: "all" | "hot" | "pending" | "attention"; limit?: number }) {
   if (!canReadTeamData(member.role, "leads")) return { error: "This role cannot access individual client records." };
   const scope = leadScope(member);
   const search = (input.search || "").trim().slice(0, 100);
@@ -98,7 +98,10 @@ export async function teamLeads(member: TeamMember, input: { search?: string; pr
       AND ($2='' OR l.name ILIKE '%'||$2||'%' OR l.phone LIKE '%'||$2||'%'
         OR l.service_interest ILIKE '%'||$2||'%' OR l.package_name ILIKE '%'||$2||'%')
       AND ($3='all' OR ($3='hot' AND l.priority='HOT' AND l.status NOT IN ('CONVERTED','LOST LEAD'))
-        OR ($3='pending' AND l.status IN ('PAYMENT PENDING','FOLLOW-UP REQUIRED','HUMAN ASSISTANCE REQUIRED')))
+        OR ($3='pending' AND l.status IN ('PAYMENT PENDING','FOLLOW-UP REQUIRED','HUMAN ASSISTANCE REQUIRED'))
+        OR ($3='attention' AND (l.priority='HOT' OR l.follow_up_at <= NOW()
+          OR l.status IN ('PAYMENT PENDING','FOLLOW-UP REQUIRED','HUMAN ASSISTANCE REQUIRED'))
+          AND l.status NOT IN ('CONVERTED','LOST LEAD')))
     ORDER BY CASE WHEN l.priority='HOT' THEN 0 ELSE 1 END, l.updated_at DESC LIMIT $4`,
     [member.name, search, input.priority || "all", limit]);
   return { scope: member.role === "director" ? "all clients" : "assigned to " + member.name,
@@ -110,7 +113,7 @@ export async function teamAttention(member: TeamMember) {
   if (!canReadTeamData(member.role, "attention")) {
     return { error: "Individual client priority lists are unavailable for this role. Request marketing trends instead." };
   }
-  const leads = await teamLeads(member, { priority: "pending", limit: 20 });
+  const leads = await teamLeads(member, { priority: "attention", limit: 20 });
   const scope = member.role === "director" ? "TRUE" : "t.assigned_to=$1";
   const tasks = await db().query(`SELECT title,assigned_to,due_at,status,priority,created_at
     FROM business_tasks t WHERE status <> 'COMPLETED' AND ${scope}
