@@ -186,10 +186,10 @@ async function applyTeamAction(member:TeamMember, action:TeamAction):Promise<str
       let notification = " Team notification sent.";
       if (recipient.id !== member.id) {
         try {
-          await sendStaffAlert({phone:recipient.phone,name:recipient.name,heading:"New assignment from Mary Kaunda",body:`${member.name} assigned a task: ${String(action.title||"")} (ID: ${String(result?.id||"")}).`});
+          await sendStaffAlert({phone:recipient.phone,name:recipient.name,heading:"New assignment from Mary Kaunda",body:`${member.name} assigned a task: ${String(action.title||"")} (ID: ${String((result as Record<string, unknown>).id || "")}).`});
         } catch { notification = " Notification delivery could not be confirmed; check the staff dashboard."; }
       }
-      return `Task created for ${recipient.name} (ID: ${String(result?.id||"")}) and synchronised with the Research Portal.${notification}`;
+      return `Task created for ${recipient.name} (ID: ${String((result as Record<string, unknown>).id || "")}) and synchronised with the Research Portal.${notification}`;
     }
     case "complete_task": {
       const task=await exactTask(action.task||"",member);
