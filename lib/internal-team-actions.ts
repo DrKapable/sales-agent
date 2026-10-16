@@ -71,6 +71,7 @@ async function exactLead(client: string) {
 }
 function staffNameTokens(value: string) {
   return value.toLowerCase()
+    .replace(/['’]s\b/g, "")
     .replace(/[’'\u2019]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .split(/\s+/)
