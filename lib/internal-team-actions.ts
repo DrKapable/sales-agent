@@ -3,6 +3,7 @@ import { canonicalTeamPhone, findTeamMember, listTeamMembers, type TeamMember } 
 import { createMirroredBusinessTask } from "@/lib/business-task-bridge";
 import { addMessage, getConversation, getLeadById } from "@/lib/store";
 import { sendStaffAlert } from "@/lib/team-alert-transport";
+import { beginStaffDispatch, finishStaffDispatch, flagStaffDispatchUncertain } from "@/lib/internal-team-correspondence";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 import { sendWhatsAppFollowUpTemplate } from "@/lib/whatsapp-template";
 import { recordOutgoingMessageAccepted } from "@/lib/message-delivery";
@@ -215,7 +216,7 @@ export async function stageTeamAction(member:TeamMember, action:TeamAction) {
   }
   return `Proposed: ${validated.summary}. To proceed, reply *CONFIRM ${code}* within 10 minutes. No action has been performed yet.`;
 }
-async function applyTeamAction(member:TeamMember, action:TeamAction):Promise<string> {
+async function applyTeamAction(member:TeamMember, action:TeamAction, actionId:string):Promise<string> {
   // Re-resolve all client/staff/task scopes at execution time to prevent role or assignment drift.
   await validateTeamAction(member,action);
   if (action.recipientId) {
@@ -280,8 +281,25 @@ async function applyTeamAction(member:TeamMember, action:TeamAction):Promise<str
     }
     case "message_staff": {
       const target=await staffFor(action.assignee||"");
-      await sendStaffAlert({phone:target.phone,name:target.name,heading:`Message from ${member.name} via Mary Kaunda`,body:requiresText(action.message,"message",900)});
-      return `Message submitted to WhatsApp for ${target.name}. Delivery confirmation may follow.`;
+      const body=requiresText(action.message,"message",900);
+      const trackingId=await beginStaffDispatch({actionId,sender:member,recipient:target,body});
+      let sent: Awaited<ReturnType<typeof sendStaffAlert>>;
+      try {
+        sent=await sendStaffAlert({phone:target.phone,name:target.name,
+          heading:`Message from ${member.name} via Mary Kaunda`,body});
+      } catch(error) {
+        await flagStaffDispatchUncertain(trackingId,"WhatsApp submission was not verified.").catch(()=>undefined);
+        throw error;
+      }
+      try {
+        await finishStaffDispatch(trackingId,sent.messageIds);
+      } catch(error) {
+        console.error("Staff message submitted but delivery tracking not persisted",{
+          trackingId,error:error instanceof Error?error.name:"unknown"
+        });
+        return `WhatsApp accepted the message for ${target.name}, but I could not save the delivery-tracking record. Do not resend without checking the staff dashboard.`;
+      }
+      return `WhatsApp accepted the message for ${target.name}. Delivery/read status and subsequent replies can now be checked separately; acceptance is not proof of delivery.`;
     }
     case "follow_up_client": {
       const lead=await exactLead(action.client||"");
@@ -317,7 +335,7 @@ export async function confirmTeamAction(member:TeamMember,code:string) {
   const action=request.action as TeamAction;
   let status="COMPLETED"; let result="";
   try {
-    result=await applyTeamAction(current,action);
+    result=await applyTeamAction(current,action,String(request.id));
   } catch (error) {
     status="FAILED";
     result=error instanceof Error?error.message:"The action could not be completed.";

@@ -17,6 +17,8 @@ export type IncomingWhatsAppMessage = {
   text: string;
   phoneNumberId: string | null;
   displayPhoneNumber: string | null;
+  /** WhatsApp context id when sender explicitly replies to an earlier message. */
+  replyToMessageId?: string;
 };
 
 export type WhatsAppDeliveryReceipt = {
@@ -115,6 +117,7 @@ export function parseIncomingMessages(payload: unknown): IncomingWhatsAppMessage
           from?: string;
           type?: string;
           text?: { body?: string };
+          context?: { id?: string };
           document?: { id?: string; filename?: string; mime_type?: string; caption?: string };
           image?: { id?: string; mime_type?: string; caption?: string };
           audio?: { id?: string; mime_type?: string };
@@ -147,7 +150,8 @@ export function parseIncomingMessages(payload: unknown): IncomingWhatsAppMessage
           name: value.contacts?.[0]?.profile?.name ?? null,
           text,
           phoneNumberId,
-          displayPhoneNumber
+          displayPhoneNumber,
+          ...(item.context?.id ? { replyToMessageId: item.context.id } : {})
         });
       }
     }
