@@ -6,12 +6,19 @@ import type { TeamMember, TeamRole } from "@/lib/internal-team-registry";
 const blank = { id: undefined as string | undefined, name: "", phone: "", role: "sales" as TeamRole, active: true, dailyBriefEnabled:true, priorityAlertsEnabled:true };
 export function TeamIntelligenceSettings() {
   const [members,setMembers] = useState<TeamMember[]>([]);
+  const [monitor,setMonitor] = useState<Record<string,any>|null>(null);
   const [form,setForm] = useState({...blank});
   const [password,setPassword] = useState("");
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState("");
   const [notice,setNotice] = useState("");
 
+  async function checkMonitoring() {
+    const response=await fetch("/api/admin/team-intelligence/monitor",{cache:"no-store"});
+    const snapshot=await response.json();
+    if(!response.ok)throw new Error(snapshot.error||"Monitoring unavailable.");
+    setMonitor(snapshot);
+  }
   async function reload() {
     const response=await fetch("/api/admin/team-intelligence", {cache:"no-store"});
     const data=await response.json();
@@ -42,6 +49,17 @@ export function TeamIntelligenceSettings() {
   return <details className="teamIntelligenceSettings">
     <summary>Team WhatsApp access <span>{members.length} configured</span></summary>
     <div className="teamSettingsContent">
+      <div className="teamMonitoringBar">
+        <button type="button" onClick={()=>void checkMonitoring().catch(cause=>setError(cause instanceof Error?cause.message:"Monitoring unavailable."))}>Refresh communication status</button>
+        {monitor&&<span role="status">
+          {monitor.staff?.active||0} active staff · {monitor.actions?.pending||0} pending confirmations ·
+          {monitor.actions?.completed_last7||0} actions completed (7d) ·
+          {monitor.actions?.failed_last7||0} failed actions (7d) ·
+          {monitor.notifications?.accepted_last7||0} WhatsApp submissions accepted (7d) ·
+          {monitor.notifications?.failed_last7||0} failed notifications (7d)
+          {(monitor.notifications?.stuck||0)>0?` · ${monitor.notifications.stuck} submissions need review`:""}
+        </span>}
+      </div>
       <p>Mary recognises staff from the sender's registered WhatsApp number. Directors see all business reports; sales and support see only their assigned leads; marketing sees aggregate trends. Team conversations are excluded from client statistics.</p>
       <div className="teamAccessList">
         {members.map(member=><div key={member.id} className="teamAccessMember">
@@ -73,6 +91,7 @@ export function TeamIntelligenceSettings() {
       summary{font-size:13px;cursor:pointer;padding:12px 4px;font-weight:800}summary span{font-weight:500;color:#65827d;font-size:11px;margin-left:10px}
       .teamSettingsContent{border-top:1px solid #e4efea;padding:13px 1px 18px;font-size:12px}
       p{line-height:1.55}
+      .teamMonitoringBar{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:9px 0;font-size:11px;color:#476e65}
       .teamAccessList{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin:12px 0}
       .teamAccessMember{border:1px solid #d9e7e2;padding:10px;border-radius:10px;display:flex;justify-content:space-between;gap:8px;align-items:center}
       .teamAccessMember strong,.teamAccessMember small{display:block}.teamAccessMember small{font-size:11px;color:#687c76;margin-top:3px}
