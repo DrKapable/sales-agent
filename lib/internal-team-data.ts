@@ -115,7 +115,7 @@ export async function teamAttention(member: TeamMember) {
   }
   const leads = await teamLeads(member, { priority: "attention", limit: 20 });
   const scope = member.role === "director" ? "TRUE" : "t.assigned_to=$1";
-  const tasks = await db().query(`SELECT title,assigned_to,due_at,status,priority,created_at
+  const tasks = await db().query(`SELECT id,title,assigned_to,due_at,status,priority,created_at
     FROM business_tasks t WHERE status <> 'COMPLETED' AND ${scope}
     ORDER BY CASE WHEN due_at < NOW() THEN 0 ELSE 1 END,
       CASE WHEN priority='urgent' THEN 0 WHEN priority='high' THEN 1 ELSE 2 END,
@@ -123,7 +123,7 @@ export async function teamAttention(member: TeamMember) {
   return {
     report: "Current operational priorities at " + new Date().toISOString(),
     leads, openTasks: tasks.map((t) => ({
-      title: limitedText(t.title, 160), assignedTo: limitedText(t.assigned_to),
+      id: String(t.id), title: limitedText(t.title, 160), assignedTo: limitedText(t.assigned_to),
       dueAt: t.due_at || null, priority: t.priority, overdue: Boolean(t.due_at && Date.parse(String(t.due_at)) < Date.now())
     })),
     note: "This is a prioritised sample, not an exhaustive record of outstanding work."
