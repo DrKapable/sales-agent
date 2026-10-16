@@ -253,7 +253,7 @@ export async function listLeads(): Promise<Lead[]> {
   if (process.env.DATABASE_URL) await Promise.all([ensureDatabase(), listTeamMembers()]);
   else await ensureDatabase();
   const db = database();
-  if (!db) return [...memory.leads.values()].filter((lead) => !["260977259132", "260974634555", "260979235018", "260975352801"].includes(lead.phone.replace(/\\D/g,""))).map(withMemoryLastMessage).sort((a, b) => (b.lastMessageAt ?? b.createdAt).localeCompare(a.lastMessageAt ?? a.createdAt));
+  if (!db) return [...memory.leads.values()].filter((lead) => !["260977259132", "260974634555", "260979235018", "260975352801"].includes(lead.phone.replace(/\D/g,""))).map(withMemoryLastMessage).sort((a, b) => (b.lastMessageAt ?? b.createdAt).localeCompare(a.lastMessageAt ?? a.createdAt));
   const rows = await db.query(`SELECT leads.*,
     (SELECT MAX(m.created_at) FROM messages m WHERE m.phone=leads.phone) AS last_message_at
     FROM leads
