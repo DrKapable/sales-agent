@@ -41,7 +41,9 @@ describe("preview before forwarding a team reminder", () => {
     const message="Please address the outstanding issue in the MedMinds inbox. Dr. Juma asked me to follow up with you. Kindly update the team when it is resolved.";
     const draft=staffMessagePreview("Dr. Mustafa Juma Phiri","Dr Kanyembo Ng'andwe",message);
     expect(draft).toContain("*Recipient:* Dr Kanyembo Ng'andwe");
-    expect(draft).toContain("*Message heading:* Message from Dr. Mustafa Juma Phiri via Mary Kaunda");
+    expect(draft).toContain("*Full proposed WhatsApp message:*");
+    expect(draft).toContain("Message from Dr. Mustafa Juma Phiri via Mary Kaunda");
+    expect(draft).toContain("For: Dr Kanyembo Ng\'andwe");
     expect(draft).toContain(message);
     expect(draft).not.toContain("Message submitted");
   });
