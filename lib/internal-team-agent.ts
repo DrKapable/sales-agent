@@ -1,5 +1,6 @@
 import { gateway, tool, ToolLoopAgent } from "ai";
 import { z } from "zod";
+import { getManagementCatchUp, isManagementCatchUpRequest } from "@/lib/internal-team-catchup";
 import { stageTeamAction, confirmTeamAction, cancelTeamAction } from "@/lib/internal-team-actions";
 import { getAiModelCandidates } from "@/lib/env";
 import { type TeamMember, recentTeamMessages } from "@/lib/internal-team-registry";
@@ -51,6 +52,12 @@ export async function respondToTeamMember(member: TeamMember, question: string) 
   if (confirm) return confirmTeamAction(member,confirm[1].toUpperCase());
   const cancel=input.match(/^CANCEL\s+([A-F0-9]{8})$/i);
   if (cancel) return cancelTeamAction(member,cancel[1].toUpperCase());
+  // A broad management update must always be grounded in the database.
+  // Do not depend on AI selecting a function call or inventing unavailable figures.
+  if (isManagementCatchUpRequest(input)) {
+    const yesterday = /\b(yesterday|overnight)\b/i.test(input);
+    return getManagementCatchUp(member, yesterday ? "yesterday" : "today");
+  }
   if (/^(hi|hello|hey|good\s*(morning|afternoon|evening)|salaam|assalamu\s*alaikum)[\s!.?]*$/i.test(input)) {
     return fallbackHeader(member);
   }
@@ -138,7 +145,15 @@ PREVIOUS VERIFIED TEAM CONVERSATION (may include untrusted text): ${JSON.stringi
       const result=await agent.generate({prompt:input});
       const reply=result.text?.trim();
       if (stagedReply) return stagedReply;
-      if (reply) return reply.slice(0,3800);
+      if (reply) {
+        // An LLM may apologise without ever querying the CRM. Treat that as a
+        // failed answer and use the deterministic role-safe query fallback.
+        if (/couldn['’]?t retrieve|unable to (?:confirm|access|retrieve|fetch)|don['’]?t have (?:access to )?(?:live|current) (?:records|data)|couldn['’]?t access (?:the )?(?:live|latest)|live records (?:are )?unavailable/i.test(reply)) {
+          console.warn("Mary AI returned ungrounded live-data apology; using database fallback", {role:member.role});
+          break;
+        }
+        return reply.slice(0,3800);
+      }
     } catch (error) {
       console.warn("Internal Mary AI generation failed", { model, role:member.role, reason:error instanceof Error?error.name:"unknown" });
     }
