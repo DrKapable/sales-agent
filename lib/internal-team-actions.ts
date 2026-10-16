@@ -3,7 +3,7 @@ import { canonicalTeamPhone, findTeamMember, listTeamMembers, type TeamMember } 
 import { createMirroredBusinessTask } from "@/lib/business-task-bridge";
 import { addMessage, getConversation, getLeadById } from "@/lib/store";
 import { sendStaffAlert } from "@/lib/team-alert-transport";
-import { beginStaffDispatch, finishStaffDispatch, flagStaffDispatchUncertain } from "@/lib/internal-team-correspondence";
+import { beginStaffDispatch, finishStaffDispatch, flagStaffDispatchUncertain, staffInstructionFooter } from "@/lib/internal-team-correspondence";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 import { sendWhatsAppFollowUpTemplate } from "@/lib/whatsapp-template";
 import { recordOutgoingMessageAccepted } from "@/lib/message-delivery";
@@ -205,9 +205,10 @@ export async function stageTeamAction(member:TeamMember, action:TeamAction) {
   if (action.kind === "message_staff") {
     const recipient = await staffFor(action.assignee || "");
     const fullBody = requiresText(action.message,"message",900);
+    const messageWithReference = fullBody + "\\n\\n" + staffInstructionFooter(id);
     return [
       "*WhatsApp message for your approval*",
-      staffMessagePreview(member.name,recipient.name,fullBody),
+      staffMessagePreview(member.name,recipient.name,messageWithReference),
       "Outside the 24-hour reply window, an approved Meta notification template may be used.",
       "To send, reply *CONFIRM " + code + "* within 10 minutes.",
       "To cancel, reply *CANCEL " + code + "*.",
@@ -281,7 +282,7 @@ async function applyTeamAction(member:TeamMember, action:TeamAction, actionId:st
     }
     case "message_staff": {
       const target=await staffFor(action.assignee||"");
-      const body=requiresText(action.message,"message",900);
+      const body=requiresText(action.message,"message",900) + "\\n\\n" + staffInstructionFooter(actionId);
       const trackingId=await beginStaffDispatch({actionId,sender:member,recipient:target,body});
       let sent: Awaited<ReturnType<typeof sendStaffAlert>>;
       try {
