@@ -29,12 +29,15 @@ async function reliableFallback(member: TeamMember, message: string) {
   }
   if (/hot|lead|client|follow.up|pending|attention|overdue|task/i.test(message) && (member.role==="director"||member.role==="sales"||member.role==="support")) {
     const info = await teamAttention(member);
-    const leads = "leads" in info && "clients" in info.leads ? info.leads.clients : [];
-    return `Current priorities for ${member.name}: ${leads.length} priority clients in the displayed sample and ${"openTasks" in info ? info.openTasks.length : 0} open tasks shown. ${leads.slice(0,5).map((x:any)=>[x.name||x.phone,x.status].filter(Boolean).join(" (" ) + ")").join("; ") || "No priority client records found."} The figures represent limited lists; request a specific client for more detail.`;
+    const priority = info as { leads?: { clients?: Array<{name?:string|null;phone?:string;status?:string}> }; openTasks?: unknown[] };
+    const leads = priority.leads?.clients || [];
+    const tasks = priority.openTasks || [];
+    return `Current priorities for ${member.name}: ${leads.length} priority clients in the displayed sample and ${tasks.length} open tasks shown. ${leads.slice(0,5).map((x:any)=>[x.name||x.phone,x.status].filter(Boolean).join(" (" ) + ")").join("; ") || "No priority client records found."} The figures represent limited lists; request a specific client for more detail.`;
   }
   if (/market|campaign|enquir|service|trend/i.test(message) && (member.role==="marketing"||member.role==="director")) {
     const m=await teamMarketing(member,period);
-    return `Enquiry trends for ${m.report}: ${m.categories.slice(0,5).map((x:any)=>`${x.service} (${x.source}): ${x.enquiries} enquiries`).join("; ") || "No matching enquiries."}`;
+    const categories = m.categories || [];
+    return `Enquiry trends for ${m.report}: ${categories.slice(0,5).map((x:any)=>`${x.service} (${x.source}): ${x.enquiries} enquiries`).join("; ") || "No matching enquiries."}`;
   }
   const data=await teamOverview(member,period);
   return `${fallbackHeader(member)} Current ${data.scope}: ${data.totalLeads} total leads, ${data.newLeadsInPeriod} new in ${data.report}, ${data.hotOpenLeads} open hot leads and ${data.followUpsDue} follow-ups due.`;
