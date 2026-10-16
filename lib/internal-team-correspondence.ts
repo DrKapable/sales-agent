@@ -40,6 +40,15 @@ async function ensureTables() {
       forwarded_at TIMESTAMPTZ,
       forward_state TEXT NOT NULL DEFAULT 'NOT_ATTEMPTED'
     )`);
+    await db().query(`CREATE TABLE IF NOT EXISTS team_staff_delivery_alerts (
+      id UUID PRIMARY KEY,
+      dispatch_id UUID NOT NULL REFERENCES team_staff_dispatches(id),
+      status TEXT NOT NULL,
+      notify_state TEXT NOT NULL DEFAULT 'CLAIMED',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ,
+      UNIQUE (dispatch_id,status)
+    )`);
   })().catch(error => { setup = null; throw error; });
   await setup;
 }
@@ -247,5 +256,59 @@ export async function relayTeamStaffReply(input: {
     console.warn("Staff reply forwarding unavailable",{recipientStaffId:input.member.id,
       reason:error instanceof Error?error.name:"unknown"});
     return {linked:true,forwarded:false};
+  }
+}
+
+/**
+ * Meta may send duplicate and out-of-order callbacks. Notify the original sender
+ * only when the tracked instruction reaches a verified milestone.
+ */
+export async function notifyStaffDispatchReceipt(messageId:string) {
+  await ensureTables();
+  const rows=await db().query(`SELECT d.id,d.body,d.message_ids,d.sender_staff_id,
+      r.name AS recipient_name,s.name AS sender_name,s.phone_digits AS sender_phone
+    FROM team_staff_dispatches d
+      JOIN team_staff r ON r.id=d.recipient_staff_id
+      JOIN team_staff s ON s.id=d.sender_staff_id
+    WHERE d.status='ACCEPTED' AND d.message_ids ? $1
+      AND s.active=TRUE LIMIT 1`,[messageId]);
+  if(!rows.length)return {matched:false};
+  const dispatch=rows[0];
+  const ids=Array.isArray(dispatch.message_ids)?dispatch.message_ids.map(String):[];
+  if(!ids.length)return {matched:true,notified:false};
+  const states=await db().query(`SELECT message_id,status FROM message_delivery_status
+    WHERE message_id=ANY($1::text[])`,[ids]);
+  const lookup=new Map(states.map(x=>[String(x.message_id),String(x.status).toUpperCase()]));
+  const values=ids.map(id=>lookup.get(id)||"ACCEPTED");
+  const milestone=values.includes("FAILED")?"FAILED"
+    :values.every(s=>s==="READ")?"READ"
+    :values.every(s=>s==="READ"||s==="DELIVERED")?"DELIVERED":null;
+  if(!milestone)return {matched:true,notified:false};
+  const claimed=await db().query(`INSERT INTO team_staff_delivery_alerts
+    (id,dispatch_id,status) VALUES ($1,$2,$3)
+    ON CONFLICT (dispatch_id,status) DO NOTHING RETURNING id`,
+    [crypto.randomUUID(),dispatch.id,milestone]);
+  if(!claimed.length)return {matched:true,notified:false};
+  const text=(milestone==="READ"?"The message was marked read by WhatsApp."
+    :milestone==="DELIVERED"?"WhatsApp confirmed delivery to the recipient's device."
+    :"WhatsApp reported a delivery failure. Check the Sales dashboard before resending.");
+  try {
+    await sendStaffAlert({
+      phone:String(dispatch.sender_phone),name:String(dispatch.sender_name),
+      heading:"MedMinds staff message delivery update",
+      body:"Recipient: "+String(dispatch.recipient_name)+"\\nStatus: "+milestone
+        +"\\n"+text+"\\nInstruction: "+compactText(dispatch.body,250)
+    });
+    await db().query(`UPDATE team_staff_delivery_alerts SET notify_state='ACCEPTED',
+      updated_at=NOW() WHERE id=$1`,[claimed[0].id]);
+    return {matched:true,notified:true};
+  } catch(error) {
+    await db().query(`UPDATE team_staff_delivery_alerts SET notify_state='FAILED',
+      updated_at=NOW() WHERE id=$1`,[claimed[0].id]).catch(()=>undefined);
+    console.warn("Staff delivery milestone could not be relayed",{
+      dispatchId:String(dispatch.id),milestone,
+      reason:error instanceof Error?error.name:"unknown"
+    });
+    return {matched:true,notified:false};
   }
 }
