@@ -142,7 +142,7 @@ export async function staffInboundSessionOpen(phone: string, since: Date) {
 export async function isRegisteredTeamPhone(phone: string) {
   await ensureTables();
   const normalized = canonicalTeamPhone(phone);
-  if (!/^[1-9]\\d{8,14}$/.test(normalized)) return false;
+  if (!/^[1-9]\d{8,14}$/.test(normalized)) return false;
   const rows = await db().query(`SELECT 1 FROM team_staff WHERE phone_digits=$1 LIMIT 1`, [normalized]);
   return rows.length > 0;
 }
