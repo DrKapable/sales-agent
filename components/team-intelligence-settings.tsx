@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { TeamMember, TeamRole } from "@/lib/internal-team-registry";
 
-const blank = { id: undefined as string | undefined, name: "", phone: "", role: "sales" as TeamRole, active: true };
+const blank = { id: undefined as string | undefined, name: "", phone: "", role: "sales" as TeamRole, active: true, dailyBriefEnabled:true, priorityAlertsEnabled:true };
 export function TeamIntelligenceSettings() {
   const [members,setMembers] = useState<TeamMember[]>([]);
   const [form,setForm] = useState({...blank});
@@ -36,7 +36,7 @@ export function TeamIntelligenceSettings() {
     finally{setBusy(false);}
   }
   function edit(member:TeamMember) {
-    setForm({id:member.id,name:member.name,phone:member.phone,role:member.role,active:member.active});
+    setForm({id:member.id,name:member.name,phone:member.phone,role:member.role,active:member.active,dailyBriefEnabled:member.dailyBriefEnabled,priorityAlertsEnabled:member.priorityAlertsEnabled});
     setNotice("");setError("");
   }
   return <details className="teamIntelligenceSettings">
@@ -45,7 +45,7 @@ export function TeamIntelligenceSettings() {
       <p>Mary recognises staff from the sender's registered WhatsApp number. Directors see all business reports; sales and support see only their assigned leads; marketing sees aggregate trends. Team conversations are excluded from client statistics.</p>
       <div className="teamAccessList">
         {members.map(member=><div key={member.id} className="teamAccessMember">
-          <div><strong>{member.name}</strong><small>{member.phone} · {member.role} · {member.active?"Active":"Disabled"}</small></div>
+          <div><strong>{member.name}</strong><small>{member.phone} · {member.role} · {member.active?"Active":"Disabled"} · Brief {member.dailyBriefEnabled?"On":"Off"} · Alerts {member.priorityAlertsEnabled?"On":"Off"}</small></div>
           <button onClick={()=>edit(member)} type="button">Edit</button>
         </div>)}
       </div>
@@ -56,6 +56,8 @@ export function TeamIntelligenceSettings() {
         <label>Role<select value={form.role} onChange={(event)=>setForm({...form,role:event.target.value as TeamRole})}>
           <option value="director">Director</option><option value="sales">Sales</option><option value="marketing">Marketing</option><option value="support">Customer support</option>
         </select></label>
+        <label className="teamAccessCheck"><input type="checkbox" checked={form.dailyBriefEnabled} onChange={(event)=>setForm({...form,dailyBriefEnabled:event.target.checked})} />Morning brief</label>
+        <label className="teamAccessCheck"><input type="checkbox" checked={form.priorityAlertsEnabled} onChange={(event)=>setForm({...form,priorityAlertsEnabled:event.target.checked})} />Priority alerts</label>
         <label className="teamAccessCheck"><input type="checkbox" checked={form.active} onChange={(event)=>setForm({...form,active:event.target.checked})} />Access active</label>
         <label>Confirm administrator password<input type="password" value={password} onChange={(event)=>setPassword(event.target.value)} autoComplete="current-password" /></label>
         <div className="teamAccessActions">
