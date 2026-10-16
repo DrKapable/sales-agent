@@ -20,6 +20,7 @@ import { forwardAttachmentToReviewers } from "@/lib/team-attachment-forwarding";
 import { referralRecipients } from "@/lib/referrals";
 import { findTeamMember, isRegisteredTeamPhone, recordTeamInbound, recordTeamReply } from "@/lib/internal-team-registry";
 import { respondToTeamMember } from "@/lib/internal-team-agent";
+import { relayTeamStaffReply } from "@/lib/internal-team-correspondence";
 
 import { forwardWalimaDeliveryReceipts } from "@/lib/walima-delivery-forwarding";
 
@@ -91,6 +92,14 @@ export async function POST(request: NextRequest) {
         if (teamMember) {
           const newInbound = await recordTeamInbound(teamMember.id, message.text, message.id);
           if (!newInbound) continue; // WhatsApp webhook retries must not produce duplicate responses.
+          // A staff reply to a tracked instruction is independently associated
+          // with the original sender. Failure to forward cannot block Mary.
+          await relayTeamStaffReply({
+            member:teamMember,incomingMessageId:message.id,text:message.text,
+            replyToMessageId:message.replyToMessageId
+          }).catch(error=>console.warn("Unable to correlate staff reply",{
+            staffId:teamMember.id,reason:error instanceof Error?error.name:"unknown"
+          }));
           await sendWhatsAppTypingIndicator(message.id, message.phoneNumberId ?? undefined).catch(() => undefined);
           const answer = await respondToTeamMember(teamMember, message.text);
           const sent = await sendWhatsAppTextWithRetry(message.phone, answer, message.phoneNumberId);
