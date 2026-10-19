@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
-import { attachmentDisplayName, parseClientAttachmentChatContent } from "@/lib/client-attachment-content";
+import { attachmentDisplayName, clientAttachmentUrl, parseClientAttachmentChatContent } from "@/lib/client-attachment-content";
 import { commercialDocumentNumber } from "@/lib/commercial-document";
 import { listClientDocuments } from "@/lib/client-documents";
 import { ensureQuoteDeliveryColumns } from "@/lib/quotation-delivery";
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
   const clientShared = inboundMessages.flatMap((message) => {
     if (message.role !== "user") return [];
     const attachment = parseClientAttachmentChatContent(message.content);
-    if (!attachment || attachment.kind !== "document" || seenMediaIds.has(attachment.mediaId)) return [];
+    if (!attachment || seenMediaIds.has(attachment.mediaId)) return [];
     seenMediaIds.add(attachment.mediaId);
     const fileName = attachmentDisplayName(attachment);
     return [{
@@ -64,9 +64,9 @@ export async function GET(request: Request) {
       createdAt: message.createdAt,
       sharedAt: message.createdAt,
       sharedBy: lead.name || "Client",
-      deliveryStatus: "SENT",
+      deliveryStatus: "RECEIVED",
       deliveryError: null,
-      downloadUrl: `/api/admin/whatsapp-media/${encodeURIComponent(attachment.mediaId)}?filename=${encodeURIComponent(fileName)}`
+      downloadUrl: clientAttachmentUrl(attachment)
     }];
   });
 

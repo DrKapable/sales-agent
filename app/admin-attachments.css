@@ -3,7 +3,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  margin-top: 8px;
+  margin: 8px 0 0;
   padding: 12px;
   border: 1px solid rgba(16, 43, 40, .14);
   border-radius: 12px;
@@ -65,7 +65,7 @@
 }
 
 .clientAttachmentActions a {
-  min-height: 34px;
+  min-height: 44px;
   padding: 0 10px;
   display: inline-flex;
   align-items: center;
@@ -76,6 +76,54 @@
   color: #075548;
   font-size: 11px;
   font-weight: 800;
+}
+
+.dashboard .timelineBubble .clientAttachmentPreview,
+.dashboard .timelineBubble .clientAttachmentPlayer,
+.dashboard .timelineBubble .clientAttachmentError {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dashboard .timelineBubble .clientAttachmentPreview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #edf4f1;
+}
+
+.dashboard .timelineBubble .clientAttachmentCopy span {
+  white-space: pre-wrap;
+  text-transform: none;
+}
+
+.dashboard .timelineBubble .clientAttachmentError {
+  color: #68482b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.clientAttachmentError button {
+  display: block;
+  min-height: 44px;
+  margin-top: 6px;
+  border: 1px solid #cddbd6;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 12px;
+  color: #075548;
+  cursor: pointer;
+}
+
+.clientAttachmentCard a:focus-visible,
+.clientAttachmentCard button:focus-visible {
+  outline: 3px solid #0d725f;
+  outline-offset: 3px;
 }
 
 .clientAttachmentActions a:first-child {

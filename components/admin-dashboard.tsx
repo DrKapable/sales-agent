@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { ConversationDocumentAttachment, ConversationDocumentsButton, ConversationDocumentsProvider, ConversationDocumentsSummary } from "@/components/conversation-documents-enhancer";
 import { BrandLogo } from "@/components/brand-logo";
+import { ClientAttachment } from "@/components/client-attachment";
+import { parseClientAttachmentChatContent } from "@/lib/client-attachment-content";
 import type { getSetupState } from "@/lib/env";
 import { leadPriorities, leadStatuses, type ConversationMessage, type Lead, type Offer } from "@/lib/types";
 
@@ -288,11 +290,12 @@ function ConversationPanel(props: { conversation: ConversationState | null; load
   </section></ConversationDocumentsProvider>;
 }
 
-function MessageBubble({ message }: { message: ConversationMessage }) {
+export function MessageBubble({ message }: { message: ConversationMessage }) {
   const humanMatch = message.content.match(/^\[Human: ([^\]]+)]\s*/);
   const content = humanMatch ? message.content.replace(humanMatch[0], "") : message.content;
   const kind = message.role === "user" ? "client" : humanMatch ? "human" : "agent";
-  return <div className={`timelineRow ${kind}`}><div className="timelineBubble"><span>{kind === "client" ? "Client" : humanMatch ? humanMatch[1] : "MedMinds AI"}</span><p>{content}</p>{message.role === "assistant" && <ConversationDocumentAttachment content={content} />}<time title={formatExactTime(message.createdAt)}>{formatMessageTime(message.createdAt)}</time></div></div>;
+  const attachment = parseClientAttachmentChatContent(content);
+  return <div className={`timelineRow ${kind}`}><div className="timelineBubble"><span>{kind === "client" ? "Client" : humanMatch ? humanMatch[1] : "MedMinds AI"}</span>{attachment ? <ClientAttachment key={attachment.mediaId} attachment={attachment} /> : <p>{content}</p>}{message.role === "assistant" && <ConversationDocumentAttachment content={content} />}<time title={formatExactTime(message.createdAt)}>{formatMessageTime(message.createdAt)}</time></div></div>;
 }
 
 function OfferEditor({ offer, onSave }: { offer: Offer; onSave: (offer: Offer) => Promise<void> }) {

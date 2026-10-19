@@ -9,6 +9,7 @@ function contentSecurityPolicy(nonce: string, embeddable = false, documentPrevie
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https://document-export.canva.com https://*.canva.com https://*.canvausercontent.com",
     "font-src 'self'",
+    "media-src 'self'",
     connectSource,
     "object-src 'none'",
     embeddable ? "frame-ancestors *" : documentPreview ? "frame-ancestors 'self'" : "frame-ancestors 'none'",

@@ -27,10 +27,13 @@ export function clientAttachmentChatContent(input: ClientAttachmentPayload) {
 }
 
 export function parseClientAttachmentChatContent(content: string): ClientAttachmentPayload | null {
-  if (!content.startsWith(CLIENT_ATTACHMENT_PREFIX)) return null;
+  const prefix = content.match(/^\s*\[CLIENT_ATTACHMENT\]\s*/);
+  if (!prefix) return null;
   try {
-    const parsed = JSON.parse(content.slice(CLIENT_ATTACHMENT_PREFIX.length)) as Partial<ClientAttachmentPayload>;
-    if (!parsed || !["document", "image", "audio", "video"].includes(String(parsed.kind)) || typeof parsed.mediaId !== "string" || !parsed.mediaId.trim()) return null;
+    // Admin delivery markers are presentation metadata, never part of the payload.
+    const payload = content.slice(prefix[0].length).replace(/(?:\u2063[\u200B\u200C\u200D\u2060\uFEFF]\u2063\s*)+$/, "").trim();
+    const parsed = JSON.parse(payload) as Partial<ClientAttachmentPayload>;
+    if (!parsed || !["document", "image", "audio", "video"].includes(String(parsed.kind)) || typeof parsed.mediaId !== "string" || !/^[A-Za-z0-9_-]{5,160}$/.test(parsed.mediaId.trim())) return null;
     return {
       kind: parsed.kind as ClientAttachmentKind,
       mediaId: parsed.mediaId.trim().slice(0, 160),
@@ -41,6 +44,13 @@ export function parseClientAttachmentChatContent(content: string): ClientAttachm
   } catch {
     return null;
   }
+}
+
+export function clientAttachmentUrl(attachment: ClientAttachmentPayload, download = false, attempt = 0) {
+  const params = new URLSearchParams({ filename: attachmentDisplayName(attachment) });
+  if (download) params.set("download", "1");
+  if (attempt) params.set("retry", String(attempt));
+  return `/api/admin/whatsapp-media/${encodeURIComponent(attachment.mediaId)}?${params.toString()}`;
 }
 
 export function attachmentDisplayName(attachment: ClientAttachmentPayload) {
