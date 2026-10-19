@@ -1,5 +1,6 @@
 export function documentDeliveryLabel(status: string) {
   switch (status.toUpperCase()) {
+    case "RECEIVED": return "Received from client";
     case "ACCEPTED": return "Delivery pending";
     case "SENT": return "Sent";
     case "DELIVERED": return "Delivered";
