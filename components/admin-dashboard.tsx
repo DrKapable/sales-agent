@@ -294,8 +294,9 @@ export function MessageBubble({ message }: { message: ConversationMessage }) {
   const humanMatch = message.content.match(/^\[Human: ([^\]]+)]\s*/);
   const content = humanMatch ? message.content.replace(humanMatch[0], "") : message.content;
   const kind = message.role === "user" ? "client" : humanMatch ? "human" : "agent";
+  const walimaName=content.match(/^\[Walima invitation card: ([^\]\n]+)\]/)?.[1];
   const attachment = parseClientAttachmentChatContent(content);
-  return <div className={`timelineRow ${kind}`}><div className="timelineBubble"><span>{kind === "client" ? "Client" : humanMatch ? humanMatch[1] : "MedMinds AI"}</span>{attachment ? <ClientAttachment key={attachment.mediaId} attachment={attachment} /> : <p>{content}</p>}{message.role === "assistant" && <ConversationDocumentAttachment content={content} />}<time title={formatExactTime(message.createdAt)}>{formatMessageTime(message.createdAt)}</time></div></div>;
+  return <div className={`timelineRow ${kind}`}><div className="timelineBubble"><span>{kind === "client" ? "Client" : humanMatch ? humanMatch[1] : "MedMinds AI"}</span>{walimaName && <a href={`/api/admin/walima-card?name=${encodeURIComponent(walimaName)}`} target="_blank" rel="noreferrer"><img src={`/api/admin/walima-card?name=${encodeURIComponent(walimaName)}`} alt={`Updated Walima invitation for ${walimaName}`} loading="lazy" style={{maxWidth:"100%",width:260,height:"auto",borderRadius:12}} /></a>}{attachment ? <ClientAttachment key={attachment.mediaId} attachment={attachment} /> : <p>{content}</p>}{message.role === "assistant" && <ConversationDocumentAttachment content={content} />}<time title={formatExactTime(message.createdAt)}>{formatMessageTime(message.createdAt)}</time></div></div>;
 }
 
 function OfferEditor({ offer, onSave }: { offer: Offer; onSave: (offer: Offer) => Promise<void> }) {

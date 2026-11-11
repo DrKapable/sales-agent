@@ -119,8 +119,8 @@ export function humanFollowUpInitialWaitHours(lead: Pick<Lead, "status" | "prior
   return 6;
 }
 
-export function isHumanFollowUpEligible(lead: Pick<Lead, "status">) {
-  return !["CONVERTED", "LOST LEAD"].includes(lead.status);
+export function isHumanFollowUpEligible(lead: Pick<Lead, "status"> & Partial<Pick<Lead, "serviceInterest">>) {
+  return lead.serviceInterest !== "Walima guest" && !["CONVERTED", "LOST LEAD"].includes(lead.status);
 }
 
 export function deriveHumanFollowUpDue(lead: Pick<Lead, "status" | "priority" | "followUpAt">, lastActivityAt: string) {

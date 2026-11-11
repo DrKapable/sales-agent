@@ -86,7 +86,7 @@ export async function runMaryAutomaticFollowUps() {
     const step = Math.max(1, Number(row.sequence_step || 1));
     const lead = leadByPhone.get(phone);
 
-    if (!lead || ["CONVERTED", "LOST LEAD"].includes(lead.status)) {
+    if (!lead || lead.serviceInterest === "Walima guest" || ["CONVERTED", "LOST LEAD"].includes(lead.status)) {
       await sql.query(`UPDATE human_follow_up_tasks SET status='DROPPED',completed_at=NOW(),completed_by='Mary Kaunda',channel='WHATSAPP',summary=$2,transport_status='SKIPPED',updated_at=NOW() WHERE id=$1 AND status='PENDING'`, [id, lead ? `Automatic follow-up cancelled because lead is ${lead.status}.` : "Automatic follow-up cancelled because the client record is unavailable."]);
       if (lead?.followUpAt) await updateLead(phone, { followUpAt: null }).catch(() => undefined);
       continue;

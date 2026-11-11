@@ -23,6 +23,7 @@ import { respondToTeamMember } from "@/lib/internal-team-agent";
 import { relayTeamStaffReply, notifyStaffDispatchReceipt } from "@/lib/internal-team-correspondence";
 
 import { forwardWalimaDeliveryReceipts } from "@/lib/walima-delivery-forwarding";
+import { handleWeddingReply } from "@/lib/walima-guest-support";
 
 const HUMAN_TAKEOVER_PREFIX = "[HUMAN TAKEOVER]";
 
@@ -94,6 +95,9 @@ export async function POST(request: NextRequest) {
         // client attachment review and the public-facing Mary sales conversation.
         // Sender identity is derived from the signed Meta webhook's "from" field, never profile name/text.
         const teamMember = await findTeamMember(message.phone);
+        // Wedding questions bypass commercial qualification and staff business tools.
+        // Staff business messages retain their existing authenticated route.
+        if (await handleWeddingReply(message, Boolean(teamMember))) continue;
         if (teamMember) {
           const newInbound = await recordTeamInbound(teamMember.id, message.text, message.id);
           if (!newInbound) continue; // WhatsApp webhook retries must not produce duplicate responses.

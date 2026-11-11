@@ -195,7 +195,7 @@ function isExplicitOptOut(text: string) {
 }
 
 function isEligibleToSend(lead: Lead) {
-  return lead.source === "whatsapp" && !lead.aiPaused && !STOP_STATUSES.has(lead.status);
+  return lead.serviceInterest !== "Walima guest" && lead.source === "whatsapp" && !lead.aiPaused && !STOP_STATUSES.has(lead.status);
 }
 
 export function initialFollowUpWaitHours(lead: Pick<Lead, "status" | "priority">) {
