@@ -877,3 +877,13 @@ td select { max-width: 205px; border: 1px solid var(--line); border-radius: 8px;
     flex-wrap: wrap;
   }
 }
+
+/* Guest inbox filters remain visible on mobile, outside the collapsed tools. */
+.inboxGroupFilters { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px; }
+.inboxGroupFilters button { display:flex; align-items:center; gap:8px; min-height:44px; padding:10px 14px; border:1px solid #cddfd8; border-radius:999px; background:#fff; color:#214b3c; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.inboxGroupFilters button[aria-pressed="true"] { background:#174e3b; color:#fff; border-color:#174e3b; }
+.inboxGroupFilters button:focus-visible { outline:3px solid #80bda4; outline-offset:3px; }
+.inboxGroupFilters button span { border-radius:999px; padding:2px 7px; background:rgba(117,166,142,.18); font-size:12px; }
+.guestFilterNote { margin:-4px 0 16px; color:#506c60; font-size:13px; }
+.walimaGuestBadge { padding:4px 7px; border-radius:6px; background:#e2f1e8; color:#24553d; font-size:10px; font-weight:800; white-space:nowrap; }
+@media(max-width:600px) { .inboxGroupFilters { gap:6px; } .inboxGroupFilters button { flex:1 1 auto; justify-content:center; padding:9px 10px; font-size:12px; } }

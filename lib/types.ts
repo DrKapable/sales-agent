@@ -15,6 +15,8 @@ export const leadPriorities = ["HOT", "WARM", "STANDARD"] as const;
 export type LeadPriority = (typeof leadPriorities)[number];
 
 export type Lead = {
+  isWalimaGuest?: boolean;
+  walimaGuestName?: string | null;
   id: string;
   phone: string;
   name: string | null;

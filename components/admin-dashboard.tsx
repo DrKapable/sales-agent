@@ -12,6 +12,7 @@ import { leadPriorities, leadStatuses, type ConversationMessage, type Lead, type
 type Setup = ReturnType<typeof getSetupState>;
 type ConversationState = { lead: Lead; messages: ConversationMessage[]; replyWindow: { open: boolean; expiresAt: string | null }; delivery?: { status: "accepted" | "simulated"; messageId: string | null } };
 type Tab = "leads" | "offers" | "setup";
+type InboxGroup = "all" | "guests" | "business";
 type LeadSort = "smart" | "recent" | "oldest" | "name" | "priority";
 const staffMembers = ["Dr. Mustafa Juma Phiri", "Dr Kanyembo Ng'andwe"] as const;
 const CONVERSATION_REFRESH_MS = 5000;
@@ -36,6 +37,23 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [leadQuery, setLeadQuery] = useState("");
+  const [inboxGroup, setInboxGroup] = useState<InboxGroup>("all");
+  useEffect(() => {
+    const requested=new URLSearchParams(window.location.search).get("inbox");
+    let saved:string|null=null;
+    try { saved=window.localStorage.getItem("medminds-inbox-group"); } catch {}
+    const value=requested || saved;
+    if(value==="guests" || value==="business" || value==="all") {
+      setInboxGroup(value);
+      if(requested) { try { window.localStorage.setItem("medminds-inbox-group",value); } catch {} }
+    }
+  },[]);
+  function chooseInboxGroup(group:InboxGroup) {
+    setInboxGroup(group); setLeadQuery(""); setStatusFilter("ALL"); setPriorityFilter("ALL");
+    try { window.localStorage.setItem("medminds-inbox-group",group); } catch {}
+    const url=new URL(window.location.href); url.searchParams.set("inbox",group); window.history.replaceState(null,"",url);
+  }
+  const guestCount=leads.filter(lead=>lead.isWalimaGuest).length;
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [leadSort, setLeadSort] = useState<LeadSort>("smart");
@@ -53,8 +71,8 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
   const filteredLeads = useMemo(() => {
     const needle = leadQuery.trim().toLowerCase();
     const filtered = leads.filter((lead) => {
-      const text = `${lead.name || ""} ${lead.phone} ${lead.serviceInterest || ""} ${lead.programme || ""}`.toLowerCase();
-      return (statusFilter === "ALL" || lead.status === statusFilter) && (priorityFilter === "ALL" || lead.priority === priorityFilter) && text.includes(needle);
+      const text = `${lead.name || ""} ${lead.walimaGuestName || ""} ${lead.phone} ${lead.serviceInterest || ""} ${lead.programme || ""}`.toLowerCase();
+      return (inboxGroup === "all" || (inboxGroup === "guests" ? lead.isWalimaGuest : !lead.isWalimaGuest)) && (statusFilter === "ALL" || lead.status === statusFilter) && (priorityFilter === "ALL" || lead.priority === priorityFilter) && text.includes(needle);
     });
     return filtered.sort((a, b) => {
       if (leadSort === "recent") return activityTime(b) - activityTime(a);
@@ -63,7 +81,10 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
       if (leadSort === "priority") return priorityRank(b.priority) - priorityRank(a.priority) || activityTime(b) - activityTime(a);
       return leadSortScore(b) - leadSortScore(a) || activityTime(b) - activityTime(a);
     });
-  }, [leads, leadQuery, priorityFilter, statusFilter, leadSort]);
+  }, [leads, leadQuery, priorityFilter, statusFilter, leadSort, inboxGroup]);
+  useEffect(()=>{
+    if(!filteredLeads.some(lead=>lead.id===selectedLeadId)) setSelectedLeadId(filteredLeads[0]?.id ?? null);
+  },[filteredLeads,selectedLeadId]);
   const offerCategories = useMemo(() => ["All categories", ...Array.from(new Set(offers.map((offer) => offer.category))).sort()], [offers]);
   const visibleOffers = useMemo(() => offers.filter((offer) => {
     const text = `${offer.name} ${offer.category} ${offer.description}`.toLowerCase();
@@ -79,7 +100,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to load this conversation.");
       setConversation(data as ConversationState);
-      setLeads((current) => current.map((lead) => lead.id === data.lead.id ? data.lead : lead));
+      setLeads((current) => current.map((lead) => lead.id === data.lead.id ? { ...lead, ...data.lead } : lead));
       if (!quiet) {
         setSender((data.lead.assignedTo as (typeof staffMembers)[number] | null) ?? staffMembers[0]);
         setNote(data.lead.internalNote ?? "");
@@ -155,7 +176,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to update the client.");
       const updated = data as Lead;
-      setLeads((current) => current.map((lead) => lead.id === id ? updated : lead));
+      setLeads((current) => current.map((lead) => lead.id === id ? { ...lead, ...updated } : lead));
       setConversation((current) => current?.lead.id === id ? { ...current, lead: updated } : current);
       setConversationError("");
       return updated;
@@ -173,7 +194,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to send the reply.");
       setConversation(data as ConversationState);
-      setLeads((current) => current.map((lead) => lead.id === data.lead.id ? data.lead : lead));
+      setLeads((current) => current.map((lead) => lead.id === data.lead.id ? { ...lead, ...data.lead } : lead));
       setReplyText("");
       setConversationError("");
       setConversationNotice(data.delivery?.status === "accepted" ? "Reply accepted by Meta for WhatsApp delivery." : "Simulator reply saved. No WhatsApp message was sent.");
@@ -196,7 +217,7 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
     const rows = filteredLeads.map((lead) => [lead.name, lead.phone, lead.serviceInterest, lead.programme, lead.institution, lead.deadline, lead.status, lead.priority, lead.followUpAt, lead.assignedTo, lead.aiPaused ? "Yes" : "No", lead.lastMessageAt, lead.updatedAt]);
     const csv = [headings, ...rows].map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `medminds-leads-${new Date().toISOString().slice(0, 10)}.csv`; anchor.click(); URL.revokeObjectURL(url);
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `medminds-${inboxGroup === "guests" ? "walima-guests" : "leads"}-${new Date().toISOString().slice(0, 10)}.csv`; anchor.click(); URL.revokeObjectURL(url);
   }
 
   async function logout() { await fetch("/api/admin/logout", { method: "POST" }); window.location.href = "/"; }
@@ -212,13 +233,19 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
       <button className="logout" onClick={logout}>Sign out</button>
     </aside>
     <section className="dashboardMain">
-      <header className="dashboardHeader"><div><span className="kicker">Sales operations</span><h1>{tab === "leads" ? "Client inbox" : tab === "offers" ? "Approved offers" : "Configuration"}</h1></div><span className={`setupBadge ${setup.whatsappConfigured ? "ready" : "pending"}`}>{setup.whatsappConfigured ? "WhatsApp ready" : "Setup pending"}</span></header>
+      <header className="dashboardHeader"><div><span className="kicker">Sales operations</span><h1>{tab === "leads" ? (inboxGroup === "guests" ? "Walima guest inbox" : "Client inbox") : tab === "offers" ? "Approved offers" : "Configuration"}</h1></div><span className={`setupBadge ${setup.whatsappConfigured ? "ready" : "pending"}`}>{setup.whatsappConfigured ? "WhatsApp ready" : "Setup pending"}</span></header>
 
       {tab === "leads" && <>
-        <div className="metricGrid"><div><span>Total leads</span><strong>{leads.length}</strong></div><div><span>Conversion</span><strong>{conversion}%</strong></div><div><span>Needs attention</span><strong>{followUps}</strong></div><div><span>Follow-ups due</span><strong>{dueFollowUps}</strong></div><div><span>Human managed</span><strong>{humanManaged}</strong></div></div>
-        <div className="pipeline">{counts.filter((item) => item.count > 0).map((item) => <button key={item.status} onClick={() => setStatusFilter(item.status)}>{item.status}<strong>{item.count}</strong></button>)}</div>
+        <div className="inboxGroupFilters" role="group" aria-label="Filter conversations">
+          <button type="button" aria-pressed={inboxGroup==="all"} onClick={()=>chooseInboxGroup("all")}>All messages <span>{leads.length}</span></button>
+          <button type="button" aria-pressed={inboxGroup==="guests"} onClick={()=>chooseInboxGroup("guests")}>Walima guests <span>{guestCount}</span></button>
+          <button type="button" aria-pressed={inboxGroup==="business"} onClick={()=>chooseInboxGroup("business")}>MedMinds leads <span>{leads.length-guestCount}</span></button>
+        </div>
+        {inboxGroup==="guests" && <p className="guestFilterNote">Only your wedding guests · 28 December 2026 · Lota Lodge</p>}
+        {inboxGroup !== "guests" && <><div className="metricGrid"><div><span>Total leads</span><strong>{leads.length}</strong></div><div><span>Conversion</span><strong>{conversion}%</strong></div><div><span>Needs attention</span><strong>{followUps}</strong></div><div><span>Follow-ups due</span><strong>{dueFollowUps}</strong></div><div><span>Human managed</span><strong>{humanManaged}</strong></div></div>
+        <div className="pipeline">{counts.filter((item) => item.count > 0).map((item) => <button key={item.status} onClick={() => setStatusFilter(item.status)}>{item.status}<strong>{item.count}</strong></button>)}</div></>}
         <div className="leadToolbar">
-          <input value={leadQuery} onChange={(event) => setLeadQuery(event.target.value)} placeholder="Search name, number, service or programme" />
+          <input value={leadQuery} onChange={(event) => setLeadQuery(event.target.value)} aria-label="Search conversations" placeholder={inboxGroup === "guests" ? "Find a guest by name or number" : "Search name, number, service or programme"} />
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{leadStatuses.map((status) => <option key={status}>{status}</option>)}</select>
           <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option value="ALL">All priorities</option>{leadPriorities.map((priority) => <option key={priority}>{priority}</option>)}</select>
           <select aria-label="Sort conversations" value={leadSort} onChange={(event) => setLeadSort(event.target.value as LeadSort)}><option value="smart">Smart priority</option><option value="recent">Most recent chat</option><option value="oldest">Oldest chat</option><option value="priority">Priority</option><option value="name">Client name</option></select>
@@ -226,15 +253,15 @@ export function AdminDashboard({ initialLeads, initialOffers, setup }: { initial
         </div>
         <div className="inboxLayout">
           <section className="leadList" aria-label="Client conversations">
-            <div className="leadListTop"><strong>{filteredLeads.length} clients</strong><span>Live · message activity</span></div>
+            <div className="leadListTop"><strong>{filteredLeads.length} {inboxGroup === "guests" ? "guests" : "conversations"}</strong><span>Live · message activity</span></div>
             {filteredLeads.map((lead) => <button key={lead.id} className={`leadListItem ${selectedLeadId === lead.id ? "selected" : ""}`} onClick={() => setSelectedLeadId(lead.id)}>
               <span className="clientAvatar">{initials(lead.name)}</span>
               <span className="leadListCopy"><strong>{lead.name || "Unnamed client"}</strong><small>{lead.serviceInterest || "Service not established"}</small><em title={activityTitle(lead)}>{lead.phone} · {lead.followUpAt ? `${followUpLabel(lead.followUpAt)} · ` : ""}{lead.lastMessageAt ? `Last message ${relativeTime(lead.lastMessageAt)}` : "No messages yet"}</em></span>
-              <span className="leadBadges"><span className={`priorityPill ${lead.priority.toLowerCase()}`}>{lead.priority}</span><span className={`statusPill ${lead.aiPaused ? "human" : "ai"}`}>{lead.aiPaused ? "Human" : "AI"}</span></span>
+              <span className="leadBadges">{lead.isWalimaGuest && <span className="walimaGuestBadge">Walima guest</span>}<span className={`priorityPill ${lead.priority.toLowerCase()}`}>{lead.priority}</span><span className={`statusPill ${lead.aiPaused ? "human" : "ai"}`}>{lead.aiPaused ? "Human" : "AI"}</span></span>
             </button>)}
-            {!filteredLeads.length && <div className="emptyState"><strong>No matching clients</strong><p>Adjust the search or filters.</p></div>}
+            {!filteredLeads.length && <div className="emptyState"><strong>{inboxGroup === "guests" ? "No matching guests" : "No matching conversations"}</strong><p>Adjust the search or filters.</p></div>}
           </section>
-          <ConversationPanel conversation={conversation} loading={conversationLoading} error={conversationError} notice={conversationNotice} sender={sender} note={note} replyText={replyText} saving={saving} onSender={setSender} onNote={setNote} onReply={setReplyText} onPatch={patchLead} onSend={sendHumanReply} />
+          <ConversationPanel conversation={conversation?.lead.id === selectedLeadId && filteredLeads.some(lead=>lead.id===selectedLeadId) ? conversation : null} loading={conversationLoading} error={conversationError} notice={conversationNotice} sender={sender} note={note} replyText={replyText} saving={saving} onSender={setSender} onNote={setNote} onReply={setReplyText} onPatch={patchLead} onSend={sendHumanReply} />
         </div>
       </>}
 

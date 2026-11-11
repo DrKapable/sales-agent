@@ -1,6 +1,7 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { deleteAllClientRecords, deleteClientRecord } from "@/lib/client-records";
 import { listLeads } from "@/lib/store";
+import { withWalimaGuestLabels } from "@/lib/walima-guest-filter";
 import type { Lead } from "@/lib/types";
 
 type ArchivedChat = { lead: Lead; archivedAt: string };
@@ -41,7 +42,7 @@ async function archivedMap() {
 
 export async function listActiveLeads(): Promise<Lead[]> {
   const [leads, archived] = await Promise.all([listLeads(), archivedMap()]);
-  return leads.filter((lead) => !archived.has(lead.phone));
+  return withWalimaGuestLabels(leads.filter((lead) => !archived.has(lead.phone)));
 }
 
 export async function listArchivedLeads(): Promise<ArchivedChat[]> {
