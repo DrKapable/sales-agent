@@ -16,8 +16,9 @@ export function isWeddingText(text: string) {
 }
 export function shouldHandleWedding(input: { text: string; knownGuest: boolean; lastAssistant?: string; activeWeddingThread?: boolean; quotedInvitation: boolean; isStaff: boolean }) {
   if (isWeddingText(input.text) || input.quotedInvitation) return true;
-  if (input.isStaff || !input.knownGuest) return false;
-  if (/\b(research|dissertation|thesis|quotation|invoice|qbank|medminds prep|subscription|paystack|sampay|exam|website|business|client|sales)\b/i.test(input.text)) return false;
+  if (!input.knownGuest) return false;
+  if (input.isStaff && /^(?:(?:CONFIRM|CANCEL)\s+[A-F0-9]{8}|(?:ACK|WORKING|DONE)\b)/i.test(input.text)) return false;
+  if (/\b(research|dissertation|thesis|quotation|invoice|qbank|medminds prep|subscription|paystack|sampay|exam|website|business|client|sales|priorities|staff|leads|payments|revenue|analytics)\b/i.test(input.text)) return false;
   return Boolean(input.activeWeddingThread || (input.lastAssistant && (input.lastAssistant.startsWith(WALIMA_CARD_PREFIX) || isWeddingText(input.lastAssistant))));
 }
 export function weddingFallback(text: string) {
