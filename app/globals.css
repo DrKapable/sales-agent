@@ -887,3 +887,5 @@ td select { max-width: 205px; border: 1px solid var(--line); border-radius: 8px;
 .guestFilterNote { margin:-4px 0 16px; color:#506c60; font-size:13px; }
 .walimaGuestBadge { padding:4px 7px; border-radius:6px; background:#e2f1e8; color:#24553d; font-size:10px; font-weight:800; white-space:nowrap; }
 @media(max-width:600px) { .inboxGroupFilters { gap:6px; } .inboxGroupFilters button { flex:1 1 auto; justify-content:center; padding:9px 10px; font-size:12px; } }
+
+@media(max-width:820px) { .dashboard.mobileChatOpen .inboxGroupFilters, .dashboard.mobileChatOpen .guestFilterNote { display:none; } }
