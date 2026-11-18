@@ -4,6 +4,7 @@ import { getFollowUpActivityForPeriod } from "@/lib/follow-up";
 import { previousLusakaDay } from "@/lib/daily-report-period";
 import { referralRecipients } from "@/lib/referrals";
 import { sendTeamCopies } from "@/lib/team-notifications";
+import { teamNotificationsPaused } from "@/lib/team-alert-transport";
 
 let sql: NeonQueryFunction<false, false> | null = null;
 function db() { if (!process.env.DATABASE_URL) return null; sql ??= neon(process.env.DATABASE_URL); return sql; }
@@ -17,6 +18,7 @@ async function claimDay(deliveryDate: string) {
 }
 
 export async function runDailyManagementBrief(now = new Date()) {
+  if (teamNotificationsPaused()) return { sent: false, reason: "paused" };
   const period = previousLusakaDay(now);
   if (!(await claimDay(period.deliveryDate))) return { sent: false, reason: "already_sent" };
   try {
