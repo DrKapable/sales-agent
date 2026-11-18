@@ -1,5 +1,5 @@
 import { referralRecipients } from "@/lib/referrals";
-import { sendStaffAlert } from "@/lib/team-alert-transport";
+import { sendStaffAlert, teamNotificationsPaused } from "@/lib/team-alert-transport";
 import { staffAlertKind } from "@/lib/team-alert-templates";
 import type { Lead } from "@/lib/types";
 
@@ -113,6 +113,12 @@ export async function sendTeamCopies(input: {
     ],
     input.includeDefaultCc !== false
   );
+  if (teamNotificationsPaused()) {
+    return recipients.map((recipient) => ({
+      status: "fulfilled" as const,
+      value: { recipient: recipient.name, sent: false, copyLabel: recipient.copyLabel }
+    }));
+  }
   const results = await Promise.allSettled(recipients.map(async (recipient) => {
     if (!recipient.phone) return { recipient: recipient.name, sent: false, copyLabel: recipient.copyLabel };
     await sendStaffAlert({ phone: recipient.phone, name: recipient.name, heading: `${input.heading} (${recipient.copyLabel})`, body: input.body, phoneNumberIdOverride: input.phoneNumberIdOverride });
