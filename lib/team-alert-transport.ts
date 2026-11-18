@@ -7,6 +7,11 @@ import { sanitizeWhatsAppApiError, sendWhatsAppText } from "@/lib/whatsapp";
 import { STAFF_ALERT_TEMPLATES, staffAlertKind, type StaffAlertKind } from "@/lib/team-alert-templates";
 
 export const STAFF_NOTIFICATION_TEMPLATE = STAFF_ALERT_TEMPLATES.staff.name;
+
+/** Pause outbound staff alerts without interrupting client WhatsApp conversations. */
+export function teamNotificationsPaused() {
+  return process.env.MEDMINDS_TEAM_NOTIFICATIONS_PAUSED === "true";
+}
 const LANGUAGE = "en_US";
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -22,6 +27,7 @@ export async function staffSessionOpen(phone: string, now = Date.now()) {
 }
 
 export async function sendStaffAlert(input: { phone: string; name: string; heading: string; body: string; phoneNumberIdOverride?: string; kind?: StaffAlertKind; forceTemplate?: boolean }) {
+  if (teamNotificationsPaused()) throw new Error("MedMinds team WhatsApp notifications are paused.");
   const messageIds: string[] = [];
   if (!input.forceTemplate && await staffSessionOpen(input.phone)) {
     const sent = await sendWhatsAppText(input.phone, `${input.heading}\nFor: ${input.name}\n\n${input.body}`, input.phoneNumberIdOverride);
