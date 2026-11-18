@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { listTeamMembers, type TeamMember } from "@/lib/internal-team-registry";
 import { teamAttention, teamFinance, teamMarketing, teamOverview } from "@/lib/internal-team-data";
-import { sendStaffAlert } from "@/lib/team-alert-transport";
+import { sendStaffAlert, teamNotificationsPaused } from "@/lib/team-alert-transport";
 
 type Db=NeonQueryFunction<false,false>;
 let client: Db | null=null;
@@ -104,6 +104,7 @@ async function attentionFor(member:TeamMember) {
 
 /** Scheduled by Vercel Cron, with deduplication and per-staff opt-outs. */
 export async function runTeamNotifications(kind:"daily"|"attention",now=new Date()) {
+  if (teamNotificationsPaused()) return {kind,date:localDay(now),total:0,submitted:0,results:[],paused:true};
   await ensureDeliveries();
   const members=(await listTeamMembers()).filter(m=>m.active &&
     (kind==="daily"?m.dailyBriefEnabled:m.priorityAlertsEnabled));
